@@ -1,0 +1,100 @@
+{
+  "name": "MERL-T Storage Layer",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "/process",
+        "options": {}
+      },
+      "name": "Storage Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "path": "/retrieve",
+        "options": {}
+      },
+      "name": "Retrieve Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 450]
+    },
+    {
+      "parameters": {
+        "path": "/store",
+        "options": {}
+      },
+      "name": "Store Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 600]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Vector search implementation\nconst query = $input.body;\nreturn {\n  json: {\n    vector_results: [],\n    graph_results: [],\n    combined_context: ''\n  }\n}"
+      },
+      "name": "Vector Search",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 450]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Knowledge graph query implementation\nconst query = $input.body;\nreturn {\n  json: {\n    graph_query_results: [],\n    related_entities: []\n  }\n}"
+      },
+      "name": "Graph Query",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 450]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "legal_data",
+        "columns": "data,metadata,timestamp",
+        "values": "={{ $json.data }},={{ $json.metadata }},=NOW()"
+      },
+      "name": "Store Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [450, 600]
+    }
+  ],
+  "connections": {
+    "Retrieve Webhook": {
+      "main": [
+        [
+          {
+            "node": "Vector Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vector Search": {
+      "main": [
+        [
+          {
+            "node": "Graph Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Webhook": {
+      "main": [
+        [
+          {
+            "node": "Store Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

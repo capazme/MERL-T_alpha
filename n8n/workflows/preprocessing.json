@@ -1,0 +1,83 @@
+{
+  "name": "MERL-T Preprocessing Layer",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "/api/query",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract entities and abbreviations\nconst text = $input.body.query;\nreturn {\n  json: {\n    extracted_entities: [],\n    abbreviations: [],\n    temporalInfo: [],\n    complexity_score: 0\n  }\n}"
+      },
+      "name": "Text Analysis",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "resource": "completion",
+        "prompt": "={{ $json.query }}",
+        "options": {
+          "model": "gpt-4"
+        }
+      },
+      "name": "Query Understanding",
+      "type": "n8n-nodes-base.openai",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http",
+        "url": "=http://orchestration-layer/process",
+        "options": {}
+      },
+      "name": "Forward to Orchestration",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Text Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text Analysis": {
+      "main": [
+        [
+          {
+            "node": "Query Understanding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Understanding": {
+      "main": [
+        [
+          {
+            "node": "Forward to Orchestration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

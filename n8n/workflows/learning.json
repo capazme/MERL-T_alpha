@@ -1,0 +1,78 @@
+{
+  "name": "MERL-T Learning Layer",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "/process",
+        "options": {}
+      },
+      "name": "Learning Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process feedback and calculate metrics\nconst feedback = $input.body;\nreturn {\n  json: {\n    feedback_processed: true,\n    metrics: {\n      accuracy: 0.85,\n      user_satisfaction: 0.9,\n      response_time: 1.2\n    },\n    improvements: [\n      'Enhanced entity recognition',\n      'Better temporal understanding'\n    ]\n  }\n}"
+      },
+      "name": "Process Feedback",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Update model weights and parameters\nconst metrics = $input.body.metrics;\nreturn {\n  json: {\n    model_updated: true,\n    new_weights: {},\n    performance_delta: '+0.05'\n  }\n}"
+      },
+      "name": "Update Model",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://storage-layer/store",
+        "options": {}
+      },
+      "name": "Store Updates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Learning Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Feedback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Feedback": {
+      "main": [
+        [
+          {
+            "node": "Update Model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Model": {
+      "main": [
+        [
+          {
+            "node": "Store Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

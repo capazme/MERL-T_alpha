@@ -1,0 +1,12 @@
+{
+  "name": "merl-t-alpha",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend/*"
+  ],
+  "scripts": {
+    "start": "echo 'Please specify a package to start'",
+    "test": "echo 'Please specify a package to test'"
+  }
+}

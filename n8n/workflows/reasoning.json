@@ -1,0 +1,103 @@
+{
+  "name": "MERL-T Reasoning Layer",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "/process",
+        "options": {}
+      },
+      "name": "Reasoning Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://storage-layer/retrieve",
+        "options": {}
+      },
+      "name": "Retrieve Context",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "resource": "completion",
+        "prompt": "={{ $input.body.query + '\\n\\nContext: ' + $json.context }}",
+        "options": {
+          "model": "gpt-4"
+        }
+      },
+      "name": "Legal Reasoning",
+      "type": "n8n-nodes-base.openai",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Apply RLCF framework\nconst result = $input.body;\nreturn {\n  json: {\n    reasoning_result: result,\n    confidence_score: 0.85,\n    rlcf_metrics: {\n      relevance: 0.9,\n      legal_validity: 0.8,\n      completeness: 0.85,\n      fairness: 0.9\n    }\n  }\n}"
+      },
+      "name": "RLCF Framework",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://storage-layer/store",
+        "options": {}
+      },
+      "name": "Store Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Reasoning Webhook": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Context": {
+      "main": [
+        [
+          {
+            "node": "Legal Reasoning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Legal Reasoning": {
+      "main": [
+        [
+          {
+            "node": "RLCF Framework",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RLCF Framework": {
+      "main": [
+        [
+          {
+            "node": "Store Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

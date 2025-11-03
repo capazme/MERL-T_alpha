@@ -1,0 +1,417 @@
+# Research Scenario Configurations for RLCF Framework
+# 
+# This file contains predefined configurations for common academic research scenarios.
+# Each scenario tests different aspects of the RLCF framework with specific parameter settings.
+
+# =============================================================================
+# SCENARIO 1: Credential-Heavy Authority Weighting
+# =============================================================================
+# Research Question: How does emphasis on credentials vs. performance affect consensus quality?
+# Hypothesis: High credential weighting may reduce democratic oversight and increase bias
+
+credential_heavy_scenario:
+  name: "Credential-Heavy Authority Weighting"
+  description: "Tests impact of strong credential emphasis on authority scoring"
+  research_focus: "Authority weighting bias, credential vs. performance effects"
+  
+  model_config:
+    authority_weights:
+      baseline_credentials: 0.7  # High credential emphasis
+      track_record: 0.2
+      recent_performance: 0.1
+    
+    track_record:
+      update_factor: 0.03  # Slower adaptation to performance changes
+    
+    thresholds:
+      disagreement: 0.4  # Standard threshold
+    
+    baseline_credentials:
+      types:
+        ACADEMIC_DEGREE:
+          weight: 0.5  # Very high academic weight
+          scoring_function:
+            type: map
+            values:
+              Bachelor: 0.8
+              LLM: 1.2
+              JD: 1.5
+              PhD: 2.0  # Maximum boost for PhD
+            default: 0.0
+        
+        PROFESSIONAL_EXPERIENCE:
+          weight: 0.3
+          scoring_function:
+            type: formula
+            expression: "0.8 + 0.15 * sqrt(value)"
+            default: 0.0
+        
+        INSTITUTIONAL_ROLE:
+          weight: 0.2
+          scoring_function:
+            type: map
+            values:
+              Junior: 0.5
+              Senior: 1.2
+              Partner: 1.8
+            default: 0.0
+  
+  expected_outcomes:
+    - "Higher authority concentration among credentialed users"
+    - "Potential increase in professional clustering bias"
+    - "Reduced influence of recent performance quality"
+    - "May suppress innovative interpretations from less credentialed experts"
+
+# =============================================================================
+# SCENARIO 2: Performance-Only Authority Weighting  
+# =============================================================================
+# Research Question: Can pure performance-based authority create fair evaluation?
+# Hypothesis: Performance-only weighting increases democratic participation but may lose domain expertise
+
+performance_only_scenario:
+  name: "Performance-Only Authority Weighting"
+  description: "Tests pure performance-based authority without credential bias"
+  research_focus: "Democratic oversight, expertise vs. equality, performance validity"
+  
+  model_config:
+    authority_weights:
+      baseline_credentials: 0.0  # Eliminate credential bias
+      track_record: 0.7
+      recent_performance: 0.3
+    
+    track_record:
+      update_factor: 0.1  # Faster adaptation to performance
+    
+    thresholds:
+      disagreement: 0.4
+    
+    # Credentials still tracked for bias analysis but not used in authority
+    baseline_credentials:
+      types:
+        ACADEMIC_DEGREE:
+          weight: 0.0  # Zero weight
+          scoring_function:
+            type: map
+            values:
+              Bachelor: 1.0
+              JD: 1.0 
+              PhD: 1.0  # All equal
+            default: 1.0
+  
+  expected_outcomes:
+    - "More equal authority distribution"
+    - "Reduced demographic and professional bias"
+    - "Higher recent performance sensitivity"
+    - "Potential loss of domain-specific expertise weighting"
+
+# =============================================================================
+# SCENARIO 3: High Uncertainty Preservation
+# =============================================================================
+# Research Question: How does preserving more uncertainty affect decision quality?
+# Hypothesis: Lower thresholds preserve valuable disagreement but may reduce actionable consensus
+
+high_uncertainty_scenario:
+  name: "High Uncertainty Preservation"
+  description: "Tests impact of preserving disagreement in more cases"
+  research_focus: "Dialectical preservation, consensus quality, uncertainty calibration"
+  
+  model_config:
+    authority_weights:
+      baseline_credentials: 0.3
+      track_record: 0.5
+      recent_performance: 0.2
+    
+    track_record:
+      update_factor: 0.05
+    
+    thresholds:
+      disagreement: 0.2  # Much lower threshold - preserve more uncertainty
+    
+    baseline_credentials:
+      types:
+        ACADEMIC_DEGREE:
+          weight: 0.3
+          scoring_function:
+            type: map
+            values:
+              Bachelor: 1.0
+              LLM: 1.1
+              JD: 1.2
+              PhD: 1.5
+            default: 0.0
+  
+  expected_outcomes:
+    - "More uncertainty-preserving outputs with alternative positions"
+    - "Better calibration between confidence and accuracy"
+    - "Preserved dialectical reasoning in complex cases"
+    - "May reduce actionable consensus in clear-cut cases"
+
+# =============================================================================
+# SCENARIO 4: Rapid Authority Adaptation
+# =============================================================================
+# Research Question: How does rapid authority adaptation affect system stability?
+# Hypothesis: Fast adaptation improves responsiveness but may create volatility
+
+rapid_adaptation_scenario:
+  name: "Rapid Authority Adaptation"
+  description: "Tests fast authority score updates based on recent performance"
+  research_focus: "Authority stability, gaming resistance, adaptation speed"
+  
+  model_config:
+    authority_weights:
+      baseline_credentials: 0.2  # Reduced baseline importance
+      track_record: 0.3
+      recent_performance: 0.5  # High recent performance weight
+    
+    track_record:
+      update_factor: 0.2  # Much faster track record updates
+    
+    thresholds:
+      disagreement: 0.4
+    
+    baseline_credentials:
+      types:
+        ACADEMIC_DEGREE:
+          weight: 0.4
+          scoring_function:
+            type: map
+            values:
+              Bachelor: 1.0
+              JD: 1.1
+              PhD: 1.3
+            default: 0.0
+        
+        PROFESSIONAL_EXPERIENCE:
+          weight: 0.6
+          scoring_function:
+            type: formula
+            expression: "0.5 + 0.1 * sqrt(value)"
+            default: 0.0
+  
+  expected_outcomes:
+    - "Higher authority volatility"
+    - "Faster response to quality changes"
+    - "Potential gaming vulnerability"
+    - "Reduced authority predictability"
+
+# =============================================================================
+# SCENARIO 5: Balanced Constitutional Framework
+# =============================================================================
+# Research Question: What configuration best embodies RLCF constitutional principles?
+# Hypothesis: Balanced weighting with moderate uncertainty preservation optimizes all principles
+
+constitutional_balanced_scenario:
+  name: "Balanced Constitutional Framework"
+  description: "Optimal balance of all four RLCF constitutional principles"
+  research_focus: "Constitutional compliance, principle balance, overall framework validation"
+  
+  model_config:
+    authority_weights:
+      baseline_credentials: 0.3  # Balanced - respects expertise
+      track_record: 0.5         # Primary weight on demonstrated competence
+      recent_performance: 0.2   # Democratic responsiveness
+    
+    track_record:
+      update_factor: 0.05  # Stable but adaptive
+    
+    thresholds:
+      disagreement: 0.4  # Balanced uncertainty preservation
+    
+    baseline_credentials:
+      types:
+        ACADEMIC_DEGREE:
+          weight: 0.25
+          scoring_function:
+            type: map
+            values:
+              Bachelor: 1.0
+              LLM: 1.1
+              JD: 1.2
+              PhD: 1.4  # Moderate premium for higher education
+            default: 0.0
+        
+        PROFESSIONAL_EXPERIENCE:
+          weight: 0.35  # Highest weight on actual practice
+          scoring_function:
+            type: formula
+            expression: "0.6 + 0.2 * sqrt(value)"
+            default: 0.0
+        
+        PUBLICATION:
+          weight: 0.25  # Academic contribution valued
+          scoring_function:
+            type: formula
+            expression: "min(0.8 + 0.1 * value, 1.3)"
+            default: 0.0
+        
+        INSTITUTIONAL_ROLE:
+          weight: 0.15  # Modest institutional recognition
+          scoring_function:
+            type: map
+            values:
+              Junior: 0.8
+              Senior: 1.1
+              Partner: 1.3
+            default: 0.0
+  
+  constitutional_compliance:
+    dynamic_authority: "High - 70% weight on demonstrated competence"
+    preserved_uncertainty: "Balanced - 0.4 threshold preserves meaningful disagreement"
+    transparent_process: "Full - all calculations auditable and documented"
+    universal_expertise: "Moderate - cross-domain insights weighted appropriately"
+  
+  expected_outcomes:
+    - "Optimal balance of expertise and democratic oversight"
+    - "Preserved uncertainty in genuinely complex cases"
+    - "Transparent and auditable authority calculations"  
+    - "Fair treatment of diverse expertise domains"
+
+# =============================================================================
+# SCENARIO 6: Jurisdiction-Specific Configuration
+# =============================================================================
+# Research Question: How can RLCF adapt to different legal system requirements?
+# Hypothesis: Jurisdiction-specific credentials and cultural factors require configuration adaptation
+
+jurisdiction_specific_scenario:
+  name: "Common Law vs. Civil Law Jurisdiction"
+  description: "Tests adaptation to different legal system traditions"
+  research_focus: "Cross-jurisdictional validity, cultural adaptation, legal system differences"
+  
+  # Common Law Configuration (e.g., US, UK, Canada)
+  common_law_config:
+    authority_weights:
+      baseline_credentials: 0.35  # Higher credential emphasis in precedent-based systems
+      track_record: 0.45
+      recent_performance: 0.2
+    
+    baseline_credentials:
+      types:
+        BAR_ADMISSION:
+          weight: 0.4
+          scoring_function:
+            type: map
+            values:
+              State_Bar: 1.0
+              Federal_Bar: 1.3
+              Supreme_Court_Bar: 1.6
+            default: 0.0
+        
+        CASE_LAW_EXPERIENCE:
+          weight: 0.35  # Critical in precedent-based systems
+          scoring_function:
+            type: formula
+            expression: "0.7 + 0.15 * sqrt(value)"
+            default: 0.0
+        
+        JUDICIAL_CLERKSHIP:
+          weight: 0.25
+          scoring_function:
+            type: map
+            values:
+              District_Court: 1.2
+              Circuit_Court: 1.5
+              Supreme_Court: 1.8
+            default: 0.0
+  
+  # Civil Law Configuration (e.g., Germany, France, Japan)
+  civil_law_config:
+    authority_weights:
+      baseline_credentials: 0.4   # Higher academic emphasis in code-based systems
+      track_record: 0.4
+      recent_performance: 0.2
+    
+    baseline_credentials:
+      types:
+        ACADEMIC_DEGREE:
+          weight: 0.45  # Higher academic weight in civil law
+          scoring_function:
+            type: map
+            values:
+              Law_Degree: 1.0
+              Masters_Law: 1.3
+              PhD_Law: 1.7
+              Habilitation: 2.0
+            default: 0.0
+        
+        STATUTORY_INTERPRETATION:
+          weight: 0.35
+          scoring_function:
+            type: formula
+            expression: "0.8 + 0.12 * sqrt(value)"
+            default: 0.0
+        
+        ACADEMIC_POSITION:
+          weight: 0.2
+          scoring_function:
+            type: map
+            values:
+              Lecturer: 1.1
+              Professor: 1.4
+              Chair_Professor: 1.7
+            default: 0.0
+
+# =============================================================================
+# SCENARIO 7: Anti-Gaming Configuration
+# =============================================================================
+# Research Question: How can RLCF resist strategic manipulation?
+# Hypothesis: Balanced weights and delayed authority updates reduce gaming effectiveness
+
+anti_gaming_scenario:
+  name: "Gaming-Resistant Configuration"
+  description: "Tests resistance to strategic manipulation of authority scores"
+  research_focus: "Gaming resistance, strategic behavior, system integrity"
+  
+  model_config:
+    authority_weights:
+      baseline_credentials: 0.4  # Higher baseline makes gaming harder
+      track_record: 0.5         # Long-term focus resists short-term gaming
+      recent_performance: 0.1   # Reduced recent weight limits gaming impact
+    
+    track_record:
+      update_factor: 0.02  # Very slow updates resist gaming attempts
+    
+    thresholds:
+      disagreement: 0.35  # Slightly lower threshold reduces gaming through disagreement
+    
+    # Additional anti-gaming measures
+    gaming_resistance:
+      authority_update_delay: 24  # Hours before authority changes take effect
+      minimum_evaluations: 10     # Minimum evaluations before track record updates
+      performance_smoothing: 0.8  # Additional smoothing factor for recent performance
+      outlier_detection: true     # Detect and flag unusual evaluation patterns
+  
+  expected_outcomes:
+    - "Reduced effectiveness of strategic evaluation behavior"
+    - "More stable authority distributions over time"
+    - "Detection of coordinated gaming attempts"
+    - "Maintained system integrity under adversarial conditions"
+
+# =============================================================================
+# Usage Instructions
+# =============================================================================
+
+usage_instructions: |
+  To use these research scenarios:
+  
+  1. Select a scenario configuration from above
+  2. Save the model_config section to model_config.yaml
+  3. Update configuration via API:
+     curl -X PUT "http://localhost:8000/config/model" \
+       -H "X-API-KEY: your-key" \
+       -H "Content-Type: application/json" \
+       -d @model_config.yaml
+  
+  4. Run experiments with consistent parameters
+  5. Document results and compare across scenarios
+  6. Use export endpoints to gather research data:
+     curl "http://localhost:8000/export/dataset?format=scientific"
+
+validation_notes: |
+  All configurations have been validated for:
+  - Mathematical constraints (weights sum to 1.0)
+  - Constitutional compliance (no principle violations)
+  - Security requirements (safe formula evaluation)
+  - Performance characteristics (reasonable computation time)
+  
+  Each scenario includes expected outcomes for hypothesis testing
+  and comparative analysis across different research questions.

@@ -1,0 +1,77 @@
+{
+  "name": "MERL-T Main Integration",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "/api/query",
+        "options": {}
+      },
+      "name": "Main Endpoint",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "preprocessing"
+      },
+      "name": "Preprocessing",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "orchestration"
+      },
+      "name": "Orchestration",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Combine results and prepare response\nconst results = $input.body;\nreturn {\n  json: {\n    \"query\": results.original_query,\n    \"answer\": results.reasoning_result,\n    \"confidence\": results.confidence_score,\n    \"rlcf_metrics\": results.rlcf_metrics,\n    \"execution_time\": results.total_time\n  }\n}"
+      },
+      "name": "Format Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Main Endpoint": {
+      "main": [
+        [
+          {
+            "node": "Preprocessing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preprocessing": {
+      "main": [
+        [
+          {
+            "node": "Orchestration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestration": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

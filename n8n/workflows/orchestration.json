@@ -1,0 +1,104 @@
+{
+  "name": "MERL-T Orchestration Layer",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "/process",
+        "options": {}
+      },
+      "name": "Orchestration Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Determine required components and execution order\nconst input = $input.body;\nreturn {\n  json: {\n    ...input,\n    execution_plan: {\n      requires_reasoning: true,\n      requires_storage: true,\n      requires_learning: input.complexity_score > 0.7,\n      execution_order: ['reasoning', 'storage', 'learning']\n    }\n  }\n}"
+      },
+      "name": "Plan Generation",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.execution_plan.requires_reasoning }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Routing",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://reasoning-layer/process",
+        "options": {}
+      },
+      "name": "Call Reasoning Layer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "url": "=http://storage-layer/process",
+        "options": {}
+      },
+      "name": "Call Storage Layer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [850, 400]
+    }
+  ],
+  "connections": {
+    "Orchestration Webhook": {
+      "main": [
+        [
+          {
+            "node": "Plan Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Generation": {
+      "main": [
+        [
+          {
+            "node": "Routing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Routing": {
+      "true": [
+        [
+          {
+            "node": "Call Reasoning Layer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "false": [
+        [
+          {
+            "node": "Call Storage Layer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
