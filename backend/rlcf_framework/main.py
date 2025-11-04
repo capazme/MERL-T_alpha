@@ -27,7 +27,7 @@ from .config import (
     ModelConfig,
     TaskConfig,
 )
-from .routers import config_router
+from .routers import config_router, ner_router
 from .config_manager import get_config_manager
 import yaml
 from .database import engine
@@ -70,6 +70,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(config_router.router)
+app.include_router(ner_router.router)
 
 
 @app.on_event("startup")
