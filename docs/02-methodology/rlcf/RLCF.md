@@ -680,14 +680,16 @@ def separate_ground_truth(task_data: dict, task_type: str) -> Tuple[dict, dict]:
 **Supported Legal Task Types:**
 
 1. **Question Answering (QA)** - Legal query resolution with reasoning
-2. **Classification** - Document categorization and labeling
-3. **Summarization** - Legal document summarization with quality assessment
-4. **Prediction** - Legal outcome prediction (violation/no violation)
-5. **Natural Language Inference (NLI)** - Logical relationship analysis
-6. **Named Entity Recognition (NER)** - Legal entity identification
-7. **Drafting** - Legal document drafting and revision
-8. **Risk Spotting** - Compliance risk identification with severity scoring
-9. **Doctrine Application** - Legal principle application assessment
+2. **Statutory Rule QA** - Statutory interpretation with legal article analysis
+3. **Retrieval Validation** - Validation of retrieval quality from KG/API/Vector agents
+4. **Classification** - Document categorization and labeling
+5. **Summarization** - Legal document summarization with quality assessment
+6. **Prediction** - Legal outcome prediction (violation/no violation)
+7. **Natural Language Inference (NLI)** - Logical relationship analysis
+8. **Named Entity Recognition (NER)** - Legal entity identification
+9. **Drafting** - Legal document drafting and revision
+10. **Risk Spotting** - Compliance risk identification with severity scoring
+11. **Doctrine Application** - Legal principle application assessment
 
 This modular architecture enables the RLCF framework to handle the full spectrum of legal AI tasks while maintaining mathematical rigor in aggregation and evaluation processes.
 

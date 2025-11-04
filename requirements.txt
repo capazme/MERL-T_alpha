@@ -31,6 +31,7 @@ typing_extensions>=4.8.0
 asteval>=0.9.31  # Safe formula evaluation for RLCF
 pandas>=2.1.0
 click>=8.1.0  # CLI framework
+watchdog>=3.0.0  # File system monitoring for hot-reload
 
 # Future Phase 2-6 Dependencies (commented out for now)
 # spacy>=3.7.0  # NLP for Preprocessing Layer

@@ -16,23 +16,52 @@ from .database import Base
 
 
 class TaskType(str, enum.Enum):
-    SUMMARIZATION = "SUMMARIZATION"
-    CLASSIFICATION = "CLASSIFICATION"
-    QA = "QA"
-    PREDICTION = "PREDICTION"
-    NLI = "NLI"
-    NER = "NER"
-    DRAFTING = "DRAFTING"
-    RISK_SPOTTING = "RISK_SPOTTING"
-    DOCTRINE_APPLICATION = "DOCTRINE_APPLICATION"
-    COMPLIANCE_RISK_SPOTTING = "COMPLIANCE_RISK_SPOTTING"
-    DOC_CLAUSE_CLASSIFICATION = "DOC_CLAUSE_CLASSIFICATION"
-    DRAFTING_GENERATION_PARALLEL = "DRAFTING_GENERATION_PARALLEL"
-    NAMED_ENTITY_BIO = "NAMED_ENTITY_BIO"
-    NLI_ENTAILMENT = "NLI_ENTAILMENT"
-    STATUTORY_RULE_QA = "STATUTORY_RULE_QA"
-    SUMMARIZATION_PAIRS = "SUMMARIZATION_PAIRS"
-    VIOLATION_OUTCOME_PREDICTION = "VIOLATION_OUTCOME_PREDICTION"
+    """
+    Official RLCF Task Types aligned with MERL-T methodology.
+
+    These represent fundamental legal reasoning patterns and RLCF entry points
+    in the MERL-T pipeline. Variations should be handled via task_config.yaml
+    metadata, not additional enum types.
+
+    Reference: docs/02-methodology/rlcf/technical/database-schema.md
+    Reference: docs/02-methodology/legal-reasoning.md (RLCF integration points)
+
+    Task Types organized by MERL-T pipeline stage:
+
+    Tier 1 - Core Pipeline (RLCF Entry Points):
+      STATUTORY_RULE_QA: Statutory interpretation (Literal Interpreter output)
+      QA: General legal Q&A (Synthesis output, Systemic/Precedent expert outputs)
+      RETRIEVAL_VALIDATION: Validates retrieval quality (NEW - covers KG/API/Vector agents)
+
+    Tier 2 - Reasoning Layer:
+      PREDICTION: Legal outcome prediction
+      NLI: Natural language inference
+      RISK_SPOTTING: Compliance risk identification
+      DOCTRINE_APPLICATION: Legal principle application (Principles Balancer output)
+
+    Tier 3 - Preprocessing & Specialized:
+      CLASSIFICATION: Document categorization
+      SUMMARIZATION: Document summarization
+      NER: Named entity recognition (Query Understanding validation)
+      DRAFTING: Legal document drafting
+    """
+
+    # Tier 1: Core Pipeline & RLCF Entry Points
+    STATUTORY_RULE_QA = "STATUTORY_RULE_QA"  # Literal Interpreter outputs
+    QA = "QA"  # Synthesis, general expert outputs
+    RETRIEVAL_VALIDATION = "RETRIEVAL_VALIDATION"  # NEW: Validates KG/API/Vector retrieval
+
+    # Tier 2: Reasoning Layer
+    PREDICTION = "PREDICTION"  # Legal outcome prediction
+    NLI = "NLI"  # Natural language inference
+    RISK_SPOTTING = "RISK_SPOTTING"  # Compliance risk identification
+    DOCTRINE_APPLICATION = "DOCTRINE_APPLICATION"  # Principles Balancer outputs
+
+    # Tier 3: Preprocessing & Specialized
+    CLASSIFICATION = "CLASSIFICATION"  # Document categorization
+    SUMMARIZATION = "SUMMARIZATION"  # Document summarization
+    NER = "NER"  # Named entity recognition
+    DRAFTING = "DRAFTING"  # Legal document drafting
 
 
 class TaskStatus(str, enum.Enum):

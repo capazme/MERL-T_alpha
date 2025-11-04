@@ -27,6 +27,8 @@ from .config import (
     ModelConfig,
     TaskConfig,
 )
+from .routers import config_router
+from .config_manager import get_config_manager
 import yaml
 from .database import engine
 import os
@@ -75,13 +77,18 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
+# Include routers
+app.include_router(config_router.router)
+
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database and create admin user if it doesn't exist."""
+    """Initialize database, create admin user, and start configuration hot-reload."""
+    # Initialize database
     async with engine.begin() as conn:
         await conn.run_sync(models.Base.metadata.create_all)
-    
+
+    # Create admin user if needed
     async with SessionLocal() as session:
         async with session.begin():
             result = await session.execute(
@@ -98,12 +105,22 @@ async def startup_event():
                 )
                 session.add(new_admin)
                 await session.commit()
-                print("Default admin user created.")
+
+    # Initialize ConfigManager and start file watching for hot-reload
+    config_manager = get_config_manager()
+    print("[RLCF] Configuration hot-reload enabled")
+    print(f"[RLCF] Watching: {config_manager._model_config_path.name}, {config_manager._task_config_path.name}")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup resources on shutdown."""
+    # Stop config file watching
+    config_manager = get_config_manager()
+    config_manager.stop_watching()
+    print("[RLCF] Configuration watching stopped")
+
+    # Cleanup AI service
     await cleanup_ai_service()
 
 

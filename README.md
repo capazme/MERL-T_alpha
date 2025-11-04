@@ -175,6 +175,76 @@ curl -X POST "http://localhost:8000/tasks/" \
 
 ---
 
+## ✨ Recent Updates (January 2025)
+
+### 🎯 Task Types Alignment & RETRIEVAL_VALIDATION
+**Status**: ✅ Complete
+
+- **Aligned task types** with MERL-T methodology (11 official types)
+- **Removed 6 undocumented types** that had no implementation
+- **Added RETRIEVAL_VALIDATION** - new task type for validating KG/API/Vector retrieval quality
+- **Complete implementation** with handler, config, tests, and documentation
+- See [`docs/08-iteration/TASK_TYPES_COMPARISON.md`](docs/08-iteration/TASK_TYPES_COMPARISON.md) for details
+
+### 🔧 Dynamic Configuration System
+**Status**: ✅ Complete
+
+A powerful hot-reload configuration system that enables:
+
+✅ **Dynamic Task Type Management**:
+- Create, update, delete task types **without server restart**
+- API endpoints + manual YAML editing both supported
+- Automatic validation with Pydantic schemas
+
+✅ **Hot-Reload Support**:
+- File watching with `watchdog` library
+- Changes take effect immediately across all workers
+- Thread-safe concurrent access
+
+✅ **Safety Features**:
+- Automatic backup before every modification (timestamped)
+- Robust validation (invalid configs rejected)
+- Rollback support via API
+- Full audit trail of changes
+
+✅ **API Endpoints**:
+```bash
+# Create new task type dynamically
+POST /config/task/type
+
+# Update existing task type
+PUT /config/task/type/{name}
+
+# List all backups
+GET /config/backups
+
+# Restore from backup
+POST /config/backups/restore
+```
+
+**Quick Start**: [`docs/08-iteration/DYNAMIC_CONFIG_QUICKSTART.md`](docs/08-iteration/DYNAMIC_CONFIG_QUICKSTART.md)
+**Full Documentation**: [`docs/04-implementation/DYNAMIC_CONFIGURATION.md`](docs/04-implementation/DYNAMIC_CONFIGURATION.md)
+**Test Script**: `./scripts/test_dynamic_config.sh`
+
+**Example - Add Custom Task Type:**
+```bash
+curl -X POST http://localhost:8000/config/task/type \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: $ADMIN_API_KEY" \
+  -d '{
+    "task_type_name": "CONTRACT_REVIEW",
+    "schema": {
+      "input_data": {"contract_text": "str"},
+      "feedback_data": {"review_result": "str"},
+      "ground_truth_keys": ["review_result"]
+    }
+  }'
+
+# ✨ Immediately available for use - no restart needed!
+```
+
+---
+
 ## 📚 Documentation
 
 ### For Understanding the Theory

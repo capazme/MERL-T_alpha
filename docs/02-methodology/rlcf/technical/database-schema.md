@@ -125,6 +125,7 @@ CREATE INDEX idx_legal_tasks_created_at ON legal_tasks(created_at);
 - `CLASSIFICATION`: Text classification
 - `QA`: Question answering
 - `STATUTORY_RULE_QA`: Statutory interpretation
+- `RETRIEVAL_VALIDATION`: Retrieval quality validation (KG/API/Vector agents)
 - `PREDICTION`: Legal outcome prediction
 - `NLI`: Natural language inference
 - `NER`: Named entity recognition
@@ -255,6 +256,19 @@ CREATE INDEX idx_feedback_accuracy_score ON feedback(accuracy_score);
     "reasoning": "The document clearly discusses contract formation and commercial transactions...",
     "confidence": "high",
     "alternative_labels": ["UCC"]
+  }
+}
+```
+
+**Retrieval Validation Feedback:**
+```json
+{
+  "feedback_data": {
+    "validated_items": ["norm_1234", "norm_5678", "doc_9012"],
+    "irrelevant_items": ["norm_3456", "doc_7890"],
+    "missing_items": ["Article 1193 Codice Civile", "Regulation (EU) 2016/679"],
+    "reasoning": "The retrieved norms correctly address contract formation. However, norm_3456 deals with property law and is not relevant. GDPR regulation is missing and should have been retrieved given the data processing query.",
+    "retrieval_quality_score": 0.75
   }
 }
 ```

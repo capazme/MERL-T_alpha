@@ -11,6 +11,7 @@ from .qa_handler import (
     DoctrineApplicationHandler,
     StatutoryRuleQAHandler,
 )
+from .retrieval_validation_handler import RetrievalValidationHandler
 
 HANDLER_MAP = {
     TaskType.CLASSIFICATION: ClassificationHandler,
@@ -23,6 +24,7 @@ HANDLER_MAP = {
     TaskType.RISK_SPOTTING: RiskSpottingHandler,
     TaskType.DOCTRINE_APPLICATION: DoctrineApplicationHandler,
     TaskType.STATUTORY_RULE_QA: StatutoryRuleQAHandler,
+    TaskType.RETRIEVAL_VALIDATION: RetrievalValidationHandler,
 }
 
 

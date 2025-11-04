@@ -120,3 +120,17 @@ task_types:
       precedent_citations: str
       alternative_interpretations: str
     ground_truth_keys: ["chosen_label"]
+
+  RETRIEVAL_VALIDATION:
+    input_data:
+      query: str
+      retrieved_items: List[Dict]
+      retrieval_strategy: str
+      agent_type: str
+    feedback_data:
+      validated_items: List[str]
+      irrelevant_items: List[str]
+      missing_items: List[str]
+      reasoning: str
+      retrieval_quality_score: float
+    ground_truth_keys: ["validated_items", "irrelevant_items"]
