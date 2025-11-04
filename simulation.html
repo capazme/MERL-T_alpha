@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RLCF End-to-End Simulation - MERL-T</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .step-card {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .step-card.active {
+            animation: fadeInUp 0.6s forwards;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .expert-avatar {
+            transition: all 0.3s ease;
+        }
+
+        .expert-avatar:hover {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .formula {
+            font-family: 'Courier New', monospace;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border-left: 4px solid #10b981;
+        }
+
+        .metric-card {
+            transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .progress-bar {
+            transition: width 0.5s ease;
+        }
+
+        .pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: .5;
+            }
+        }
+
+        .feedback-item {
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        .timeline-dot {
+            transition: all 0.3s ease;
+        }
+
+        .timeline-dot.active {
+            transform: scale(1.5);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
+        }
+    </style>
+</head>
+<body class="p-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-bold text-white mb-4">
+                RLCF End-to-End Simulation
+            </h1>
+            <p class="text-xl text-purple-100">
+                Reinforcement Learning from Community Feedback - Live Demonstration
+            </p>
+            <p class="text-sm text-purple-200 mt-2">
+                MERL-T (Multi-Expert Legal Retrieval Transformer) - ALIS Project
+            </p>
+        </div>
+
+        <!-- Timeline Navigation -->
+        <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8">
+            <div class="flex items-center justify-between relative">
+                <div class="absolute top-1/2 left-0 right-0 h-1 bg-white/20 -translate-y-1/2"></div>
+                <div id="timelineProgress" class="absolute top-1/2 left-0 h-1 bg-green-400 -translate-y-1/2 progress-bar" style="width: 16.67%"></div>
+
+                <div id="timeline0" class="timeline-dot active relative z-10 flex flex-col items-center cursor-pointer" onclick="goToStep(0)">
+                    <div class="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white font-bold mb-2">1</div>
+                    <span class="text-white text-xs font-medium">Task</span>
+                </div>
+                <div id="timeline1" class="timeline-dot relative z-10 flex flex-col items-center cursor-pointer" onclick="goToStep(1)">
+                    <div class="w-12 h-12 rounded-full bg-white/30 flex items-center justify-center text-white font-bold mb-2">2</div>
+                    <span class="text-white text-xs font-medium">Feedback</span>
+                </div>
+                <div id="timeline2" class="timeline-dot relative z-10 flex flex-col items-center cursor-pointer" onclick="goToStep(2)">
+                    <div class="w-12 h-12 rounded-full bg-white/30 flex items-center justify-center text-white font-bold mb-2">3</div>
+                    <span class="text-white text-xs font-medium">Authority</span>
+                </div>
+                <div id="timeline3" class="timeline-dot relative z-10 flex flex-col items-center cursor-pointer" onclick="goToStep(3)">
+                    <div class="w-12 h-12 rounded-full bg-white/30 flex items-center justify-center text-white font-bold mb-2">4</div>
+                    <span class="text-white text-xs font-medium">Aggregation</span>
+                </div>
+                <div id="timeline4" class="timeline-dot relative z-10 flex flex-col items-center cursor-pointer" onclick="goToStep(4)">
+                    <div class="w-12 h-12 rounded-full bg-white/30 flex items-center justify-center text-white font-bold mb-2">5</div>
+                    <span class="text-white text-xs font-medium">Bias</span>
+                </div>
+                <div id="timeline5" class="timeline-dot relative z-10 flex flex-col items-center cursor-pointer" onclick="goToStep(5)">
+                    <div class="w-12 h-12 rounded-full bg-white/30 flex items-center justify-center text-white font-bold mb-2">6</div>
+                    <span class="text-white text-xs font-medium">Output</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div id="contentArea" class="min-h-[600px]">
+            <!-- Steps will be dynamically loaded here -->
+        </div>
+
+        <!-- Controls -->
+        <div class="flex justify-between items-center mt-8 bg-white/10 backdrop-blur-lg rounded-2xl p-6">
+            <button onclick="previousStep()" id="prevBtn" class="bg-white/20 hover:bg-white/30 text-white px-8 py-3 rounded-lg font-medium transition-all">
+                ← Precedente
+            </button>
+
+            <div class="flex gap-4">
+                <button onclick="toggleAutoplay()" id="autoplayBtn" class="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg font-medium transition-all">
+                    ▶ Auto Play
+                </button>
+                <button onclick="resetSimulation()" class="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-lg font-medium transition-all">
+                    ↻ Reset
+                </button>
+            </div>
+
+            <button onclick="nextStep()" id="nextBtn" class="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-lg font-medium transition-all">
+                Successivo →
+            </button>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8 text-purple-100 text-sm">
+            <p>© 2025 ALIS (Artificial Legal Intelligence Society) - MERL-T Project</p>
+            <p class="mt-2">Visualizzazione interattiva del ciclo RLCF completo</p>
+        </div>
+    </div>
+
+    <script>
+        // Simulation State
+        let currentStep = 0;
+        let autoplayInterval = null;
+        let charts = {};
+
+        // Simulation Data
+        const simulationData = {
+            task: {
+                id: 42,
+                title: "Interpretazione Art. 2043 c.c. - Responsabilità extracontrattuale",
+                description: "Analisi della responsabilità per danno causato da un veicolo autonomo che ha investito un pedone sulle strisce pedonali.",
+                content: "Un veicolo a guida autonoma di livello 4 ha investito un pedone sulle strisce pedonali causando lesioni gravi. Il pedone attraversava con il semaforo verde. Il software del veicolo non ha rilevato il pedone a causa di un malfunzionamento del sensore LIDAR. Chi è responsabile secondo l'Art. 2043 c.c.?",
+                taskType: "legal_interpretation",
+                status: "PENDING_REVIEW",
+                createdAt: "2025-11-04T10:30:00Z"
+            },
+            experts: [
+                {
+                    id: 1,
+                    username: "prof_rossi_diritto_civile",
+                    credentials: "Professore Ordinario di Diritto Civile - Università di Bologna, 25+ anni",
+                    baselineScore: 0.85,
+                    trackRecord: 0.92,
+                    performance: 0.88,
+                    authorityScore: 0.887,
+                    feedback: "APPROVED",
+                    reasoning: "L'Art. 2043 c.c. si applica: il produttore del software risponde per il danno causato dal malfunzionamento. La responsabilità è oggettiva per prodotto difettoso (D.P.R. 224/1988).",
+                    confidence: 0.95,
+                    expertise_areas: ["Diritto Civile", "Responsabilità civile"]
+                },
+                {
+                    id: 2,
+                    username: "avv_bianchi_tech_law",
+                    credentials: "Avvocato specializzato in Tech Law - Studio Legale Milano, 15 anni",
+                    baselineScore: 0.75,
+                    trackRecord: 0.80,
+                    performance: 0.78,
+                    authorityScore: 0.777,
+                    feedback: "APPROVED",
+                    reasoning: "Responsabilità concorrente: produttore (software) + proprietario (manutenzione). Art. 2054 c.c. per veicoli + 2043 per difetto del prodotto. Necessaria perizia tecnica.",
+                    confidence: 0.88,
+                    expertise_areas: ["Tech Law", "AI & Law"]
+                },
+                {
+                    id: 3,
+                    username: "ricercatore_verdi_ai_ethics",
+                    credentials: "Ricercatore AI Ethics - CNR, 8 anni",
+                    baselineScore: 0.60,
+                    trackRecord: 0.65,
+                    performance: 0.70,
+                    authorityScore: 0.650,
+                    feedback: "NEEDS_REVISION",
+                    reasoning: "Il caso solleva questioni di etica dell'IA. La responsabilità dovrebbe essere del produttore ma serve un framework normativo specifico per veicoli autonomi che consideri la 'reasonable care' nell'AI design.",
+                    confidence: 0.70,
+                    expertise_areas: ["AI Ethics", "Autonomous Vehicles"]
+                },
+                {
+                    id: 4,
+                    username: "giudice_ferrari_cassazione",
+                    credentials: "Giudice Corte di Cassazione - Sezione Civile, 30+ anni",
+                    baselineScore: 0.90,
+                    trackRecord: 0.95,
+                    performance: 0.92,
+                    authorityScore: 0.923,
+                    feedback: "APPROVED",
+                    reasoning: "Giurisprudenza consolidata: responsabilità del produttore per difetto del prodotto. Cass. Civ. Sez. III, n. 12345/2023 applica 2043 c.c. a sistemi autonomi. Prova del nesso causale è cruciale.",
+                    confidence: 0.98,
+                    expertise_areas: ["Diritto Civile", "Giurisprudenza"]
+                },
+                {
+                    id: 5,
+                    username: "avv_moretti_junior",
+                    credentials: "Praticante Avvocato - 2 anni esperienza",
+                    baselineScore: 0.30,
+                    trackRecord: 0.35,
+                    performance: 0.40,
+                    authorityScore: 0.350,
+                    feedback: "APPROVED",
+                    reasoning: "Secondo me è colpa del pedone che non ha guardato bene prima di attraversare. Il veicolo autonomo aveva il diritto di precedenza.",
+                    confidence: 0.45,
+                    expertise_areas: ["Diritto Civile"]
+                }
+            ],
+            aggregation: {
+                approvedCount: 4,
+                needsRevisionCount: 1,
+                rejectedCount: 0,
+                totalFeedback: 5,
+                consensusLevel: 0.80,
+                disagreementScore: 0.42,
+                shannonEntropy: 0.72,
+                finalRecommendation: "APPROVED",
+                confidenceInterval: [0.75, 0.92],
+                weightedConfidence: 0.87
+            },
+            bias: {
+                detected: true,
+                types: [
+                    {
+                        name: "Authority Bias",
+                        severity: "LOW",
+                        description: "Feedback del giudice ha peso molto maggiore rispetto al praticante",
+                        score: 0.25
+                    },
+                    {
+                        name: "Expertise Domain Clustering",
+                        severity: "MEDIUM",
+                        description: "Manca expertise specifica in automotive engineering",
+                        score: 0.55
+                    },
+                    {
+                        name: "Reasoning Quality Variance",
+                        severity: "HIGH",
+                        description: "Il feedback del praticante mostra comprensione errata dei principi giuridici",
+                        score: 0.78
+                    }
+                ],
+                mitigationStrategies: [
+                    "Richiesta di review aggiuntiva da esperto automotive law",
+                    "Downweighting del feedback con confidence < 0.50",
+                    "Educational feedback al praticante sui principi di responsabilità oggettiva"
+                ]
+            },
+            output: {
+                finalDecision: "APPROVED con riserva",
+                confidence: 0.87,
+                consensusLevel: 0.80,
+                synthesizedReasoning: "Sulla base del consenso di 4 esperti su 5 (incluso un giudice di Cassazione), l'interpretazione prevalente è che l'Art. 2043 c.c. si applica al caso con responsabilità oggettiva del produttore del software per difetto del prodotto. La responsabilità è rafforzata dall'applicazione concorrente dell'Art. 2054 c.c. sulla circolazione dei veicoli. La giurisprudenza recente (Cass. 2023) conferma questo orientamento. Tuttavia, è raccomandata una perizia tecnica per accertare il nesso causale tra malfunzionamento e danno, e ulteriore review da esperto automotive law data la complessità tecnica del caso.",
+                keyLegalPrinciples: [
+                    "Art. 2043 c.c. - Responsabilità extracontrattuale",
+                    "Art. 2054 c.c. - Circolazione dei veicoli",
+                    "D.P.R. 224/1988 - Responsabilità per prodotto difettoso",
+                    "Cass. Civ. Sez. III, n. 12345/2023 - Precedente sui sistemi autonomi"
+                ],
+                recommendedActions: [
+                    "Perizia tecnica sul malfunzionamento LIDAR",
+                    "Review aggiuntiva da esperto automotive law",
+                    "Consultazione della giurisprudenza europea su veicoli autonomi"
+                ],
+                uncertaintyFlags: [
+                    "Manca consensus su distribuzione responsabilità proprietario/produttore",
+                    "Framework normativo per AI in fase evolutiva"
+                ],
+                traceId: "RLCF-2025-11-04-042"
+            }
+        };
+
+        // Step Templates
+        const steps = [
+            // Step 0: Task Creation
+            {
+                title: "📝 Step 1: Creazione Task Legale",
+                render: () => `
+                    <div class="step-card active bg-white/10 backdrop-blur-lg rounded-2xl p-8">
+                        <h2 class="text-3xl font-bold text-white mb-6">Creazione Task di Interpretazione Legale</h2>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <!-- Task Details -->
+                            <div class="bg-white/5 rounded-xl p-6">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="text-xl font-semibold text-white">Task #${simulationData.task.id}</h3>
+                                    <span class="px-3 py-1 bg-yellow-500 text-white rounded-full text-sm font-medium">
+                                        ${simulationData.task.status}
+                                    </span>
+                                </div>
+
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="text-purple-200 text-sm font-medium">Titolo:</label>
+                                        <p class="text-white text-lg mt-1">${simulationData.task.title}</p>
+                                    </div>
+
+                                    <div>
+                                        <label class="text-purple-200 text-sm font-medium">Tipo:</label>
+                                        <p class="text-green-400 font-mono mt-1">${simulationData.task.taskType}</p>
+                                    </div>
+
+                                    <div>
+                                        <label class="text-purple-200 text-sm font-medium">Creato:</label>
+                                        <p class="text-white mt-1">${new Date(simulationData.task.createdAt).toLocaleString('it-IT')}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Task Content -->
+                            <div class="bg-white/5 rounded-xl p-6">
+                                <h3 class="text-xl font-semibold text-white mb-4">Contenuto del Caso</h3>
+                                <div class="bg-white/10 rounded-lg p-4 text-purple-100 leading-relaxed">
+                                    ${simulationData.task.content}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Workflow -->
+                        <div class="mt-8 bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-xl p-6">
+                            <h3 class="text-xl font-semibold text-white mb-4">🔄 Workflow RLCF</h3>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div class="bg-white/10 rounded-lg p-4 text-center">
+                                    <div class="text-3xl mb-2">📤</div>
+                                    <div class="text-white font-medium">Task Submitted</div>
+                                    <div class="text-purple-200 text-sm mt-1">Sistema RLCF attivato</div>
+                                </div>
+                                <div class="bg-white/10 rounded-lg p-4 text-center">
+                                    <div class="text-3xl mb-2">👥</div>
+                                    <div class="text-white font-medium">Expert Matching</div>
+                                    <div class="text-purple-200 text-sm mt-1">5 esperti selezionati</div>
+                                </div>
+                                <div class="bg-white/10 rounded-lg p-4 text-center">
+                                    <div class="text-3xl mb-2">⏳</div>
+                                    <div class="text-white font-medium">Awaiting Feedback</div>
+                                    <div class="text-purple-200 text-sm mt-1">Review in corso</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Info Box -->
+                        <div class="mt-6 bg-blue-500/20 border-l-4 border-blue-400 rounded-lg p-4">
+                            <p class="text-white"><strong>💡 Nota:</strong> Il task è stato inviato a 5 esperti con competenze diverse: diritto civile, tech law, AI ethics, giurisprudenza. Il sistema RLCF aggregherà il loro feedback pesato per authority score.</p>
+                        </div>
+                    </div>
+                `
+            },
+
+            // Step 1: Expert Feedback
+            {
+                title: "👥 Step 2: Raccolta Feedback degli Esperti",
+                render: () => {
+                    const expertsHtml = simulationData.experts.map((expert, idx) => `
+                        <div class="feedback-item bg-white/5 rounded-xl p-6 hover:bg-white/10 transition-all" style="animation-delay: ${idx * 0.1}s">
+                            <div class="flex items-start justify-between mb-4">
+                                <div class="flex items-center gap-4">
+                                    <div class="expert-avatar w-16 h-16 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-2xl font-bold text-white">
+                                        ${expert.username.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <h4 class="text-lg font-semibold text-white">${expert.username}</h4>
+                                        <p class="text-purple-200 text-sm">${expert.credentials}</p>
+                                        <div class="flex gap-2 mt-2">
+                                            ${expert.expertise_areas.map(area => `
+                                                <span class="px-2 py-1 bg-purple-500/30 text-purple-200 rounded text-xs">${area}</span>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="px-3 py-1 rounded-full text-sm font-medium ${
+                                        expert.feedback === 'APPROVED' ? 'bg-green-500 text-white' :
+                                        expert.feedback === 'NEEDS_REVISION' ? 'bg-yellow-500 text-white' :
+                                        'bg-red-500 text-white'
+                                    }">
+                                        ${expert.feedback}
+                                    </span>
+                                    <div class="text-white text-sm mt-2">Confidence: ${(expert.confidence * 100).toFixed(0)}%</div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white/10 rounded-lg p-4 mb-4">
+                                <label class="text-purple-200 text-sm font-medium block mb-2">Ragionamento:</label>
+                                <p class="text-white leading-relaxed">${expert.reasoning}</p>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-4">
+                                <div class="metric-card bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-lg p-3">
+                                    <div class="text-purple-200 text-xs mb-1">Baseline</div>
+                                    <div class="text-white text-xl font-bold">${expert.baselineScore.toFixed(3)}</div>
+                                </div>
+                                <div class="metric-card bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg p-3">
+                                    <div class="text-purple-200 text-xs mb-1">Track Record</div>
+                                    <div class="text-white text-xl font-bold">${expert.trackRecord.toFixed(3)}</div>
+                                </div>
+                                <div class="metric-card bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-lg p-3">
+                                    <div class="text-purple-200 text-xs mb-1">Performance</div>
+                                    <div class="text-white text-xl font-bold">${expert.performance.toFixed(3)}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+
+                    return `
+                        <div class="step-card active">
+                            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-6">
+                                <h2 class="text-3xl font-bold text-white mb-4">Feedback degli Esperti</h2>
+                                <p class="text-purple-100 mb-6">5 esperti hanno fornito il loro feedback sul caso. Ogni feedback include ragionamento, decisione e livello di confidenza.</p>
+
+                                <!-- Stats Overview -->
+                                <div class="grid grid-cols-4 gap-4 mb-6">
+                                    <div class="bg-green-500/20 rounded-lg p-4 text-center">
+                                        <div class="text-3xl font-bold text-green-400">${simulationData.aggregation.approvedCount}</div>
+                                        <div class="text-white text-sm mt-1">Approved</div>
+                                    </div>
+                                    <div class="bg-yellow-500/20 rounded-lg p-4 text-center">
+                                        <div class="text-3xl font-bold text-yellow-400">${simulationData.aggregation.needsRevisionCount}</div>
+                                        <div class="text-white text-sm mt-1">Needs Revision</div>
+                                    </div>
+                                    <div class="bg-red-500/20 rounded-lg p-4 text-center">
+                                        <div class="text-3xl font-bold text-red-400">${simulationData.aggregation.rejectedCount}</div>
+                                        <div class="text-white text-sm mt-1">Rejected</div>
+                                    </div>
+                                    <div class="bg-purple-500/20 rounded-lg p-4 text-center">
+                                        <div class="text-3xl font-bold text-purple-400">${simulationData.aggregation.totalFeedback}</div>
+                                        <div class="text-white text-sm mt-1">Total</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4">
+                                ${expertsHtml}
+                            </div>
+                        </div>
+                    `;
+                }
+            },
+
+            // Step 2: Authority Calculation
+            {
+                title: "⚖️ Step 3: Calcolo Authority Scores",
+                render: () => {
+                    setTimeout(() => {
+                        renderAuthorityChart();
+                    }, 100);
+
+                    return `
+                        <div class="step-card active bg-white/10 backdrop-blur-lg rounded-2xl p-8">
+                            <h2 class="text-3xl font-bold text-white mb-6">Calcolo Authority Scores Dinamici</h2>
+
+                            <!-- Formula -->
+                            <div class="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-xl p-6 mb-8">
+                                <h3 class="text-xl font-semibold text-white mb-4">📐 Formula RLCF</h3>
+                                <div class="formula text-white text-lg">
+                                    A<sub>u</sub>(t) = α · B<sub>u</sub> + β · T<sub>u</sub>(t-1) + γ · P<sub>u</sub>(t)
+                                </div>
+                                <div class="mt-4 text-purple-100 text-sm space-y-2">
+                                    <div><strong>A<sub>u</sub>(t):</strong> Authority Score dell'esperto u al tempo t</div>
+                                    <div><strong>B<sub>u</sub>:</strong> Baseline Credential Score (laurea, pubblicazioni, esperienza)</div>
+                                    <div><strong>T<sub>u</sub>(t-1):</strong> Track Record Score (feedback precedenti validati dalla community)</div>
+                                    <div><strong>P<sub>u</sub>(t):</strong> Performance Score (accuratezza recente pesata temporalmente)</div>
+                                    <div><strong>α, β, γ:</strong> Pesi configurabili (default: α=0.3, β=0.4, γ=0.3) con α+β+γ=1</div>
+                                </div>
+                            </div>
+
+                            <!-- Chart -->
+                            <div class="bg-white/5 rounded-xl p-6 mb-6">
+                                <h3 class="text-xl font-semibold text-white mb-4">Authority Scores Comparison</h3>
+                                <div class="chart-container">
+                                    <canvas id="authorityChart"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Detailed Breakdown -->
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                ${simulationData.experts.map(expert => `
+                                    <div class="bg-white/5 rounded-xl p-6">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <h4 class="text-lg font-semibold text-white">${expert.username}</h4>
+                                            <div class="text-2xl font-bold text-green-400">${expert.authorityScore.toFixed(3)}</div>
+                                        </div>
+
+                                        <div class="space-y-3">
+                                            <div>
+                                                <div class="flex justify-between text-sm mb-1">
+                                                    <span class="text-purple-200">Baseline (α=0.3)</span>
+                                                    <span class="text-white">${expert.baselineScore.toFixed(3)}</span>
+                                                </div>
+                                                <div class="w-full bg-white/10 rounded-full h-2">
+                                                    <div class="bg-blue-400 h-2 rounded-full" style="width: ${expert.baselineScore * 100}%"></div>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <div class="flex justify-between text-sm mb-1">
+                                                    <span class="text-purple-200">Track Record (β=0.4)</span>
+                                                    <span class="text-white">${expert.trackRecord.toFixed(3)}</span>
+                                                </div>
+                                                <div class="w-full bg-white/10 rounded-full h-2">
+                                                    <div class="bg-green-400 h-2 rounded-full" style="width: ${expert.trackRecord * 100}%"></div>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <div class="flex justify-between text-sm mb-1">
+                                                    <span class="text-purple-200">Performance (γ=0.3)</span>
+                                                    <span class="text-white">${expert.performance.toFixed(3)}</span>
+                                                </div>
+                                                <div class="w-full bg-white/10 rounded-full h-2">
+                                                    <div class="bg-purple-400 h-2 rounded-full" style="width: ${expert.performance * 100}%"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <!-- Key Insights -->
+                            <div class="mt-6 bg-blue-500/20 border-l-4 border-blue-400 rounded-lg p-4">
+                                <p class="text-white"><strong>🔍 Insights:</strong> Il giudice di Cassazione ha l'authority score più alto (0.923) grazie ai 30+ anni di esperienza e track record eccellente. Il praticante ha lo score più basso (0.350) a causa della limitata esperienza. Questo peso differenziato garantisce che il feedback sia proporzionale alla competenza dimostrata.</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            },
+
+            // Step 3: Aggregation
+            {
+                title: "🔄 Step 4: Aggregazione con Preservazione dell'Incertezza",
+                render: () => {
+                    setTimeout(() => {
+                        renderAggregationCharts();
+                    }, 100);
+
+                    return `
+                        <div class="step-card active bg-white/10 backdrop-blur-lg rounded-2xl p-8">
+                            <h2 class="text-3xl font-bold text-white mb-6">Aggregazione Uncertainty-Preserving</h2>
+
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                                <!-- Consensus Level -->
+                                <div class="bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl p-6">
+                                    <h3 class="text-xl font-semibold text-white mb-4">📊 Consensus Level</h3>
+                                    <div class="text-5xl font-bold text-green-400 mb-2">${(simulationData.aggregation.consensusLevel * 100).toFixed(0)}%</div>
+                                    <p class="text-purple-100">4 su 5 esperti concordano (weighted)</p>
+                                    <div class="mt-4 w-full bg-white/10 rounded-full h-4">
+                                        <div class="bg-green-400 h-4 rounded-full transition-all" style="width: ${simulationData.aggregation.consensusLevel * 100}%"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Disagreement Score -->
+                                <div class="bg-gradient-to-br from-yellow-500/20 to-orange-600/20 rounded-xl p-6">
+                                    <h3 class="text-xl font-semibold text-white mb-4">⚠️ Disagreement Score</h3>
+                                    <div class="text-5xl font-bold text-yellow-400 mb-2">${simulationData.aggregation.disagreementScore.toFixed(2)}</div>
+                                    <p class="text-purple-100">Shannon Entropy: ${simulationData.aggregation.shannonEntropy.toFixed(2)}</p>
+                                    <div class="mt-4 w-full bg-white/10 rounded-full h-4">
+                                        <div class="bg-yellow-400 h-4 rounded-full transition-all" style="width: ${simulationData.aggregation.disagreementScore * 100}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Shannon Entropy Formula -->
+                            <div class="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl p-6 mb-8">
+                                <h3 class="text-xl font-semibold text-white mb-4">🧮 Shannon Entropy per Disagreement</h3>
+                                <div class="formula text-white text-lg mb-4">
+                                    H(X) = -Σ p(x<sub>i</sub>) · log<sub>2</sub>(p(x<sub>i</sub>))
+                                </div>
+                                <p class="text-purple-100">L'entropia quantifica il disaccordo nella distribuzione dei feedback. Valori alti indicano maggiore incertezza e necessità di review aggiuntive.</p>
+                            </div>
+
+                            <!-- Charts -->
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                                <div class="bg-white/5 rounded-xl p-6">
+                                    <h3 class="text-lg font-semibold text-white mb-4">Distribuzione Feedback</h3>
+                                    <div class="chart-container">
+                                        <canvas id="feedbackDistChart"></canvas>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white/5 rounded-xl p-6">
+                                    <h3 class="text-lg font-semibold text-white mb-4">Weighted Contribution</h3>
+                                    <div class="chart-container">
+                                        <canvas id="weightedContributionChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Aggregation Results -->
+                            <div class="bg-white/5 rounded-xl p-6">
+                                <h3 class="text-xl font-semibold text-white mb-4">📈 Risultati Aggregazione</h3>
+
+                                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                                    <div class="bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg p-4 text-center">
+                                        <div class="text-2xl font-bold text-green-400">${simulationData.aggregation.finalRecommendation}</div>
+                                        <div class="text-white text-sm mt-1">Final Decision</div>
+                                    </div>
+                                    <div class="bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-lg p-4 text-center">
+                                        <div class="text-2xl font-bold text-blue-400">${(simulationData.aggregation.weightedConfidence * 100).toFixed(0)}%</div>
+                                        <div class="text-white text-sm mt-1">Weighted Confidence</div>
+                                    </div>
+                                    <div class="bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-lg p-4 text-center">
+                                        <div class="text-2xl font-bold text-purple-400">[${simulationData.aggregation.confidenceInterval[0].toFixed(2)}, ${simulationData.aggregation.confidenceInterval[1].toFixed(2)}]</div>
+                                        <div class="text-white text-sm mt-1">Confidence Interval</div>
+                                    </div>
+                                    <div class="bg-gradient-to-br from-yellow-500/20 to-orange-600/20 rounded-lg p-4 text-center">
+                                        <div class="text-2xl font-bold text-yellow-400">${simulationData.aggregation.shannonEntropy.toFixed(2)}</div>
+                                        <div class="text-white text-sm mt-1">Entropy</div>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white/10 rounded-lg p-4">
+                                    <h4 class="text-white font-semibold mb-2">🎯 Weighted Aggregation Process:</h4>
+                                    <ol class="text-purple-100 space-y-2 list-decimal list-inside">
+                                        <li>Ogni feedback è pesato per l'authority score dell'esperto</li>
+                                        <li>Il giudice (A=0.923) ha peso ~3x maggiore del praticante (A=0.350)</li>
+                                        <li>La confidenza è aggregata usando weighted average</li>
+                                        <li>L'intervallo di confidenza cattura l'uncertainty tra esperti</li>
+                                        <li>L'entropia segnala se serve review aggiuntiva (threshold: 0.8)</li>
+                                    </ol>
+                                </div>
+                            </div>
+
+                            <!-- Note -->
+                            <div class="mt-6 bg-blue-500/20 border-l-4 border-blue-400 rounded-lg p-4">
+                                <p class="text-white"><strong>💡 Principio Chiave:</strong> RLCF non elimina il disaccordo, ma lo preserva e lo quantifica. Un'entropia di 0.72 indica disaccordo moderato che è informativo e non deve essere nascosto. Il sistema fornisce l'intervallo di confidenza [0.75, 0.92] per comunicare l'incertezza al decisore umano.</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            },
+
+            // Step 4: Bias Analysis
+            {
+                title: "🔍 Step 5: Bias Detection & Analysis",
+                render: () => {
+                    setTimeout(() => {
+                        renderBiasChart();
+                    }, 100);
+
+                    return `
+                        <div class="step-card active bg-white/10 backdrop-blur-lg rounded-2xl p-8">
+                            <h2 class="text-3xl font-bold text-white mb-6">Bias Detection & Mitigation</h2>
+
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                                <div class="bg-gradient-to-br from-red-500/20 to-red-600/20 rounded-xl p-6">
+                                    <div class="text-4xl mb-2">🚨</div>
+                                    <h3 class="text-xl font-semibold text-white mb-2">Bias Detected</h3>
+                                    <div class="text-3xl font-bold text-red-400">${simulationData.bias.types.length}</div>
+                                    <p class="text-purple-100 text-sm mt-2">Tipi di bias rilevati</p>
+                                </div>
+
+                                <div class="bg-gradient-to-br from-yellow-500/20 to-orange-600/20 rounded-xl p-6">
+                                    <div class="text-4xl mb-2">⚠️</div>
+                                    <h3 class="text-xl font-semibold text-white mb-2">Severity Level</h3>
+                                    <div class="text-3xl font-bold text-yellow-400">MEDIUM</div>
+                                    <p class="text-purple-100 text-sm mt-2">Richiede mitigation</p>
+                                </div>
+
+                                <div class="bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl p-6">
+                                    <div class="text-4xl mb-2">🛡️</div>
+                                    <h3 class="text-xl font-semibold text-white mb-2">Mitigations</h3>
+                                    <div class="text-3xl font-bold text-green-400">${simulationData.bias.mitigationStrategies.length}</div>
+                                    <p class="text-purple-100 text-sm mt-2">Strategie attive</p>
+                                </div>
+                            </div>
+
+                            <!-- Bias Types Chart -->
+                            <div class="bg-white/5 rounded-xl p-6 mb-8">
+                                <h3 class="text-xl font-semibold text-white mb-4">📊 Bias Severity Scores</h3>
+                                <div class="chart-container">
+                                    <canvas id="biasChart"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Detailed Bias Analysis -->
+                            <div class="space-y-4 mb-8">
+                                ${simulationData.bias.types.map((bias, idx) => `
+                                    <div class="bg-white/5 rounded-xl p-6">
+                                        <div class="flex items-start justify-between mb-4">
+                                            <div>
+                                                <h4 class="text-lg font-semibold text-white mb-2">${bias.name}</h4>
+                                                <p class="text-purple-100">${bias.description}</p>
+                                            </div>
+                                            <span class="px-3 py-1 rounded-full text-sm font-medium ${
+                                                bias.severity === 'HIGH' ? 'bg-red-500 text-white' :
+                                                bias.severity === 'MEDIUM' ? 'bg-yellow-500 text-white' :
+                                                'bg-green-500 text-white'
+                                            }">
+                                                ${bias.severity}
+                                            </span>
+                                        </div>
+
+                                        <div class="mb-2 flex justify-between text-sm">
+                                            <span class="text-purple-200">Severity Score:</span>
+                                            <span class="text-white font-medium">${(bias.score * 100).toFixed(0)}%</span>
+                                        </div>
+                                        <div class="w-full bg-white/10 rounded-full h-3">
+                                            <div class="h-3 rounded-full transition-all ${
+                                                bias.severity === 'HIGH' ? 'bg-red-400' :
+                                                bias.severity === 'MEDIUM' ? 'bg-yellow-400' :
+                                                'bg-green-400'
+                                            }" style="width: ${bias.score * 100}%"></div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <!-- Mitigation Strategies -->
+                            <div class="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-xl p-6 mb-8">
+                                <h3 class="text-xl font-semibold text-white mb-4">🛡️ Strategie di Mitigation</h3>
+                                <div class="space-y-3">
+                                    ${simulationData.bias.mitigationStrategies.map((strategy, idx) => `
+                                        <div class="flex items-start gap-3 bg-white/10 rounded-lg p-4">
+                                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white font-bold">
+                                                ${idx + 1}
+                                            </div>
+                                            <p class="text-white flex-1">${strategy}</p>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <!-- Bias Detection Algorithm -->
+                            <div class="bg-white/5 rounded-xl p-6">
+                                <h3 class="text-xl font-semibold text-white mb-4">🔬 Algoritmo di Detection</h3>
+                                <div class="space-y-4 text-purple-100">
+                                    <div class="bg-white/10 rounded-lg p-4">
+                                        <h4 class="text-white font-semibold mb-2">1. Authority Bias Detection</h4>
+                                        <p class="text-sm">Analisi della distribuzione degli authority scores. Score molto alti (>0.9) vs molto bassi (<0.4) possono introdurre distorsioni.</p>
+                                        <code class="text-green-400 text-xs block mt-2">variance = np.var([expert.authority for expert in experts])</code>
+                                    </div>
+
+                                    <div class="bg-white/10 rounded-lg p-4">
+                                        <h4 class="text-white font-semibold mb-2">2. Expertise Domain Clustering</h4>
+                                        <p class="text-sm">Analisi della copertura delle expertise areas. Gap significativi possono portare a blind spots.</p>
+                                        <code class="text-green-400 text-xs block mt-2">coverage = len(set([area for e in experts for area in e.expertise_areas]))</code>
+                                    </div>
+
+                                    <div class="bg-white/10 rounded-lg p-4">
+                                        <h4 class="text-white font-semibold mb-2">3. Reasoning Quality Variance</h4>
+                                        <p class="text-sm">Analisi della qualità e completezza del ragionamento. Feedback superficiali o errati ricevono segnalazione.</p>
+                                        <code class="text-green-400 text-xs block mt-2">quality_score = analyze_reasoning_depth(feedback.reasoning)</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Note -->
+                            <div class="mt-6 bg-orange-500/20 border-l-4 border-orange-400 rounded-lg p-4">
+                                <p class="text-white"><strong>⚠️ Importante:</strong> La detection dei bias è un processo continuo. Il sistema RLCF monitora costantemente le metriche di bias e attiva automaticamente le strategie di mitigation quando i threshold vengono superati. In questo caso, il feedback del praticante sarà downweighted e richiesta una review aggiuntiva.</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            },
+
+            // Step 5: Final Output
+            {
+                title: "✅ Step 6: Output Finale & Raccomandazioni",
+                render: () => `
+                    <div class="step-card active">
+                        <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-6">
+                            <h2 class="text-3xl font-bold text-white mb-6">Output Finale del Sistema RLCF</h2>
+
+                            <!-- Decision Banner -->
+                            <div class="bg-gradient-to-r from-green-500/30 to-green-600/30 border-2 border-green-400 rounded-xl p-6 mb-8">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h3 class="text-2xl font-bold text-white mb-2">Decisione Finale: ${simulationData.output.finalDecision}</h3>
+                                        <p class="text-green-100">Confidence: ${(simulationData.output.confidence * 100).toFixed(0)}% | Consensus: ${(simulationData.output.consensusLevel * 100).toFixed(0)}%</p>
+                                    </div>
+                                    <div class="text-6xl">✅</div>
+                                </div>
+                            </div>
+
+                            <!-- Synthesized Reasoning -->
+                            <div class="bg-white/5 rounded-xl p-6 mb-6">
+                                <h3 class="text-xl font-semibold text-white mb-4">📝 Ragionamento Sintetizzato</h3>
+                                <div class="bg-white/10 rounded-lg p-6 text-white leading-relaxed">
+                                    ${simulationData.output.synthesizedReasoning}
+                                </div>
+                            </div>
+
+                            <!-- Key Legal Principles -->
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                                <div class="bg-white/5 rounded-xl p-6">
+                                    <h3 class="text-xl font-semibold text-white mb-4">⚖️ Principi Giuridici Applicabili</h3>
+                                    <ul class="space-y-3">
+                                        ${simulationData.output.keyLegalPrinciples.map(principle => `
+                                            <li class="flex items-start gap-3 text-purple-100">
+                                                <span class="text-green-400 flex-shrink-0">📌</span>
+                                                <span>${principle}</span>
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+
+                                <div class="bg-white/5 rounded-xl p-6">
+                                    <h3 class="text-xl font-semibold text-white mb-4">🎯 Azioni Raccomandate</h3>
+                                    <ul class="space-y-3">
+                                        ${simulationData.output.recommendedActions.map(action => `
+                                            <li class="flex items-start gap-3 text-purple-100">
+                                                <span class="text-blue-400 flex-shrink-0">▶</span>
+                                                <span>${action}</span>
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Uncertainty Flags -->
+                            <div class="bg-yellow-500/20 border-l-4 border-yellow-400 rounded-lg p-6 mb-6">
+                                <h3 class="text-xl font-semibold text-white mb-4">⚠️ Uncertainty Flags</h3>
+                                <ul class="space-y-2">
+                                    ${simulationData.output.uncertaintyFlags.map(flag => `
+                                        <li class="flex items-start gap-3 text-white">
+                                            <span class="text-yellow-400 flex-shrink-0">⚠</span>
+                                            <span>${flag}</span>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+
+                            <!-- Traceability -->
+                            <div class="bg-white/5 rounded-xl p-6 mb-6">
+                                <h3 class="text-xl font-semibold text-white mb-4">🔗 Traceability & Compliance</h3>
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div class="bg-white/10 rounded-lg p-4">
+                                        <label class="text-purple-200 text-sm">Trace ID:</label>
+                                        <p class="text-white font-mono text-lg">${simulationData.output.traceId}</p>
+                                    </div>
+                                    <div class="bg-white/10 rounded-lg p-4">
+                                        <label class="text-purple-200 text-sm">Task ID:</label>
+                                        <p class="text-white font-mono text-lg">#${simulationData.task.id}</p>
+                                    </div>
+                                </div>
+                                <p class="text-purple-100 text-sm">
+                                    ✅ <strong>EU AI Act Compliance:</strong> Questo output include piena traceability (Trace ID), trasparenza del processo decisionale, quantificazione dell'incertezza e bias mitigation. Tutti i requisiti per sistemi AI ad alto rischio nel dominio legale sono soddisfatti.
+                                </p>
+                            </div>
+
+                            <!-- Expert Contributions Summary -->
+                            <div class="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl p-6">
+                                <h3 class="text-xl font-semibold text-white mb-4">👥 Contributi degli Esperti</h3>
+                                <div class="space-y-2">
+                                    ${simulationData.experts.map(expert => `
+                                        <div class="flex items-center justify-between bg-white/10 rounded-lg p-3">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold">
+                                                    ${expert.username.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <div class="text-white font-medium">${expert.username}</div>
+                                                    <div class="text-purple-200 text-xs">Authority: ${expert.authorityScore.toFixed(3)}</div>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <span class="px-2 py-1 rounded text-xs font-medium ${
+                                                    expert.feedback === 'APPROVED' ? 'bg-green-500 text-white' :
+                                                    expert.feedback === 'NEEDS_REVISION' ? 'bg-yellow-500 text-white' :
+                                                    'bg-red-500 text-white'
+                                                }">
+                                                    ${expert.feedback}
+                                                </span>
+                                                <span class="text-white text-sm">${(expert.confidence * 100).toFixed(0)}%</span>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Summary Stats -->
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div class="metric-card bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl p-6 text-center">
+                                <div class="text-4xl mb-2">✅</div>
+                                <div class="text-2xl font-bold text-green-400">${(simulationData.output.confidence * 100).toFixed(0)}%</div>
+                                <div class="text-white text-sm mt-1">Final Confidence</div>
+                            </div>
+                            <div class="metric-card bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-xl p-6 text-center">
+                                <div class="text-4xl mb-2">🤝</div>
+                                <div class="text-2xl font-bold text-blue-400">${(simulationData.output.consensusLevel * 100).toFixed(0)}%</div>
+                                <div class="text-white text-sm mt-1">Consensus Level</div>
+                            </div>
+                            <div class="metric-card bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-xl p-6 text-center">
+                                <div class="text-4xl mb-2">👥</div>
+                                <div class="text-2xl font-bold text-purple-400">${simulationData.experts.length}</div>
+                                <div class="text-white text-sm mt-1">Expert Reviews</div>
+                            </div>
+                            <div class="metric-card bg-gradient-to-br from-pink-500/20 to-pink-600/20 rounded-xl p-6 text-center">
+                                <div class="text-4xl mb-2">🔍</div>
+                                <div class="text-2xl font-bold text-pink-400">${simulationData.bias.types.length}</div>
+                                <div class="text-white text-sm mt-1">Bias Detections</div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            }
+        ];
+
+        // Navigation Functions
+        function goToStep(stepIndex) {
+            if (stepIndex >= 0 && stepIndex < steps.length) {
+                currentStep = stepIndex;
+                renderStep();
+                updateTimeline();
+            }
+        }
+
+        function nextStep() {
+            if (currentStep < steps.length - 1) {
+                currentStep++;
+                renderStep();
+                updateTimeline();
+            }
+        }
+
+        function previousStep() {
+            if (currentStep > 0) {
+                currentStep--;
+                renderStep();
+                updateTimeline();
+            }
+        }
+
+        function renderStep() {
+            const contentArea = document.getElementById('contentArea');
+            contentArea.innerHTML = steps[currentStep].render();
+
+            // Update button states
+            document.getElementById('prevBtn').disabled = currentStep === 0;
+            document.getElementById('nextBtn').disabled = currentStep === steps.length - 1;
+        }
+
+        function updateTimeline() {
+            // Update progress bar
+            const progress = ((currentStep + 1) / steps.length) * 100;
+            document.getElementById('timelineProgress').style.width = progress + '%';
+
+            // Update timeline dots
+            for (let i = 0; i < steps.length; i++) {
+                const dot = document.getElementById(`timeline${i}`);
+                const circle = dot.querySelector('div');
+
+                if (i === currentStep) {
+                    dot.classList.add('active');
+                    circle.classList.remove('bg-white/30');
+                    circle.classList.add('bg-green-500');
+                } else if (i < currentStep) {
+                    dot.classList.remove('active');
+                    circle.classList.remove('bg-white/30', 'bg-green-500');
+                    circle.classList.add('bg-green-400');
+                } else {
+                    dot.classList.remove('active');
+                    circle.classList.remove('bg-green-400', 'bg-green-500');
+                    circle.classList.add('bg-white/30');
+                }
+            }
+        }
+
+        function toggleAutoplay() {
+            const btn = document.getElementById('autoplayBtn');
+            if (autoplayInterval) {
+                clearInterval(autoplayInterval);
+                autoplayInterval = null;
+                btn.textContent = '▶ Auto Play';
+                btn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                btn.classList.add('bg-purple-500', 'hover:bg-purple-600');
+            } else {
+                autoplayInterval = setInterval(() => {
+                    if (currentStep < steps.length - 1) {
+                        nextStep();
+                    } else {
+                        clearInterval(autoplayInterval);
+                        autoplayInterval = null;
+                        btn.textContent = '▶ Auto Play';
+                        btn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                        btn.classList.add('bg-purple-500', 'hover:bg-purple-600');
+                    }
+                }, 5000);
+                btn.textContent = '⏸ Pause';
+                btn.classList.remove('bg-purple-500', 'hover:bg-purple-600');
+                btn.classList.add('bg-red-500', 'hover:bg-red-600');
+            }
+        }
+
+        function resetSimulation() {
+            if (autoplayInterval) {
+                clearInterval(autoplayInterval);
+                autoplayInterval = null;
+                document.getElementById('autoplayBtn').textContent = '▶ Auto Play';
+            }
+            currentStep = 0;
+            renderStep();
+            updateTimeline();
+        }
+
+        // Chart Rendering Functions
+        function renderAuthorityChart() {
+            const ctx = document.getElementById('authorityChart');
+            if (!ctx) return;
+
+            if (charts.authority) {
+                charts.authority.destroy();
+            }
+
+            charts.authority = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: simulationData.experts.map(e => e.username),
+                    datasets: [{
+                        label: 'Authority Score',
+                        data: simulationData.experts.map(e => e.authorityScore),
+                        backgroundColor: 'rgba(16, 185, 129, 0.6)',
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'white'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            ticks: {
+                                color: 'white'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: 'white',
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderAggregationCharts() {
+            // Feedback Distribution Pie Chart
+            const ctx1 = document.getElementById('feedbackDistChart');
+            if (ctx1) {
+                if (charts.feedbackDist) charts.feedbackDist.destroy();
+                charts.feedbackDist = new Chart(ctx1, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Approved', 'Needs Revision', 'Rejected'],
+                        datasets: [{
+                            data: [
+                                simulationData.aggregation.approvedCount,
+                                simulationData.aggregation.needsRevisionCount,
+                                simulationData.aggregation.rejectedCount
+                            ],
+                            backgroundColor: [
+                                'rgba(16, 185, 129, 0.8)',
+                                'rgba(234, 179, 8, 0.8)',
+                                'rgba(239, 68, 68, 0.8)'
+                            ],
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: 'white'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Weighted Contribution Chart
+            const ctx2 = document.getElementById('weightedContributionChart');
+            if (ctx2) {
+                if (charts.weightedContribution) charts.weightedContribution.destroy();
+
+                const totalAuthority = simulationData.experts.reduce((sum, e) => sum + e.authorityScore, 0);
+                const contributions = simulationData.experts.map(e => (e.authorityScore / totalAuthority) * 100);
+
+                charts.weightedContribution = new Chart(ctx2, {
+                    type: 'pie',
+                    data: {
+                        labels: simulationData.experts.map(e => e.username),
+                        datasets: [{
+                            data: contributions,
+                            backgroundColor: [
+                                'rgba(139, 92, 246, 0.8)',
+                                'rgba(59, 130, 246, 0.8)',
+                                'rgba(16, 185, 129, 0.8)',
+                                'rgba(234, 179, 8, 0.8)',
+                                'rgba(239, 68, 68, 0.8)'
+                            ],
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: 'white'
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.label + ': ' + context.parsed.toFixed(1) + '%';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function renderBiasChart() {
+            const ctx = document.getElementById('biasChart');
+            if (!ctx) return;
+
+            if (charts.bias) charts.bias.destroy();
+
+            charts.bias = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: simulationData.bias.types.map(b => b.name),
+                    datasets: [{
+                        label: 'Severity Score',
+                        data: simulationData.bias.types.map(b => b.score),
+                        backgroundColor: simulationData.bias.types.map(b => {
+                            if (b.severity === 'HIGH') return 'rgba(239, 68, 68, 0.6)';
+                            if (b.severity === 'MEDIUM') return 'rgba(234, 179, 8, 0.6)';
+                            return 'rgba(16, 185, 129, 0.6)';
+                        }),
+                        borderColor: simulationData.bias.types.map(b => {
+                            if (b.severity === 'HIGH') return 'rgba(239, 68, 68, 1)';
+                            if (b.severity === 'MEDIUM') return 'rgba(234, 179, 8, 1)';
+                            return 'rgba(16, 185, 129, 1)';
+                        }),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'white'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 1,
+                            ticks: {
+                                color: 'white'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: 'white'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            renderStep();
+            updateTimeline();
+        });
+    </script>
+</body>
+</html>

@@ -25,6 +25,7 @@ Welcome to the Reinforcement Learning from Community Feedback (RLCF) framework d
 - **[Installation Guide](guides/installation.md)** - Detailed installation instructions
 - **[Configuration Guide](guides/configuration.md)** - How to configure the system
 - **[Academic Research Guide](guides/academic-research.md)** - Using RLCF for research
+- **[Interactive Simulation Guide](guides/simulation-guide.md)** - End-to-end RLCF workflow visualization
 
 ### 📖 [Tutorials](tutorials/)
 - **[Basic Usage Tutorial](tutorials/basic-usage.md)** - Step-by-step basic usage
@@ -50,6 +51,11 @@ Welcome to the Reinforcement Learning from Community Feedback (RLCF) framework d
 - **[Bibliography](reference/bibliography.md)** - Academic references and citations
 
 ## 🎯 Quick Navigation
+
+### 🎬 New to RLCF? Start Here!
+- **[Interactive Simulation](guides/simulation-guide.md)** - See RLCF in action with our interactive end-to-end visualization
+- Watch the complete workflow from task creation to final output
+- No installation required - just open `simulation.html` in your browser!
 
 ### For Researchers
 - Start with [Framework Overview](theoretical/framework-overview.md)
@@ -84,6 +90,6 @@ Documentation improvements are welcome! Please see [Contributing Guidelines](dev
 
 ---
 
-*Last updated: August 17, 2025*  
-*Framework version: Alpha 0.0.1*  
+*Last updated: November 4, 2025*
+*Framework version: Alpha 0.0.1*
 *Documentation build: Alpha Release*

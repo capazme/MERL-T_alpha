@@ -68,6 +68,29 @@ MERL-T (Multi-Expert Legal Retrieval Transformer) is a comprehensive system for 
 
 📖 **Read the full RLCF paper**: [`docs/02-methodology/rlcf/RLCF.md`](docs/02-methodology/rlcf/RLCF.md)
 
+### 🎬 Interactive RLCF Simulation
+
+Want to see RLCF in action? Try our **interactive end-to-end simulation** that visualizes the complete workflow:
+
+🔗 **[Open simulation.html](./simulation.html)** (just open the file in your browser!)
+
+The simulation demonstrates:
+- ✅ Legal task creation and expert matching
+- ✅ Multi-expert feedback collection with varying authority levels
+- ✅ Real-time authority score calculation using the RLCF formula
+- ✅ Uncertainty-preserving aggregation with Shannon entropy
+- ✅ Automated bias detection and mitigation strategies
+- ✅ Final output with full EU AI Act compliance traceability
+
+**Features**:
+- 6 interactive steps with animated transitions
+- Live Chart.js visualizations of authority scores, consensus, and bias
+- Auto-play mode for presentations
+- Real case study: Italian civil law (autonomous vehicle accident)
+- No installation required - runs in any modern browser
+
+📖 **Full guide**: [`docs/02-methodology/rlcf/guides/simulation-guide.md`](docs/02-methodology/rlcf/guides/simulation-guide.md)
+
 ---
 
 ## 🏗️ System Architecture
