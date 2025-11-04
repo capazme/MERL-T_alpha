@@ -1,0 +1,226 @@
+# Intent Classifier Configuration (Phase 1: OpenRouter LLM)
+# ===========================================================
+#
+# Supports evolvable architecture:
+# - Phase 1: OpenRouter (immediate)
+# - Phase 2: Fine-tuned model + fallback (3-6 months)
+# - Phase 3: Community model (6-12 months)
+#
+# No code changes needed for transitions - just update primary_classifier.
+# RLCF feedback active from Phase 1.
+#
+# Reference: backend/orchestration/intent_classifier.py
+
+intent_types:
+  # ===================================
+  # Intent 1: Contract Interpretation
+  # ===================================
+  contract_interpretation:
+    display_name: "Interpretazione Contratti"
+    description: "Interpretazione di clausole contrattuali specifiche"
+    icon: "contract"
+
+    # Real examples from Italian legal practice
+    examples:
+      - "Cosa significa questa clausola di non concorrenza nel mio contratto?"
+      - "Come interpreto la parte sulla responsabilità nel contratto di appalto?"
+      - "Quali sono le obbligazioni previste in questa clausola di confidenzialità?"
+      - "Che cosa vuol dire 'forza maggiore' in questo contratto?"
+      - "Posso recesso da questo contratto secondo questa clausola?"
+
+    # Keywords that boost intent detection
+    keywords:
+      - "clausola"
+      - "contratto"
+      - "significa"
+      - "interpreta"
+      - "obbligazione"
+      - "diritto"
+      - "dovere"
+
+    # Confidence threshold for RLCF review
+    confidence_threshold: 0.85
+
+    # Priority level for review tasks
+    review_priority: "normal"
+
+
+  # ===================================
+  # Intent 2: Compliance Question
+  # ===================================
+  compliance_question:
+    display_name: "Domanda di Conformità"
+    description: "Verifica conformità a normative specifiche (GDPR, privacy, lavoro, etc.)"
+    icon: "compliance"
+
+    examples:
+      - "Il mio sistema di gestione dati è conforme al GDPR?"
+      - "Sono in violazione del d.lgs. 196/2003 sulla privacy con questa procedura?"
+      - "Come posso verificare la conformità dell'azienda al diritto del lavoro?"
+      - "Qual è il mio obbligo di trasparenza secondo il d.lgs. 33/2013?"
+      - "Sono conforme alle normative su accessibilità digitale?"
+
+    keywords:
+      - "conforme"
+      - "conformità"
+      - "violazione"
+      - "obbligo"
+      - "GDPR"
+      - "privacy"
+      - "lavoro"
+      - "ambiente"
+
+    confidence_threshold: 0.80
+    review_priority: "high"  # Compliance questions are critical
+
+
+  # ===================================
+  # Intent 3: Norm Explanation
+  # ===================================
+  norm_explanation:
+    display_name: "Spiegazione di Norme"
+    description: "Spiegazione semplificata di articoli, leggi, decreti, o codicistiche"
+    icon: "book"
+
+    examples:
+      - "Cosa dice l'articolo 2043 del codice civile su responsabilità civile?"
+      - "Puoi spiegare il decreto legislativo 196/2003 sulla privacy?"
+      - "Che cosa significa la Costituzione articolo 3 sulla uguaglianza?"
+      - "Cosa comporta l'articolo 1414 c.c. sull'annullabilità dei contratti?"
+      - "Qual è il significato della legge sulla parità di genere?"
+
+    keywords:
+      - "articolo"
+      - "art."
+      - "legge"
+      - "decreto"
+      - "codice"
+      - "costituzione"
+      - "significa"
+      - "spiega"
+      - "cosa dice"
+      - "d.lgs"
+      - "c.c"
+      - "c.p"
+
+    confidence_threshold: 0.90  # High confidence for clear norm references
+    review_priority: "low"
+
+
+  # ===================================
+  # Intent 4: Precedent Search
+  # ===================================
+  precedent_search:
+    display_name: "Ricerca Giurisprudenza"
+    description: "Ricerca di sentenze, giurisprudenza, e precedenti legali"
+    icon: "gavel"
+
+    examples:
+      - "Ci sono sentenze della Cassazione su responsabilità extracontrattuale?"
+      - "Quali sono i precedenti giurisprudenziali su questa questione?"
+      - "Come hanno giudicato i tribunali italiani il risarcimento del danno morale?"
+      - "Qual è l'orientamento consolidato sulla buona fede contrattuale?"
+      - "Ci sono sentenze recenti su diritti del consumatore secondo il d.lgs. 206/2005?"
+
+    keywords:
+      - "sentenza"
+      - "giurisprudenza"
+      - "precedente"
+      - "tribunale"
+      - "cassazione"
+      - "corte"
+      - "giudice"
+      - "ha deciso"
+      - "orientamento"
+      - "caso"
+
+    confidence_threshold: 0.80
+    review_priority: "normal"
+
+
+# ===================================
+# LLM Configuration (Phase 1)
+# ===================================
+llm_config:
+  # Provider and model selection
+  provider: "openrouter"
+  model: "anthropic/claude-3.5-sonnet"  # Best for Italian legal reasoning
+
+  # Model parameters
+  temperature: 0.1              # Low: consistent intent detection
+  max_tokens: 500               # Sufficient for JSON response + reasoning
+  top_p: 0.9                    # Standard nucleus sampling
+
+  # API timeout and retry
+  timeout: 30                   # seconds
+  max_retries: 2
+  retry_delay: 1                # seconds
+
+  # Cost optimization notes
+  # Claude 3.5 Sonnet: ~$0.003/query (10K queries = €30/month)
+  # For Phase 2: Will reduce to ~5% of queries via primary model
+
+
+# ===================================
+# RLCF Configuration (Phase 1+)
+# ===================================
+rlcf_config:
+  # Confidence threshold for triggering community review
+  confidence_threshold_review: 0.85
+
+  # Minimum authority score for feedback to be counted
+  min_authority_score: 0.6
+
+  # Minimum validations needed for ground truth
+  min_validations_for_ground_truth: 3
+
+  # Enable active learning sampling (Phase 2+)
+  active_learning_enabled: false
+  uncertainty_sampling_threshold: 0.5
+
+
+# ===================================
+# Phase 2 Transition Notes
+# ===================================
+# When ready for Phase 2 (3-6 months):
+#
+# 1. Fine-tune Italian-Legal-BERT on RLCF-validated intents
+# 2. Deploy model at: backend/models/finetuned_intent_classifier.pt
+# 3. Update backend/orchestration/intent_classifier.py:
+#    - Implement FinetuneItalianLegalBERT class
+#    - Replace primary_classifier = None with actual model
+#    - Keep LLM as fallback for robustness
+#
+# 4. Update this config:
+#    - Set phase2_model_path: "backend/models/finetuned_intent_classifier.pt"
+#    - Cost will drop to €2-5/month (90% reduction)
+#    - Latency will improve to ~50ms
+#
+# Example Phase 2 transition:
+# ```python
+# from backend.models.finetuned_intent_classifier import FinetuneItalianLegalBERT
+# classifier = await get_intent_classifier()
+# classifier.set_primary_classifier(FinetuneItalianLegalBERT())
+# ```
+
+
+# ===================================
+# Phase 3 Transition Notes
+# ===================================
+# When RLCF foundation is mature (6-12 months):
+#
+# 1. Train community-driven model on:
+#    - RLCF-validated intents with authority weighting
+#    - Active learning-selected uncertain cases
+#    - Continuous feedback loop
+#
+# 2. Deploy with incremental retraining:
+#    - Weekly updates from community feedback
+#    - Authority scores adjust expert influence
+#    - Model improves autonomously
+#
+# 3. Performance targets:
+#    - Accuracy: 95%+ on Italian legal intents
+#    - Latency: ~20ms inference
+#    - Cost: ~€2-3/month (self-hosted)
+#    - Autonomy: 100% - no external LLM dependency
