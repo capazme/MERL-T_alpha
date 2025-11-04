@@ -1,6 +1,84 @@
-.git
-.gitignore
-.dockerignore
-node_modules
+# MERL-T Docker Ignore
+# Files and directories to exclude from Docker build context
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation (not needed in container)
+docs/
+*.md
+!README.md
+
+# Frontend (built separately)
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+node_modules/
 npm-debug.log
-README.md
+
+# Tests (not needed in production)
+tests/
+*.test.py
+test_*.py
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Environment files
+.env
+.env.*
+!.env.template
+
+# Data & Logs (should be mounted as volumes)
+*.db
+*.log
+data/
+logs/
+
+# Infrastructure configs (not needed in container)
+infrastructure/
+docker-compose*.yml
+Dockerfile*
+!Dockerfile
+
+# Scripts (not needed in production)
+scripts/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker
+.dockerignore

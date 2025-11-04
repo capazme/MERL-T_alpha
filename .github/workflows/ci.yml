@@ -1,0 +1,40 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run linting
+        run: ruff check backend/
+      - name: Run type checking
+        run: mypy backend/
+      - name: Run unit tests
+        run: pytest tests/unit/ --cov=backend/
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: cd frontend && npm ci
+      - name: Run linting
+        run: cd frontend && npm run lint
+      - name: Run tests
+        run: cd frontend && npm test

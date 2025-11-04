@@ -1,9 +1,389 @@
-# MERL-T Alpha
+# MERL-T: Multi-Expert Legal Retrieval Transformer
 
-This repository contains the implementation of the MERL-T Alpha project.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
+[![Phase](https://img.shields.io/badge/Phase-1%20Complete-brightgreen.svg)](docs/IMPLEMENTATION_ROADMAP.md)
 
-## Quick Start
+**MERL-T** is an AI-powered architecture for legal research, compliance monitoring, and regulatory analysis. Sponsored by **ALIS** (Artificial Legal Intelligence Society), it implements a novel **RLCF (Reinforcement Learning from Community Feedback)** framework for aligning legal AI systems with expert knowledge.
 
-1.  Clone the repository: `git clone <repository-url>`
-2.  Install dependencies: `npm install && pip install -r requirements.txt`
-3.  Start the development environment: `docker-compose up -d`
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.11 or higher
+- Node.js 18+ and npm (for frontend)
+- Git
+
+### Installation
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/ALIS/MERL-T_alpha.git
+cd MERL-T_alpha
+
+# 2. Install backend dependencies
+pip install -e .
+
+# 3. Run database migrations
+rlcf-admin db migrate
+
+# 4. Seed demo data (optional)
+rlcf-admin db seed --users 5 --tasks 10
+
+# 5. Start backend server
+rlcf-admin server --reload
+
+# 6. (In another terminal) Start frontend
+cd frontend/rlcf-web
+npm install
+npm run dev
+```
+
+**Access the application**:
+- Backend API: http://localhost:8000/docs
+- Frontend: http://localhost:3000
+- Gradio Admin: `python backend/rlcf_framework/app_interface.py`
+
+---
+
+## 📋 What is MERL-T?
+
+MERL-T (Multi-Expert Legal Retrieval Transformer) is a comprehensive system for legal AI that:
+
+1. **Retrieves** relevant legal information from multiple sources (norms, case law, doctrine)
+2. **Reasons** using multiple legal methodologies (literal, systemic-teleological, principles-based, precedent-based)
+3. **Learns** from community feedback using a novel RLCF framework
+4. **Complies** with EU AI Act requirements for high-risk legal AI systems
+
+### Key Innovation: RLCF Framework
+
+**Reinforcement Learning from Community Feedback (RLCF)** differs from traditional RLHF by:
+
+- **Dynamic Authority Scoring**: Expert influence based on demonstrated competence, not just credentials
+- **Uncertainty Preservation**: Disagreement among experts is valuable information, not noise
+- **Community-Driven Validation**: Distributed expert feedback with transparent aggregation
+- **Mathematical Rigor**: Formally defined authority scores, aggregation algorithms, and bias detection
+
+📖 **Read the full RLCF paper**: [`docs/02-methodology/rlcf/RLCF.md`](docs/02-methodology/rlcf/RLCF.md)
+
+---
+
+## 🏗️ System Architecture
+
+MERL-T is designed as a **5-layer architecture**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  1. PREPROCESSING LAYER                                     │
+│     Query understanding, NER, intent classification          │
+│     Knowledge Graph enrichment                               │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│  2. ORCHESTRATION LAYER                                     │
+│     LLM Router (100% LLM-based decision engine)             │
+│     Retrieval Agents: KG, API, VectorDB                     │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│  3. REASONING LAYER                                         │
+│     4 Expert Types: Literal, Systemic, Principles, Precedent│
+│     Synthesizer (convergent / divergent modes)              │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│  4. STORAGE LAYER                                           │
+│     PostgreSQL, Memgraph (graph), Qdrant (vectors), Redis   │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│  5. LEARNING LAYER (RLCF)                                   │
+│     Feedback collection, Authority scoring, Aggregation      │
+│     Model fine-tuning, A/B testing                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Current Status**: **Phase 1 Complete** (RLCF Core + Learning Layer)
+**Next Phase**: Preprocessing Layer (Query Understanding + Knowledge Graph)
+
+📖 **Full architecture docs**: [`docs/03-architecture/`](docs/03-architecture/)
+
+---
+
+## 🧪 RLCF Framework (Phase 1 - Complete)
+
+### What's Implemented
+
+✅ **Core RLCF Algorithms**:
+- Dynamic authority scoring (`A_u(t) = α·B_u + β·T_u(t-1) + γ·P_u(t)`)
+- Uncertainty-preserving aggregation (Algorithm 1 from RLCF paper)
+- Disagreement quantification (Shannon entropy-based)
+- Track record evolution (exponential smoothing)
+
+✅ **Backend (FastAPI)**:
+- 50+ REST API endpoints
+- SQLAlchemy 2.0 async models
+- Task handlers (polymorphic design)
+- Configuration-driven behavior (YAML)
+- OpenRouter AI service integration
+
+✅ **Frontend (React 19 + TypeScript)**:
+- Modern stack: Vite, TanStack Query, Zustand, TailwindCSS
+- Blind evaluation interface
+- Analytics dashboard (authority leaderboard, system metrics)
+- Configuration editor (YAML hot-reload)
+- Dataset export (JSONL, CSV)
+
+✅ **CLI Tools**:
+- `rlcf-cli` (user commands: tasks, users, feedback)
+- `rlcf-admin` (admin commands: config, db, server)
+
+✅ **Testing**:
+- 2,750+ lines of test code
+- 85%+ coverage on core algorithms
+- pytest + pytest-asyncio
+
+✅ **Gradio Admin Interface**:
+- Task creation (YAML, CSV upload)
+- AI response generation
+- Aggregation visualization
+- Bias analysis reports
+- Training cycle management
+
+### Example: Creating a Legal QA Task
+
+```bash
+# Using CLI
+rlcf-cli tasks create examples/qa_tasks.yaml
+
+# Using API
+curl -X POST "http://localhost:8000/tasks/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "task_type": "QA",
+    "input_data": {
+      "question": "È valido un contratto firmato da un minorenne?",
+      "context": "Diritto civile italiano"
+    },
+    "ground_truth_data": {
+      "answer": "No, il contratto è annullabile per incapacità di agire (Art. 2 c.c.)"
+    }
+  }'
+```
+
+---
+
+## 📚 Documentation
+
+### For Understanding the Theory
+1. [`docs/01-introduction/executive-summary.md`](docs/01-introduction/executive-summary.md) - High-level overview
+2. [`docs/02-methodology/rlcf/RLCF.md`](docs/02-methodology/rlcf/RLCF.md) - **Core RLCF paper** (mathematical foundations)
+3. [`docs/03-architecture/02-orchestration-layer.md`](docs/03-architecture/02-orchestration-layer.md) - Detailed architecture (100+ pages)
+
+### For Implementation & Development
+1. **[`docs/IMPLEMENTATION_ROADMAP.md`](docs/IMPLEMENTATION_ROADMAP.md)** - 42-week build plan (Phases 0-7)
+2. **[`docs/TECHNOLOGY_RECOMMENDATIONS.md`](docs/TECHNOLOGY_RECOMMENDATIONS.md)** - Tech stack with benchmarks (2025)
+3. [`docs/02-methodology/rlcf/testing/MANUAL_TESTING_GUIDE.md`](docs/02-methodology/rlcf/testing/MANUAL_TESTING_GUIDE.md) - Testing procedures
+4. [`docs/02-methodology/rlcf/guides/quick-start.md`](docs/02-methodology/rlcf/guides/quick-start.md) - RLCF quick start
+
+---
+
+## 🛠️ Development
+
+### Repository Structure
+
+```
+MERL-T_alpha/
+├── backend/
+│   ├── rlcf_framework/      # Phase 1: RLCF core (COMPLETE)
+│   ├── preprocessing/       # Phase 2: Query understanding (TODO)
+│   ├── orchestration/       # Phase 3: LLM Router + Agents (TODO)
+│   ├── reasoning/           # Phase 4: Experts + Synthesizer (TODO)
+│   └── shared/              # Shared utilities
+├── frontend/
+│   └── rlcf-web/            # React app (COMPLETE)
+├── tests/
+│   └── rlcf/                # Test suite (COMPLETE)
+├── docs/                    # Comprehensive documentation
+├── scripts/                 # Development scripts
+└── infrastructure/          # Docker, K8s configs
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest tests/rlcf/
+
+# Run with coverage
+pytest tests/rlcf/ --cov=backend/rlcf_framework --cov-report=html
+
+# Run specific test file
+pytest tests/rlcf/test_authority_module.py -v
+```
+
+### CLI Usage Examples
+
+```bash
+# User commands (rlcf-cli)
+rlcf-cli users create john_doe --authority-score 0.5
+rlcf-cli users list --sort-by authority_score --limit 10
+rlcf-cli tasks list --status OPEN
+rlcf-cli tasks export 123 --format json -o task_123.json
+
+# Admin commands (rlcf-admin)
+rlcf-admin config show --type model
+rlcf-admin config validate
+rlcf-admin db migrate
+rlcf-admin db seed --users 10 --tasks 20
+rlcf-admin server --host 0.0.0.0 --port 8080 --reload
+```
+
+### Configuration
+
+Configuration is YAML-based and hot-reloadable:
+
+- **`backend/rlcf_framework/model_config.yaml`**: Authority weights, thresholds, AI model settings
+- **`backend/rlcf_framework/task_config.yaml`**: Task type definitions, validation schemas
+
+Edit via:
+- Gradio interface (Admin tab)
+- API: `PUT /config/model` or `PUT /config/tasks`
+- Direct file editing (auto-reloads)
+
+---
+
+## 🐳 Docker Deployment
+
+### Development Environment
+
+```bash
+# Start databases (PostgreSQL, Redis, etc.)
+docker-compose -f docker-compose.dev.yml up -d
+
+# Backend and frontend run natively (see Quick Start)
+```
+
+### Production Deployment (Phase 6)
+
+```bash
+# Full stack deployment
+docker-compose up -d
+
+# Access:
+# - Backend: http://localhost:8000
+# - Frontend: http://localhost:3000
+```
+
+📖 **Deployment guide**: [`docs/04-implementation/09-deployment.md`](docs/04-implementation/09-deployment.md)
+
+---
+
+## 🎯 Roadmap
+
+### ✅ Phase 0: Setup (Weeks 1-2) - **COMPLETE**
+- Repository structure
+- CI/CD pipeline
+- Development environment
+
+### ✅ Phase 1: RLCF Core (Weeks 3-8) - **COMPLETE**
+- Database models
+- Authority module
+- Aggregation engine
+- API + Frontend
+- CLI tools
+- Testing suite
+
+### 🚧 Phase 2: Preprocessing Layer (Weeks 9-14) - **NEXT**
+- Knowledge Graph population (Neo4j → Memgraph)
+- NER for legal entities (ITALIAN-LEGAL-BERT)
+- Intent classification
+- KG enrichment service
+
+### 📋 Phase 3: Orchestration Layer (Weeks 15-22)
+- LLM Router (LangGraph-based)
+- VectorDB Agent (Qdrant)
+- KG Agent (Memgraph)
+- API Agent (Akoma Ntoso)
+
+### 📋 Phase 4: Reasoning Layer (Weeks 23-30)
+- 4 Expert types
+- Synthesizer (convergent/divergent)
+- Iteration controller
+
+### 📋 Phase 5: Integration & Testing (Weeks 31-36)
+- End-to-end testing
+- Performance optimization
+- Security hardening
+
+### 📋 Phase 6: Production Readiness (Weeks 37-42)
+- Kubernetes deployment
+- Observability (SigNoz)
+- CI/CD automation
+
+📖 **Full roadmap**: [`docs/IMPLEMENTATION_ROADMAP.md`](docs/IMPLEMENTATION_ROADMAP.md)
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions from legal experts, AI researchers, and developers!
+
+**How to contribute**:
+1. Read [`docs/02-methodology/rlcf/development/contributing.md`](docs/02-methodology/rlcf/development/contributing.md)
+2. Fork the repository
+3. Create a feature branch (`git checkout -b feature/amazing-feature`)
+4. Make your changes (ensure tests pass: `pytest tests/`)
+5. Commit with conventional commits (`feat:`, `fix:`, `docs:`)
+6. Push and create a Pull Request
+
+**Areas where we need help**:
+- 🧑‍⚖️ **Legal experts**: Annotate datasets, provide feedback on legal reasoning
+- 🧠 **AI/ML researchers**: Improve RLCF algorithms, LLM integration
+- 💻 **Developers**: Implement Phases 2-6, frontend enhancements
+- 📚 **Technical writers**: Documentation improvements
+
+---
+
+## 📄 License & Compliance
+
+**License**: MIT (see [LICENSE](LICENSE))
+
+**AI Act Compliance**: MERL-T is designed for EU AI Act compliance as a high-risk AI system (legal assistance domain):
+- ✅ Transparency: Full traceability via trace IDs
+- ✅ Human oversight: Community feedback loops (RLCF)
+- ✅ Accuracy: Multi-expert validation
+- ✅ Bias detection: Built into aggregation algorithms
+
+📖 **Compliance details**: [`docs/05-governance/ai-act-compliance.md`](docs/05-governance/ai-act-compliance.md)
+
+---
+
+## 📞 Support & Community
+
+- **Documentation**: [`docs/`](docs/)
+- **Issues**: [GitHub Issues](https://github.com/ALIS/MERL-T_alpha/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/ALIS/MERL-T_alpha/discussions)
+- **ALIS Website**: [alis.org](https://alis.org)
+
+---
+
+## 🙏 Acknowledgments
+
+- **ALIS (Artificial Legal Intelligence Society)** for sponsoring and governing the project
+- **Legal experts** who contributed to dataset annotation and validation
+- **Open-source community** for the amazing tools we build upon (FastAPI, React, SQLAlchemy, etc.)
+
+---
+
+## 🌟 Star History
+
+If you find MERL-T useful, please consider starring the repository! ⭐
+
+---
+
+**Built with ❤️ by the ALIS community**
+
+*For detailed implementation progress, see [`docs/IMPLEMENTATION_ROADMAP.md`](docs/IMPLEMENTATION_ROADMAP.md)*

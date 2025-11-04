@@ -1,3 +1,204 @@
+# MERL-T Docker Compose - Full Stack
+# Usage: docker-compose up -d
+#
+# This runs the complete stack (backend + frontend + databases).
+# For development with native backend/frontend, use docker-compose.dev.yml instead.
+
 version: '3.8'
+
 services:
-  # Add your services here
+  # ===========================================================================
+  # Backend Service (FastAPI)
+  # ===========================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: merl-t-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount code for hot-reload during development
+      - ./backend:/app/backend
+      - ./data:/app/data  # Persist SQLite database
+    environment:
+      # Database (using SQLite by default, uncomment PostgreSQL section below to use it)
+      - DATABASE_URL=sqlite+aiosqlite:///./data/rlcf.db
+      # To use PostgreSQL instead:
+      # - DATABASE_URL=postgresql+asyncpg://merl_t:merl_t_password@postgres:5432/merl_t_db
+
+      # Server
+      - HOST=0.0.0.0
+      - PORT=8000
+      - RELOAD=true
+
+      # CORS (allow frontend)
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000
+
+      # API Keys (set in .env file or override here)
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-your_openrouter_api_key_here}
+      - ADMIN_API_KEY=${ADMIN_API_KEY:-your_admin_api_key_here}
+
+      # RLCF Configuration
+      - AUTHORITY_WEIGHT_BASELINE=0.4
+      - AUTHORITY_WEIGHT_TRACK_RECORD=0.4
+      - AUTHORITY_WEIGHT_RECENT_PERFORMANCE=0.2
+      - DISAGREEMENT_THRESHOLD=0.3
+      - TRACK_RECORD_LAMBDA=0.95
+
+      # AI Model
+      - AI_MODEL=openai/gpt-3.5-turbo
+      - AI_TEMPERATURE=0.7
+      - AI_MAX_TOKENS=1000
+
+      # Logging
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=text
+    command: uvicorn backend.rlcf_framework.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false  # Optional dependency
+
+  # ===========================================================================
+  # Frontend Service (React + Vite)
+  # ===========================================================================
+  frontend:
+    image: node:20-alpine
+    container_name: merl-t-frontend
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/rlcf-web:/app
+      - /app/node_modules  # Anonymous volume for node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ===========================================================================
+  # PostgreSQL (Optional - uncomment to use instead of SQLite)
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: merl-t-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=merl_t
+      - POSTGRES_PASSWORD=merl_t_password
+      - POSTGRES_DB=merl_t_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U merl_t"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - postgres  # Only start if explicitly requested: docker-compose --profile postgres up
+
+  # ===========================================================================
+  # Neo4j (Phase 2+ - Knowledge Graph)
+  # ===========================================================================
+  neo4j:
+    image: neo4j:5.13-community
+    container_name: merl-t-neo4j
+    ports:
+      - "7474:7474"  # Browser UI
+      - "7687:7687"  # Bolt protocol
+    environment:
+      - NEO4J_AUTH=neo4j/merl_t_password
+      - NEO4J_PLUGINS=["apoc", "graph-data-science"]
+      - NEO4J_dbms_memory_heap_initial__size=512m
+      - NEO4J_dbms_memory_heap_max__size=2G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - phase2  # Only start for Phase 2+: docker-compose --profile phase2 up
+
+  # ===========================================================================
+  # Redis (Phase 2+ - Caching Layer)
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: merl-t-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - phase2  # Only start for Phase 2+: docker-compose --profile phase2 up
+
+  # ===========================================================================
+  # Qdrant (Phase 3+ - Vector Database)
+  # ===========================================================================
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: merl-t-qdrant
+    ports:
+      - "6333:6333"  # HTTP API
+      - "6334:6334"  # gRPC API
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:6333/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - phase3  # Only start for Phase 3+: docker-compose --profile phase3 up
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  # SQLite data (default)
+  data:
+
+  # PostgreSQL
+  postgres_data:
+
+  # Neo4j (Phase 2+)
+  neo4j_data:
+  neo4j_logs:
+
+  # Redis (Phase 2+)
+  redis_data:
+
+  # Qdrant (Phase 3+)
+  qdrant_data:
+
+# =============================================================================
+# Networks (default bridge network)
+# =============================================================================
+networks:
+  default:
+    name: merl-t-network
+    driver: bridge

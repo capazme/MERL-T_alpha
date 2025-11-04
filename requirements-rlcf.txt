@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+sqlalchemy
+aiosqlite
+greenlet
+pydantic
+numpy
+scipy
+pydantic-settings
+pyyaml
+gradio
+requests
+typing_extensions
+asteval
+aiohttp
+pandas
