@@ -1,0 +1,434 @@
+# DATI ARRICCHITI CON FONTI REALI PER MERL-T REASONING DEEP DIVE
+
+examples:
+  - id: 1
+    numero: 1
+    titolo: "Contratto Minorenne"
+    emoji: "👶"
+    query: "È valido un contratto firmato da un sedicenne?"
+
+    query_understanding:
+      abbreviation_expansion:
+        - token: "contratto"
+          expanded: "contratto civile"
+          confidence: 0.98
+          rlcf_feedback: null
+      entity_extraction:
+        - token: "sedicenne"
+          type: "PERSON"
+          value: "16"
+          pos_tag: "ADJ"
+          confidence: 0.94
+        - token: "contratto"
+          type: "LEGALOBJECT"
+          value: "contratto"
+          pos_tag: "NOUN"
+          confidence: 0.96
+      concept_mapping:
+        candidates: ["contratto", "capacità", "minore", "validità"]
+        approved: ["capacità_di_agire", "validità_contrattuale", "minore_età", "annullabilità"]
+        excluded: 
+          - concept: "contratto"
+            reason: "Generic: excluded per complexity > 0.8"
+            confidence: 0.72
+      intent_classification:
+        - intent: "validità_atto"
+          probability: 0.94
+          ranking: 1
+          selected: true
+      temporal_extraction:
+        temporal_scope: "current"
+        range: null
+        default_used: true
+      complexity_scoring:
+        entity_count: 0.25
+        intent_complexity: 0.18
+        temporal_constraints: 0
+        specificity: -0.15
+        final: 0.62
+        formula: "0.25 + 0.18 + 0 - 0.15 = 0.62"
+
+    kg_enrichment:
+      cypher_queries:
+        - query: "MATCH (c:Concept)-[:REGULATED_BY]->(n:Norm) WHERE c.name IN ['capacità_di_agire', 'validità_contrattuale'] RETURN n"
+          results: 8
+          time_ms: 47
+      mapped_norms:
+        - id: "cc-art-2"
+          title: "Maggiore età. Capacità di agire"
+          version: "current"
+          fulltext: "La maggiore età è fissata al compimento del diciottesimo anno. Con la maggiore età si acquista la capacità di compiere tutti gli atti per i quali non sia stabilita un'età diversa. Sono salve le leggi speciali che stabiliscono un'età inferiore in materia di capacità a prestare il proprio lavoro. In tal caso il minore è abilitato all'esercizio dei diritti e delle azioni che dipendono dal contratto di lavoro."
+          related_concepts: ["capacità_di_agire", "maggiore_età"]
+          structured_paragraphs:
+            - number: 1
+              text: "La maggiore età è fissata al compimento del diciottesimo anno. Con la maggiore età si acquista la capacità di compiere tutti gli atti per i quali non sia stabilita un'età diversa."
+            - number: 2
+              text: "Sono salve le leggi speciali che stabiliscono un'età inferiore in materia di capacità a prestare il proprio lavoro. In tal caso il minore è abilitato all'esercizio dei diritti e delle azioni che dipendono dal contratto di lavoro."
+        - id: "cc-art-322"
+          title: "Inosservanza delle disposizioni precedenti"
+          version: "current"
+          fulltext: "Gli atti compiuti senza osservare le norme dei precedenti articoli del presente titolo possono essere annullati su istanza dei genitori esercenti la responsabilità genitoriale o del figlio o dei suoi eredi o aventi causa."
+          related_concepts: ["annullabilità", "rappresentanza_legale"]
+        - id: "cc-art-1425"
+          title: "Incapacità delle parti"
+          version: "current"
+          fulltext: "Il contratto è annullabile se una delle parti era legalmente incapace di contrattare. È parimenti annullabile il contratto stipulato da persona incapace di intendere o di volere."
+          related_concepts: ["incapacità_legale", "annullabilità"]
+        - id: "cc-art-1426"
+          title: "Raggiri usati dal minore"
+          fulltext: "Il contratto non è annullabile, se il minore ha con raggiri occultato la sua minore età; ma la semplice dichiarazione da lui fatta di essere maggiorenne non è di ostacolo all'impugnazione del contratto."
+      jurisprudence:
+        - id: "Cass. 18210/2015"
+          court: "Cassazione"
+          date: "2015"
+          authority_score: 0.95
+          citations: 247
+          abstract: "Gli atti compiuti da minore senza rappresentanza legale sono annullabili ai sensi dell'art. 322 c.c. L'annullabilità può essere fatta valere dal minore stesso una volta raggiunta la maggiore età, dai rappresentanti legali o dagli eredi."
+        - id: "Cass. 3281/2019"
+          court: "Cassazione"
+          date: "2019"
+          authority_score: 0.92
+          citations: 89
+          abstract: "Il termine di prescrizione quinquennale per l'azione di annullamento decorre dal raggiungimento della maggiore età da parte del minore."
+        - id: "Trib. Foggia 2507/2023"
+          court: "Tribunale"
+          date: "2023-10-16"
+          authority_score: 0.78
+          citations: 12
+          abstract: "L'art. 322 c.c. trova applicazione per gli atti di straordinaria amministrazione compiuti senza autorizzazione del giudice tutelare."
+      related_concepts_depth2:
+        depth1: ["emancipazione", "rappresentanza_legale", "ratifica"]
+        depth2: ["autorizzazione_matrimonio", "capacità_di_agire_limitata", "interdizione"]
+
+    router:
+      expert_selection:
+        - expert: "Literal Interpreter"
+          confidence: 0.92
+          reason: "Query richiede interpretazione letterale Art. 2 e 322 c.c.: requisito di maggiore età e conseguenze giuridiche della minore età"
+        - expert: "Precedent Expert"
+          confidence: 0.88
+          reason: "Giurisprudenza consolidata (Cass. 18210/2015, 3281/2019) su capacità minore e annullabilità atti"
+      retrieval_agents: ["KG Agent", "API Agent"]
+      expected_iterations: 1
+      router_confidence: 0.92
+      rationale: "Query semplice con risposta diretta basata su norme chiare (Art. 2, 322) e giurisprudenza consolidata. Complessità 0.62 → attivazione esperti base: Literal + Precedent"
+
+    retrieval:
+      kg_agent:
+        query_time_ms: 52
+        results: 12
+        cache_status: "hit"
+        norms_retrieved: ["cc-art-2", "cc-art-322", "cc-art-1425", "cc-art-1426"]
+        cypher_executed: "MATCH (c:Concept {name: 'capacità_di_agire'})-[:REGULATED_BY]->(n:Norm) RETURN n.id, n.title, n.fulltext LIMIT 10"
+      api_agent:
+        requests: 4
+        responses: 4
+        status: 200
+        time_ms: 156
+        fallback: false
+        endpoint: "https://api.normattiva.it/akoma-ntoso"
+        norms_fetched:
+          - norm_id: "cc-art-2"
+            http_status: 200
+            latency_ms: 38
+          - norm_id: "cc-art-322"
+            http_status: 200
+            latency_ms: 41
+      vectordb_agent:
+        topk: 5
+        query_time_ms: 89
+        results: 5
+        similarity_scores: [0.94, 0.91, 0.87, 0.82, 0.79]
+        chunks_retrieved:
+          - chunk_id: "chunk_4521"
+            similarity: 0.94
+            source: "cc-art-2"
+            text: "maggiore età diciottesimo anno capacità agire..."
+          - chunk_id: "chunk_8932"
+            similarity: 0.91
+            source: "cc-art-322"
+            text: "annullamento atti minore rappresentante legale..."
+      aggregated_timeline:
+        - time_ms: 52
+          agent: "KG Agent"
+          status: "completed"
+          results_count: 12
+        - time_ms: 89
+          agent: "VectorDB Agent"
+          status: "completed"
+          results_count: 5
+        - time_ms: 156
+          agent: "API Agent"
+          status: "completed"
+          results_count: 4
+
+    reasoning:
+      experts:
+        - name: "Literal Interpreter"
+          method: "letterale"
+          steps:
+            - step: 1
+              description: "Art. 2 c.c. stabilisce: 'La maggiore età è fissata al compimento del diciottesimo anno'"
+              evidence: "Norma: cc-art-2, comma 1"
+              confidence_update: 0.85
+              reasoning: "Interpretazione letterale diretta: 18 anni = maggiore età"
+            - step: 2
+              description: "Sedicenne (16 anni) < 18 anni → soggetto è minore"
+              evidence: "Inferenza logica da Art. 2"
+              confidence_update: 0.89
+              reasoning: "Confronto aritmetico: 16 < 18"
+            - step: 3
+              description: "Art. 322 c.c.: 'Gli atti compiuti senza osservare le norme [...] possono essere annullati'"
+              evidence: "Norma: cc-art-322"
+              confidence_update: 0.92
+              reasoning: "Minore privo di capacità → atti annullabili, non nulli"
+          verdict: "ANNULLABILE"
+          confidence: 0.92
+          sources: ["cc-art-2", "cc-art-322", "cc-art-1425"]
+          rationale_summary: "Il diciottenne acquista la capacità di agire (Art. 2). Il sedicenne è minore e privo di tale capacità. Gli atti del minore senza rappresentanza sono annullabili (Art. 322), non nulli."
+
+        - name: "Precedent Expert"
+          method: "jurisprudenza"
+          steps:
+            - step: 1
+              description: "Cass. 18210/2015 conferma: atti minore senza rappresentanza = annullabili"
+              evidence: "Precedente: Cass. 18210/2015"
+              confidence_update: 0.88
+              reasoning: "Orientamento consolidato Cassazione"
+            - step: 2
+              description: "Applicazione diretta al caso: contratto firmato da sedicenne senza genitori"
+              evidence: "Reasoning analogico"
+              confidence_update: 0.88
+              reasoning: "Caso identico: minore stipula contratto autonomamente"
+          verdict: "ANNULLABILE"
+          confidence: 0.88
+          sources: ["Cass. 18210/2015", "Cass. 3281/2019"]
+          rationale_summary: "Giurisprudenza costante: contratti minori annullabili su istanza rappresentanti o del minore divenuto maggiorenne (prescrizione 5 anni da maggiore età)."
+
+      consensus:
+        divergence: 0.04
+        confidence_avg: 0.90
+        convergence_status: "CONVERGED"
+        consensus_verdict: "ANNULLABILE"
+        agreement_level: "HIGH"
+
+    loop_controller:
+      metrics:
+        - metric: "confidence_avg"
+          threshold: 0.85
+          actual: 0.90
+          status: "PASS"
+          rationale: "Confidence media 0.90 supera soglia 0.85"
+        - metric: "divergence_max"
+          threshold: 0.15
+          actual: 0.04
+          status: "PASS"
+          rationale: "Divergenza 0.04 molto inferiore a soglia 0.15"
+        - metric: "gap_analysis"
+          status: "PASS"
+          rationale: "Nessun gap identificato: entrambi esperti convergono su 'ANNULLABILE'"
+      decision: "STOP"
+      rationale: "Confidenza media >0.90, divergenza <0.15 → criterio convergenza soddisfatto. Nessuna necessità di iterazione aggiuntiva."
+      iterations: 1
+      loop_triggered: false
+
+    synthesis:
+      mode: "convergent"
+      weights:
+        - expert: "Literal Interpreter"
+          weight: 0.52
+          confidence: 0.92
+          contribution: 0.478
+          rationale: "Peso maggiore per interpretazione letterale diretta delle norme"
+        - expert: "Precedent Expert"
+          weight: 0.48
+          confidence: 0.88
+          contribution: 0.422
+          rationale: "Peso bilanciato per conferma giurisprudenziale"
+      formula: "0.52 × 0.92 + 0.48 × 0.88 = 0.9384 ≈ 0.938"
+      aggregation_method: "weighted_average"
+      final_conclusion: "Contratto ANNULLABILE (Art. 2, 322 c.c.)"
+      final_confidence: 0.938
+      key_points:
+        - point: "Maggiore età: 18 anni (Art. 2 c.c.)"
+          sources: ["cc-art-2"]
+        - point: "Minore privo capacità agire → atti annullabili (Art. 322)"
+          sources: ["cc-art-322"]
+        - point: "Annullabilità su istanza rappresentante legale o del minore maggiorenne"
+          sources: ["cc-art-322", "Cass. 18210/2015"]
+        - point: "Ratifica possibile al raggiungimento maggiore età"
+          sources: ["cc-art-1443"]
+        - point: "Prescrizione 5 anni dal raggiungimento maggiore età"
+          sources: ["cc-art-1442", "Cass. 3281/2019"]
+      caveats:
+        - text: "Emancipazione (Art. 390 c.c.) potrebbe consentire validità in casi specifici"
+          severity: "LOW"
+          details: "Minore emancipato per matrimonio acquista capacità limitata"
+        - text: "Art. 1426: se minore ha con raggiri occultato minore età → contratto non annullabile"
+          severity: "MEDIUM"
+          details: "Semplice dichiarazione di essere maggiorenne NON impedisce impugnazione"
+      sources:
+        - type: "norm"
+          id: "cc-art-2"
+          title: "Maggiore età. Capacità di agire"
+          citations: 1247
+          relevance: 0.98
+          link: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262~art2"
+        - type: "norm"
+          id: "cc-art-322"
+          title: "Inosservanza delle disposizioni precedenti"
+          citations: 892
+          relevance: 0.97
+          link: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262~art322"
+        - type: "precedent"
+          id: "Cass. 18210/2015"
+          court: "Cassazione"
+          citations: 247
+          relevance: 0.95
+        - type: "norm"
+          id: "cc-art-1425"
+          title: "Incapacità delle parti"
+          citations: 634
+          relevance: 0.89
+        - type: "norm"
+          id: "cc-art-1426"
+          title: "Raggiri usati dal minore"
+          citations: 421
+          relevance: 0.82
+
+    traceability:
+      execution_time_ms: 3847
+      total_tokens: 6521
+      model_versions:
+        query_understanding: "distilbert-it-legal v2.3"
+        entity_extraction: "spaCy it_legal_ner v3.1"
+        router: "RLCF v5.1"
+        reasoning_literal: "GPT-4 Turbo"
+        reasoning_precedent: "GPT-4 Turbo"
+        synthesis: "GPT-4 Turbo"
+      compliance:
+        - feature: "Entity Privacy"
+          standard: "GDPR Art. 5"
+          status: "compliant"
+          details: "Nessun dato personale identificabile estratto o conservato"
+        - feature: "Audit Trail"
+          standard: "ISO 27001"
+          status: "compliant"
+          details: "Full trace disponibile con timestamp per ogni step"
+        - feature: "Explainability"
+          standard: "EU AI Act Art. 13"
+          status: "compliant"
+          details: "Reasoning trasparente con citazioni fonti normative"
+      feedback_history:
+        - date: "2025-11-01"
+          feedback_type: "accuracy_validation"
+          result: "correct"
+          impact: "+0.5% accuracy improvement"
+          details: "Validazione manuale giurista conferma correttezza risposta"
+        - date: "2025-10-15"
+          feedback_type: "source_addition"
+          result: "accepted"
+          impact: "Art. 1426 aggiunto come caveat"
+          details: "Feedback utente: menzionare eccezione raggiri"
+
+    export:
+      available_formats: ["JSON", "Markdown", "PDF", "CSV"]
+      json_size_kb: 87
+      markdown_pages: 4
+      pdf_pages: 6
+
+  - id: 2
+    numero: 2
+    titolo: "Licenziamento Donna Incinta"
+    emoji: "🤰"
+    query: "È legale licenziare una donna incinta?"
+
+    query_understanding:
+      complexity_scoring:
+        final: 0.75
+      concepts: ["licenziamento", "gravidanza", "discriminazione_genere", "tutela_maternità", "Art. 37 Cost"]
+
+    kg_enrichment:
+      mapped_norms:
+        - id: "dlgs-151-2001-art-54"
+          title: "Divieto di licenziamento"
+          fulltext: "Le lavoratrici non possono essere licenziate dall'inizio del periodo di gravidanza fino al termine dei periodi di interdizione dal lavoro previsti dal Capo III, nonché fino al compimento di un anno di età del bambino. Il divieto di licenziamento opera in connessione con lo stato oggettivo di gravidanza, e la lavoratrice, licenziata nel corso del periodo in cui opera il divieto, è tenuta a presentare al datore di lavoro idonea certificazione dalla quale risulti l'esistenza all'epoca del licenziamento, delle condizioni che lo vietavano. Il divieto di licenziamento non si applica nel caso: a) di colpa grave da parte della lavoratrice, costituente giusta causa per la risoluzione del rapporto di lavoro; b) di cessazione dell'attività dell'azienda cui essa è addetta; c) di ultimazione della prestazione per la quale la lavoratrice è stata assunta o di risoluzione del rapporto di lavoro per la scadenza del termine; d) di esito negativo della prova."
+          related_concepts: ["tutela_maternità", "licenziamento_nullo"]
+        - id: "cost-art-37"
+          title: "Tutela del lavoro femminile"
+          fulltext: "La donna lavoratrice ha gli stessi diritti e, a parità di lavoro, le stesse retribuzioni che spettano al lavoratore. Le condizioni di lavoro devono consentire l'adempimento della sua essenziale funzione familiare e assicurare alla madre e al bambino una speciale adeguata protezione."
+          related_concepts: ["uguaglianza", "protezione_maternità"]
+      jurisprudence:
+        - id: "Cass. 24015/2019"
+          abstract: "Il licenziamento di lavoratrice in stato di gravidanza è nullo ai sensi dell'art. 54 D.Lgs. 151/2001, con diritto alla reintegrazione e al risarcimento del danno."
+
+    router:
+      expert_selection:
+        - expert: "Literal Interpreter"
+          confidence: 0.95
+          reason: "Art. 54 D.Lgs. 151/2001 prevede divieto esplicito"
+        - expert: "Systemic Expert"
+          confidence: 0.88
+          reason: "Coordinamento Art. 54 + Art. 2119 c.c. (giusta causa)"
+        - expert: "Constitutional Expert"
+          confidence: 0.91
+          reason: "Art. 37 Cost. impone tutela speciale lavoro femminile"
+      expected_iterations: 1
+
+    reasoning:
+      experts:
+        - name: "Literal Interpreter"
+          verdict: "NULLO"
+          confidence: 0.95
+          sources: ["dlgs-151-2001-art-54"]
+          rationale_summary: "Art. 54 comma 1 stabilisce divieto assoluto licenziamento dall'inizio gravidanza a 1 anno età bambino. Sanzione: nullità (non annullabilità)."
+        - name: "Systemic Expert"
+          verdict: "NULLO salvo giusta causa"
+          confidence: 0.88
+          sources: ["dlgs-151-2001-art-54", "cc-art-2119"]
+          rationale_summary: "Sistema coordina Art. 54 (divieto) con Art. 2119 (giusta causa). Eccezione: colpa grave lavoratrice."
+        - name: "Constitutional Expert"
+          verdict: "NULLO per tutela costituzionale"
+          confidence: 0.91
+          sources: ["cost-art-37"]
+          rationale_summary: "Art. 37 Cost. impone protezione speciale maternità. Licenziamento discriminatorio viola principio costituzionale."
+
+    synthesis:
+      final_conclusion: "Licenziamento NULLO (Art. 54 TU Maternità D.Lgs. 151/2001)"
+      final_confidence: 0.915
+      key_points:
+        - "Divieto licenziamento: dall'inizio gravidanza a 1 anno età bambino"
+        - "Nullità licenziamento discriminatorio (non semplice annullabilità)"
+        - "Eccezione: giusta causa per gravi inadempienze lavoratrice"
+        - "Tutela costituzionale (Art. 37 Cost.)"
+      sources:
+        - type: "norm"
+          id: "dlgs-151-2001-art-54"
+          title: "Divieto di licenziamento"
+          link: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2001-03-26;151~art54"
+
+  - id: 3
+    numero: 3
+    titolo: "Diritto Oblio Digitale"
+    emoji: "🔍"
+    query: "Posso chiedere la cancellazione dei miei dati da Google?"
+
+    kg_enrichment:
+      mapped_norms:
+        - id: "GDPR-art-17"
+          title: "Diritto alla cancellazione ('diritto all'oblio')"
+          fulltext: "L'interessato ha il diritto di ottenere dal titolare del trattamento la cancellazione dei dati personali che lo riguardano senza ingiustificato ritardo e il titolare del trattamento ha l'obbligo di cancellare senza ingiustificato ritardo i dati personali, se sussiste uno dei motivi seguenti: a) i dati personali non sono più necessari rispetto alle finalità per le quali sono stati raccolti o altrimenti trattati; b) l'interessato revoca il consenso su cui si basa il trattamento; c) l'interessato si oppone al trattamento; d) i dati personali sono stati trattati illecitamente; e) i dati personali devono essere cancellati per adempiere un obbligo legale."
+          paragraph_2: "Il titolare del trattamento, se ha reso pubblici dati personali ed è obbligato a cancellarli, tenendo conto della tecnologia disponibile e dei costi di attuazione, adotta le misure ragionevoli, anche tecniche, per informare i titolari del trattamento che trattano i dati personali della richiesta dell'interessato di cancellare qualsiasi link, copia o riproduzione dei suoi dati personali."
+      jurisprudence:
+        - id: "Corte UE C-131/12 (Google Spain)"
+          court: "Corte di Giustizia UE"
+          date: "2014-05-13"
+          abstract: "Sentenza storica che riconosce diritto all'oblio. Bilanciamento necessario tra privacy e libertà informazione. Google è responsabile del trattamento."
+
+    synthesis:
+      final_conclusion: "Diritto RICONOSCIUTO ma BILANCIATO con libertà espressione"
+      key_points:
+        - "GDPR Art. 17: diritto cancellazione dati personali"
+        - "Bilanciamento con libertà espressione (Carta UE Art. 11)"
+        - "Test caso-per-caso: rilevanza pubblica vs privacy"
+        - "Autorità Garante Privacy può intervenire"
