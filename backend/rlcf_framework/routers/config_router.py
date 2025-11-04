@@ -22,7 +22,7 @@ from datetime import datetime
 
 from ..config import TaskConfig, ModelConfig, TaskSchemaDefinition
 from ..config_manager import get_config_manager
-from ..main import get_api_key  # Admin auth dependency
+from ..auth import get_api_key  # Admin auth dependency
 
 
 router = APIRouter(prefix="/config", tags=["Configuration Management"])

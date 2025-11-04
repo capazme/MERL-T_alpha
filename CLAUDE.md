@@ -475,3 +475,6 @@ Start with these files in order:
 3. `docker-compose.prod.yml` - Production deployment configuration
 4. `Dockerfile` - Container image build specification
 5. `setup.py` - Package configuration and CLI entry points
+
+### Other User Preferences
+- aggiorna la documentazione alla fine di ogni traguardo importante
