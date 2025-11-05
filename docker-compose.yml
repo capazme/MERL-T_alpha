@@ -54,6 +54,19 @@ services:
       # Logging
       - LOG_LEVEL=INFO
       - LOG_FORMAT=text
+
+      # Week 6 - Orchestration (Phase 2+)
+      - ROUTER_MODEL=${ROUTER_MODEL:-anthropic/claude-3.5-sonnet}
+      - ROUTER_TEMPERATURE=${ROUTER_TEMPERATURE:-0.1}
+      - EXPERT_MODEL=${EXPERT_MODEL:-anthropic/claude-3.5-sonnet}
+      - SYNTHESIZER_MODEL=${SYNTHESIZER_MODEL:-anthropic/claude-3.5-sonnet}
+      - MAX_ITERATIONS=${MAX_ITERATIONS:-3}
+
+      # Norma Controller API (Visualex microservice)
+      - NORMA_API_URL=http://visualex:5000
+
+      # Sentenze API (placeholder/mock - configure when available)
+      - SENTENZE_API_URL=http://localhost:5001
     command: uvicorn backend.rlcf_framework.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
@@ -66,6 +79,33 @@ services:
       postgres:
         condition: service_healthy
         required: false  # Optional dependency
+
+  # ===========================================================================
+  # Visualex API (Phase 2+ - Legal Scraper Microservice)
+  # ===========================================================================
+  visualex:
+    build:
+      context: ./visualex
+      dockerfile: Dockerfile
+    container_name: merl-t-visualex
+    ports:
+      - "5000:5000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=5000
+      - RATE_LIMIT=100
+      - RATE_LIMIT_WINDOW=60
+      - HISTORY_LIMIT=100
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    profiles:
+      - phase2  # Start with Phase 2+ (API Agent depends on this)
 
   # ===========================================================================
   # Frontend Service (React + Vite)

@@ -49,18 +49,26 @@ retrieval_agents:
       - temporal_evolution
     cypher_timeout_ms: 3000
 
-  # API Agent (Akoma Ntoso, Normattiva, etc.)
+  # API Agent (Custom Norma Controller + Sentenze)
   api_agent:
     enabled: true
     max_results: 20
     cache_ttl_seconds: 86400  # 24 hours
     sources:
-      normattiva:
+      # Custom Norma Controller API (localhost:5000)
+      norma_controller:
         enabled: true
-        base_url: "https://www.normattiva.it"
-      akoma_ntoso:
-        enabled: true
-        base_url: "https://www.normattiva.it/do/atto/export"
+        base_url: ${NORMA_API_URL:-http://localhost:5000}
+        endpoints:
+          fetch_all_data: "/fetch_all_data"  # Article text + Brocardi
+          fetch_article_text: "/fetch_article_text"  # Article text only
+          fetch_brocardi_info: "/fetch_brocardi_info"  # Brocardi only
+      # Sentenze API (placeholder/mock - configure when available)
+      sentenze_api:
+        enabled: false  # Set to true when API is ready
+        base_url: ${SENTENZE_API_URL:-http://localhost:5001}
+        endpoints:
+          search: "/search"  # Customize when API available
     timeout_per_source_seconds: 3
 
   # VectorDB Agent (Qdrant)
