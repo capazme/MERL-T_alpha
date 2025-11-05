@@ -1,0 +1,374 @@
+# ===========================================
+# Knowledge Graph Service Configuration
+# ===========================================
+#
+# Configuration for multi-source legal knowledge graph enrichment
+# Phase 2 Week 5-6
+#
+# ===========================================
+
+# ===========================================
+# Neo4j Connection
+# ===========================================
+neo4j:
+  # Connection URI (Bolt protocol)
+  uri: "bolt://localhost:7687"
+
+  # Alternative URIs for different environments
+  # uri: "bolt://neo4j:7687"  # Docker internal network
+  # uri: "neo4j://localhost:7687"  # Neo4j 4.0+ protocol
+
+  # Authentication
+  user: "neo4j"
+  password: "${NEO4J_PASSWORD:-merl_t_password}"  # Environment variable or default
+
+  # Database name
+  database: "neo4j"
+
+  # Connection pool settings
+  max_connection_pool_size: 50
+  connection_acquisition_timeout: 60  # seconds
+  connection_timeout: 30  # seconds
+  max_transaction_retry_time: 30  # seconds
+
+  # Query settings
+  fetch_size: 1000  # Records per batch
+  default_access_mode: "READ"  # READ or WRITE
+
+# ===========================================
+# Redis Cache Configuration
+# ===========================================
+redis:
+  # Connection
+  host: "localhost"
+  port: 6379
+  db: 0  # Database index
+  password: null  # Set if Redis has authentication
+
+  # Alternative for Docker
+  # host: "redis"
+
+  # Connection pool
+  max_connections: 10
+  socket_timeout: 5  # seconds
+  socket_connect_timeout: 5  # seconds
+  socket_keepalive: true
+
+  # Cache settings
+  default_ttl: 86400  # 24 hours in seconds
+  key_prefix: "merl-t:kg:"  # Namespace for keys
+
+  # Cache strategies per entity type
+  cache_ttl:
+    norma: 604800  # 7 days (norms change infrequently)
+    sentenza: 86400  # 1 day (case law)
+    dottrina: 172800  # 2 days (doctrine)
+    contributo: 3600  # 1 hour (community contributions)
+    rlcf: 1800  # 30 minutes (RLCF consensus)
+
+# ===========================================
+# Enrichment Service Configuration
+# ===========================================
+enrichment:
+  # Parallel query execution
+  max_parallel_queries: 5
+  query_timeout: 10  # seconds per query
+
+  # Minimum confidence threshold (0.0 - 1.0)
+  min_confidence: 0.6
+
+  # Maximum results per query type
+  max_results:
+    norms: 20
+    sentenze: 15
+    dottrina: 10
+    related_norms: 10
+    concepts: 30
+
+  # Source weights (for confidence scoring)
+  source_weights:
+    normattiva: 1.0  # Official source, highest weight
+    cassazione: 0.95  # Official case law
+    dottrina: 0.85  # Academic/expert commentary
+    community: 0.70  # Crowdsourced (requires validation)
+    rlcf: 0.90  # RLCF consensus (expert-validated)
+
+  # Quorum requirements (per entity type)
+  quorum:
+    norma:
+      min_experts: 3
+      min_authority: 0.80
+    sentenza:
+      min_experts: 4
+      min_authority: 0.85
+    dottrina:
+      min_experts: 5
+      min_authority: 0.75
+    contributo:
+      min_votes: 10
+      min_net_positive: 5
+
+  # Controversy detection
+  controversy:
+    entropy_threshold: 0.7  # Shannon entropy
+    polarization_threshold: 0.6  # Vote distribution
+
+# ===========================================
+# Data Sources Configuration
+# ===========================================
+data_sources:
+  # Normattiva.it (Official Italian legal texts)
+  normattiva:
+    enabled: true
+    api_url: null #"visualex"
+    timeout: 30
+    retry_attempts: 3
+    cache_ttl: 604800  # 7 days
+
+  # Cassazione (Supreme Court decisions)
+  cassazione:
+    enabled: true
+    api_url: null  # Configured separately
+    timeout: 30
+    retry_attempts: 3
+    cache_ttl: 86400  # 1 day
+
+  # Dottrina (Academic/expert commentary)
+  dottrina:
+    enabled: true
+    sources:
+      - "curated_collection"
+      - "academic_journals"
+    cache_ttl: 172800  # 2 days
+
+  # Community Contributions
+  community:
+    enabled: true
+    voting_window_days: 7
+    auto_approval_threshold: 10  # Net positive votes
+    require_expert_review: true
+    cache_ttl: 3600  # 1 hour
+
+  # RLCF Consensus
+  rlcf:
+    enabled: true
+    min_quorum: 3
+    min_authority: 0.75
+    cache_ttl: 1800  # 30 minutes
+
+# ===========================================
+# Cypher Query Templates
+# ===========================================
+queries:
+  # Timeout for complex graph traversals
+  complex_query_timeout: 30  # seconds
+
+  # Relationship depth limits (prevent infinite traversal)
+  max_relationship_depth:
+    modifica: 3  # MODIFICA relationships
+    abrogato_da: 3  # ABROGATO_DA relationships
+    tratta: 2  # TRATTA (concept) relationships
+    applica: 2  # APPLICA (sentenza→norma)
+
+  # Batch sizes for bulk operations
+  batch_sizes:
+    import: 1000
+    update: 500
+    delete: 100
+
+# ===========================================
+# Performance & Optimization
+# ===========================================
+performance:
+  # Enable query result caching
+  enable_query_cache: true
+  query_cache_size: 1000  # Number of queries to cache
+
+  # Connection reuse
+  connection_lifetime: 3600  # seconds
+
+  # Retry configuration
+  max_retries: 3
+  retry_delay: 1  # seconds (exponential backoff)
+
+  # Logging
+  log_queries: true
+  log_slow_queries: true
+  slow_query_threshold: 1.0  # seconds
+
+  # Metrics collection
+  collect_metrics: true
+  metrics_interval: 60  # seconds
+
+# ===========================================
+# Temporal Versioning
+# ===========================================
+versioning:
+  # Strategy per entity type
+  strategies:
+    norma:
+      type: "full_chain"  # Keep complete modification history
+      archive_after_days: null  # Never archive
+
+    sentenza:
+      type: "current_plus_archive"  # Current + historical
+      archive_after_days: 365  # Archive after 1 year
+
+    dottrina:
+      type: "latest_only"  # Keep only latest version
+      archive_after_days: 180  # Archive after 6 months
+
+    contributo:
+      type: "current_plus_archive"
+      archive_after_days: 90  # Archive after 3 months
+
+  # Archiving
+  enable_auto_archive: true
+  archive_location: "archived"  # Neo4j label for archived nodes
+
+# ===========================================
+# Error Handling
+# ===========================================
+error_handling:
+  # Retry configuration
+  retry_on_connection_error: true
+  retry_on_timeout: true
+  retry_on_transient_error: true
+
+  # Fallback behavior
+  fallback_to_cache: true
+  fallback_to_partial_results: true
+
+  # Error reporting
+  report_errors: true
+  error_log_file: "logs/kg_errors.log"
+
+# ===========================================
+# Development & Testing
+# ===========================================
+development:
+  # Enable debug logging
+  debug: false
+
+  # Mock Neo4j for testing
+  use_mock_driver: false
+
+  # Sample data for testing
+  use_sample_data: false
+  sample_data_file: "tests/fixtures/sample_kg_data.json"
+
+  # Disable caching for testing
+  disable_cache: false
+
+# ===========================================
+# Feature Flags
+# ===========================================
+features:
+  # Enable multi-source aggregation
+  multi_source_enrichment: true
+
+  # Enable RLCF integration
+  rlcf_integration: true
+
+  # Enable controversy detection
+  controversy_detection: true
+
+  # Enable community contributions
+  community_contributions: true
+
+  # Enable NER feedback loop
+  ner_feedback_loop: true
+
+  # Enable temporal queries
+  temporal_queries: true
+
+  # Enable provenance tracking
+  provenance_tracking: true
+
+# ===========================================
+# Monitoring & Alerting
+# ===========================================
+monitoring:
+  # Enable monitoring
+  enabled: true
+
+  # Metrics to collect
+  metrics:
+    - query_latency
+    - cache_hit_rate
+    - error_rate
+    - connection_pool_usage
+    - query_throughput
+
+  # Alert thresholds
+  alerts:
+    high_error_rate: 0.05  # 5%
+    slow_query_rate: 0.10  # 10%
+    cache_miss_rate: 0.50  # 50%
+    connection_pool_exhaustion: 0.90  # 90%
+
+  # Reporting
+  report_interval: 300  # 5 minutes
+  report_destination: "logs/kg_metrics.log"
+
+# ===========================================
+# End of Configuration
+# ===========================================
+
+# ===========================================
+# Document Ingestion Configuration
+# ===========================================
+document_ingestion:
+  # LLM Configuration
+  llm:
+    provider: "openrouter"
+    model: "anthropic/claude-3.5-sonnet"  # or "openai/gpt-4-turbo", "openai/gpt-4o"
+    api_key: "${OPENROUTER_API_KEY}"
+    temperature: 0.1  # Low for consistency
+    max_tokens: 4000
+    timeout_seconds: 60
+
+  # Document Reader
+  reader:
+    supported_formats: ["pdf", "docx", "txt", "md"]
+    max_file_size_mb: 50
+    ocr_enabled: false  # Enable for scanned PDFs (requires tesseract)
+    paragraph_min_words: 10
+    context_chars: 100  # Characters before/after for context
+
+  # Extraction Settings
+  extraction:
+    batch_size: 10  # Segments per LLM call
+    parallel_requests: 3  # Max concurrent LLM requests
+    confidence_threshold: 0.7  # Min confidence to accept entity
+    retry_attempts: 3
+    cache_enabled: true
+    cache_ttl_hours: 24
+
+  # Validation Settings
+  validation:
+    strict_mode: false  # If true, reject on any validation error
+    enrich_with_external: true  # Try to match external sources
+    resolve_references: true  # Link to existing Neo4j nodes
+    min_confidence: 0.7
+
+  # Neo4j Writing Settings
+  writing:
+    batch_size: 100  # Nodes per transaction
+    auto_approve: false  # Require manual review by default
+    duplicate_strategy: "merge"  # "merge", "skip", or "error"
+    provenance_required: true
+
+  # Cost Control
+  cost_control:
+    max_cost_per_document_usd: 5.0
+    alert_threshold_usd: 100.0  # Daily alert
+    track_costs: true
+
+  # Monitoring
+  monitoring:
+    log_level: "INFO"
+    track_performance: true
+    export_stats: true
+    stats_file: "ingestion_stats.json"
+

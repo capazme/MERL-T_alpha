@@ -1,0 +1,316 @@
+# Orchestration Configuration for Week 6: LLM Integration
+# ===========================================================
+# This configuration allows easy experimentation with different:
+# - LLM models (Claude, GPT-4o, etc.)
+# - Prompt templates (versioned)
+# - Agent activation strategies
+# - Expert selection criteria
+# - Iteration policies
+
+# ==============================================
+# LLM Router Configuration
+# ==============================================
+llm_router:
+  # OpenRouter configuration
+  provider: openrouter
+  model: ${ROUTER_MODEL:-anthropic/claude-3.5-sonnet}
+  temperature: ${ROUTER_TEMPERATURE:-0.1}
+  max_tokens: 2000
+  timeout_seconds: 10
+
+  # Prompt template selection (versionable)
+  prompt_template: "router_v1"  # Options: router_v1, router_v2, etc.
+
+  # Router behavior
+  structured_output: true  # Force JSON schema validation
+  fallback_strategy: "default_plan"  # If LLM fails, use safe defaults
+
+  # Decision logging (for RLCF feedback)
+  log_decisions: true
+  log_rationale: true
+
+
+# ==============================================
+# Retrieval Agents Configuration
+# ==============================================
+retrieval_agents:
+  # Execution strategy
+  execution_mode: "parallel"  # Options: parallel, sequential
+  timeout_per_agent_seconds: 5
+
+  # KG Agent (Neo4j)
+  kg_agent:
+    enabled: true
+    max_results: 50
+    task_types:  # Which task types to support
+      - expand_related_concepts
+      - hierarchical_traversal
+      - jurisprudence_lookup
+      - temporal_evolution
+    cypher_timeout_ms: 3000
+
+  # API Agent (Akoma Ntoso, Normattiva, etc.)
+  api_agent:
+    enabled: true
+    max_results: 20
+    cache_ttl_seconds: 86400  # 24 hours
+    sources:
+      normattiva:
+        enabled: true
+        base_url: "https://www.normattiva.it"
+      akoma_ntoso:
+        enabled: true
+        base_url: "https://www.normattiva.it/do/atto/export"
+    timeout_per_source_seconds: 3
+
+  # VectorDB Agent (Qdrant)
+  vectordb_agent:
+    enabled: true
+    max_results: 10
+    search_patterns:  # Which patterns to support
+      - semantic       # P1: Pure vector search
+      - hybrid         # P2: Vector + BM25
+      - filtered       # P3: Metadata filtering
+      - reranked       # P4: Cross-encoder reranking
+    default_pattern: "hybrid"
+    embedding_model: "local"  # Options: local (E5), voyage
+    rerank_top_k: 5
+
+
+# ==============================================
+# Reasoning Experts Configuration
+# ==============================================
+reasoning_experts:
+  # Execution strategy
+  execution_mode: "parallel"  # Options: parallel, sequential
+  timeout_per_expert_seconds: 10
+
+  # Literal Interpreter (Positivismo Giuridico)
+  literal_interpreter:
+    enabled: true
+    provider: openrouter
+    model: ${EXPERT_MODEL:-anthropic/claude-3.5-sonnet}
+    temperature: 0.3
+    max_tokens: 2000
+    prompt_template: "literal_interpreter"
+    epistemology: "positivismo_giuridico"
+    activation_criteria:
+      intents: [norm_explanation]
+      complexity: [low, medium]
+      requires_interpretation: false
+
+  # Systemic-Teleological (Teleologia Giuridica)
+  systemic_teleological:
+    enabled: true
+    provider: openrouter
+    model: ${EXPERT_MODEL:-anthropic/claude-3.5-sonnet}
+    temperature: 0.4
+    max_tokens: 2000
+    prompt_template: "systemic_teleological"
+    epistemology: "teleologia_giuridica"
+    activation_criteria:
+      intents: [contract_interpretation, norm_explanation]
+      complexity: [medium, high]
+      requires_interpretation: true
+
+  # Principles Balancer (Costituzionalismo)
+  principles_balancer:
+    enabled: true
+    provider: openrouter
+    model: ${EXPERT_MODEL:-anthropic/claude-3.5-sonnet}
+    temperature: 0.4
+    max_tokens: 2000
+    prompt_template: "principles_balancer"
+    epistemology: "costituzionalismo"
+    activation_criteria:
+      intents: [compliance_question]
+      complexity: [high]
+      requires_balancing: true
+      constitutional_issue: true
+
+  # Precedent Analyst (Giurisprudenziale)
+  precedent_analyst:
+    enabled: true
+    provider: openrouter
+    model: ${EXPERT_MODEL:-anthropic/claude-3.5-sonnet}
+    temperature: 0.35
+    max_tokens: 2000
+    prompt_template: "precedent_analyst"
+    epistemology: "giurisprudenziale"
+    activation_criteria:
+      intents: [precedent_search, contract_interpretation]
+      complexity: [medium, high]
+      requires_case_law: true
+
+
+# ==============================================
+# Synthesizer Configuration
+# ==============================================
+synthesizer:
+  provider: openrouter
+  model: ${SYNTHESIZER_MODEL:-anthropic/claude-3.5-sonnet}
+  temperature: 0.2
+  max_tokens: 3000
+  timeout_seconds: 8
+
+  # Synthesis mode selection
+  default_mode: "convergent"  # Options: convergent, divergent
+  mode_selection_strategy: "llm"  # Options: llm, rule_based, fixed
+
+  # Convergent synthesis (consensus extraction)
+  convergent:
+    min_consensus_threshold: 0.7  # 70% agreement required
+    source_attribution: true
+    confidence_weighting: true  # Weight by expert confidence
+
+  # Divergent synthesis (preserve perspectives)
+  divergent:
+    preserve_all_perspectives: true
+    conflict_highlighting: true
+    epistemic_humility: true  # Acknowledge uncertainty
+
+
+# ==============================================
+# Iteration Controller Configuration
+# ==============================================
+iteration:
+  enabled: true
+  max_iterations: ${MAX_ITERATIONS:-3}
+  timeout_per_iteration_seconds: 30
+
+  # Stop criteria
+  stop_criteria:
+    # Confidence-based stop
+    confidence_threshold: 0.85  # Stop if confidence ≥ 85%
+
+    # Consensus-based stop
+    expert_consensus_threshold: 0.80  # Stop if 80%+ experts agree
+
+    # Quality-based stop (LLM evaluation)
+    quality_evaluation: true
+    quality_threshold: 0.80
+
+    # Force stop conditions
+    max_iterations_reached: true
+    timeout_exceeded: true
+    no_improvement: true  # Stop if answer quality doesn't improve
+
+  # Iteration strategy
+  iteration_strategy:
+    refine_on_low_confidence: true  # Iterate if confidence < threshold
+    refine_on_disagreement: true    # Iterate if experts disagree
+    refine_on_missing_info: true    # Iterate if key info missing
+
+
+# ==============================================
+# Embeddings Configuration
+# ==============================================
+embeddings:
+  provider: "local"  # Options: local (E5), voyage
+
+  # Local embeddings (E5-large)
+  local:
+    model_name: "sentence-transformers/multilingual-e5-large"
+    device: "cpu"  # Options: cpu, cuda
+    batch_size: 32
+    normalize_embeddings: true
+
+  # Voyage AI embeddings (production alternative)
+  voyage:
+    enabled: false
+    api_key: ${VOYAGE_API_KEY:-}
+    model: "voyage-multilingual-2"
+    input_type: "document"  # Options: document, query
+
+
+# ==============================================
+# LangGraph Workflow Configuration
+# ==============================================
+workflow:
+  # State management
+  state_persistence: false  # Save state to DB (for long-running workflows)
+  trace_execution: true     # Log all state transitions
+
+  # Node execution
+  parallel_execution:
+    agents: true   # Execute retrieval agents in parallel
+    experts: true  # Execute reasoning experts in parallel
+
+  # Error handling
+  error_handling:
+    retry_on_failure: true
+    max_retries: 2
+    fallback_to_degraded: true  # Continue with partial results on error
+
+
+# ==============================================
+# Performance & Monitoring
+# ==============================================
+performance:
+  # Latency budgets (seconds)
+  target_latencies:
+    router: 2.0
+    kg_agent: 0.1
+    api_agent: 0.2
+    vectordb_agent: 0.3
+    expert: 3.0
+    synthesizer: 2.0
+    total_single_iteration: 10.0
+
+  # Monitoring
+  track_metrics: true
+  log_traces: true
+  alert_on_timeout: true
+
+
+# ==============================================
+# Experimentation Scenarios
+# ==============================================
+# Uncomment these sections to quickly test different scenarios
+
+# # Scenario 1: Fast MVP (2 experts, no iterations)
+# reasoning_experts:
+#   literal_interpreter:
+#     enabled: true
+#   systemic_teleological:
+#     enabled: true
+#   principles_balancer:
+#     enabled: false
+#   precedent_analyst:
+#     enabled: false
+# iteration:
+#   enabled: false
+
+# # Scenario 2: GPT-4o instead of Claude
+# llm_router:
+#   model: openai/gpt-4o
+# reasoning_experts:
+#   literal_interpreter:
+#     model: openai/gpt-4o
+#   systemic_teleological:
+#     model: openai/gpt-4o
+#   # ... (apply to all experts)
+
+# # Scenario 3: High quality, slow (4 experts, 3 iterations)
+# reasoning_experts:
+#   literal_interpreter:
+#     enabled: true
+#   systemic_teleological:
+#     enabled: true
+#   principles_balancer:
+#     enabled: true
+#   precedent_analyst:
+#     enabled: true
+# iteration:
+#   max_iterations: 3
+#   stop_criteria:
+#     confidence_threshold: 0.95
+
+# # Scenario 4: VectorDB only (fast semantic search)
+# retrieval_agents:
+#   kg_agent:
+#     enabled: false
+#   api_agent:
+#     enabled: false
+#   vectordb_agent:
+#     enabled: true

@@ -1,9 +1,41 @@
 # Prossimi Passi - Roadmap di Sviluppo
 
-**Data Ultimo Aggiornamento:** 2025-11-04
-**Commit:** `4a43fc7` - Add comprehensive tests for Configuration Management API and RetrievalValidationHandler
-**Branch:** `claude/review-documentation-011CUoZgk5nQkt3chDYmnch3`
-**Analisi Completa:** Backend thoroughly reviewed and documented
+**Data Ultimo Aggiornamento:** 2025-11-05 (Week 5 Day 1-2 Completion Update)
+**Commit:** Phase 2 Week 5 Day 1-2 Complete - Document Ingestion Pipeline for Neo4j
+**Branch:** `develop`
+**Status:** Phase 1 Complete + Phase 2 Week 3 Complete + Phase 2 Week 5 Day 1-2 Complete (65% implementato)
+
+---
+
+## 📈 PROGRESSO GLOBALE
+
+**Linee di Codice Totali:**
+- **Phase 1 (RLCF Core):** 15,635 linee (backend + frontend + tests)
+  - Backend: 9,885 linee
+  - Frontend: ~3,000 linee
+  - Tests: ~2,750 linee
+
+- **Phase 2 Week 3 (KG + Pipeline):** +9,000 linee
+  - Backend Production: ~3,920 linee (preprocessing + orchestration)
+  - Backend Integration: ~330 linee (pipeline_integration.py)
+  - Backend RLCF Extension: ~520 linee (rlcf_feedback_processor.py)
+  - Tests & Documentation: ~3,000+ linee
+
+- **Phase 2 Week 5 Day 1-2 (Document Ingestion):** +4,100 linee NEW
+  - Backend Production: ~2,500 linee (document_ingestion package + CLI)
+  - Documentation: ~1,600 linee (README, design doc, week summary)
+
+**TOTAL PROGETTO: ~28,735 linee (incluso Week 5 Day 1-2)**
+
+**Test Coverage:**
+- Phase 1: 85%+ on core RLCF
+- Phase 2 Week 3: 100+ new test cases, 3,000+ LOC
+
+**Completion Status:**
+- ✅ Phase 1: 100% Complete
+- ✅ Phase 2 Week 3: 60% Complete (KG + Pipeline Integration)
+- ⏳ Phase 2 Remaining: Query Understanding modules (NER/Intent refinement)
+- ❌ Phase 3-6: Not Started
 
 ---
 
@@ -97,38 +129,109 @@
 - ✅ Database: SQLite (dev), PostgreSQL support (prod)
 - ✅ Logging: Structured logging con file rotation (`rlcf_detailed.log`)
 
-**Total Lines of Code:** ~9,885 (backend) + ~3,000 (frontend) + ~2,750 (tests) = **15,635 linee**
+**Total Lines of Code (Phase 1):** ~9,885 (backend) + ~3,000 (frontend) + ~2,750 (tests) = **15,635 linee**
 
 ---
 
-## ❌ GAP IDENTIFICATI (NON Implementato)
+### ✅ COMPLETATO - Phase 2 Week 3 (KG Enrichment + Pipeline Integration)
 
-### **Phase 2: Preprocessing Layer** - 0% implementato
-**Directory prevista:** `backend/preprocessing/` (NON ESISTE)
+**New Backend Modules** (6 file, 3,920 linee):
+- ✅ `backend/preprocessing/kg_enrichment_service.py` (700 linee): Multi-source KG enrichment
+- ✅ `backend/preprocessing/cypher_queries.py` (500 linee): Neo4j query builder (20+ templates)
+- ✅ `backend/preprocessing/models_kg.py` (400 linee): KG data models
+- ✅ `backend/preprocessing/ner_feedback_loop.py` (500 linee): NER learning loop
+- ✅ `backend/preprocessing/normattiva_sync_job.py` (400 linee): Normattiva sync service
+- ✅ `backend/preprocessing/contribution_processor.py` (400 linee): Community sources
+- ✅ `backend/preprocessing/kg_config.yaml`: KG configuration
 
-Mancano:
-- ❌ Query Understanding Module (NER, intent classification)
-- ❌ Knowledge Graph setup (Memgraph/Neo4j)
-- ❌ KG Enrichment Service
-- ❌ Entity linking
-- ❌ Cypher query generator
+**New Orchestration Modules** (3 file, 1,570 linee):
+- ✅ `backend/orchestration/pipeline_orchestrator.py` (720 linee): Full pipeline coordinator
+- ✅ `backend/rlcf_framework/rlcf_feedback_processor.py` (520 linee): RLCF aggregation engine
+- ✅ `backend/rlcf_framework/pipeline_integration.py` (330 linee): FastAPI router + endpoints
 
-**Stima implementazione:** 4-6 settimane (1 developer full-time)
+**New Test Suite** (2 file, 3,000+ linee):
+- ✅ `tests/preprocessing/test_kg_complete.py` (2,156 linee): 100+ KG test cases
+- ✅ `tests/integration/test_full_pipeline_integration.py` (850 linee): 50+ pipeline test cases
+
+**New Documentation** (2 file):
+- ✅ `tests/preprocessing/KG_TEST_SUMMARY.md`: Comprehensive KG test documentation
+- ✅ `FULL_PIPELINE_INTEGRATION_SUMMARY.md` (28 pages): Complete integration architecture
+
+**New API Endpoints** (5):
+- `POST /pipeline/query` - Execute full legal query pipeline
+- `POST /pipeline/feedback/submit` - Submit expert feedback
+- `POST /pipeline/ner/correct` - Submit NER corrections
+- `GET /pipeline/stats` - Pipeline performance statistics
+- `GET /pipeline/health` - Component health check
+
+**Week 3 Total:** ~9,000 linee (production + test code)
 
 ---
 
-### **Phase 3: Orchestration Layer** - 0% implementato
-**Directory prevista:** `backend/orchestration/` (NON ESISTE)
+### ✅ COMPLETATO - Phase 2 Week 5 Day 1-2 (Document Ingestion Pipeline)
 
-Mancano:
-- ❌ LLM Router (100% LLM-based decision engine)
-- ❌ KG Agent (Memgraph queries)
-- ❌ API Agent (EUR-Lex, Normattiva)
-- ❌ VectorDB Agent (Qdrant semantic search)
-- ❌ LangGraph state machine
-- ❌ ExecutionPlan schema
+**New Backend Package** (7 file, ~2,500 linee):
+- ✅ `backend/preprocessing/document_ingestion/models.py` (400 linee): 23 entity types, provenance tracking
+- ✅ `backend/preprocessing/document_ingestion/document_reader.py` (350 linee): PDF/DOCX/TXT extraction
+- ✅ `backend/preprocessing/document_ingestion/llm_extractor.py` (500 linee): LLM-based entity extraction
+- ✅ `backend/preprocessing/document_ingestion/validator.py` (200 linee): Schema validation
+- ✅ `backend/preprocessing/document_ingestion/neo4j_writer.py` (300 linee): Async Neo4j writing
+- ✅ `backend/preprocessing/document_ingestion/ingestion_pipeline.py` (300 linee): Pipeline orchestration
+- ✅ `backend/preprocessing/cli_ingest_document.py` (200 linee): CLI tool
 
-**Stima implementazione:** 6-8 settimane (2 developers full-time)
+**Configuration**:
+- ✅ `backend/preprocessing/kg_config.yaml`: Updated with `document_ingestion` section
+
+**Documentation** (~1,600 linee):
+- ✅ `backend/preprocessing/document_ingestion/README.md` (400 linee): Comprehensive user guide
+- ✅ `docs/08-iteration/DOCUMENT_INGESTION_PIPELINE_DESIGN.md` (800 linee): Design document
+- ✅ `docs/08-iteration/WEEK5_DAY1-2_DOCUMENT_INGESTION.md` (400 linee): Implementation summary
+
+**Key Features**:
+- ✅ LLM-based extraction (Claude 3.5 Sonnet via OpenRouter)
+- ✅ Multi-format support (PDF, DOCX, TXT)
+- ✅ Complete provenance tracking (file:page:paragraph:char_range)
+- ✅ All 23 MERL-T entity types supported
+- ✅ Async/parallel processing (3 concurrent LLM requests)
+- ✅ Cost tracking per API call
+- ✅ Batch Neo4j transactions (100 nodes per batch)
+- ✅ MERGE strategy to avoid duplicates
+- ✅ Dry-run mode for testing
+
+**Test Results**:
+- ✅ Successfully ingested Torrente PDF (10 entities, 5 relationships)
+- ✅ Duration: 69.98s for 5 segments
+- ✅ Cost: $0.0448
+- ✅ Data verified in Neo4j
+
+**Week 5 Day 1-2 Total:** ~4,100 linee (production + documentation)
+
+---
+
+## ❌ GAP RIMANENTI (NON Implementato)
+
+---
+
+### **Phase 3: Orchestration Layer** - 15% implementato (Week 3)
+**Directory:** `backend/orchestration/` (IMPLEMENTATO PARZIALMENTE)
+
+Completati in Week 3:
+- ✅ **pipeline_orchestrator.py** (720 LOC): Async pipeline coordination
+  - 7 pipeline stages with proper sequencing
+  - Intent Classification → KG Enrichment → RLCF Processing → Feedback loops
+  - PipelineContext for state management
+  - Execution logging and error handling
+
+Rimangono:
+- ❌ LLM Router (100% LLM-based decision engine) - LangGraph integration
+- ❌ KG Agent (Memgraph queries) - Intelligent KG traversal
+- ❌ API Agent (EUR-Lex, Normattiva) - External API integration
+- ❌ VectorDB Agent (Qdrant semantic search) - Vector search coordination
+- ❌ Advanced LangGraph state machine with branching
+- ❌ ExecutionPlan schema with dynamic routing
+
+**Stima implementazione:** 4-6 settimane (1-2 developers)
+**Prerequisiti completati:** Pipeline orchestration foundation, RLCF feedback integration
 
 ---
 

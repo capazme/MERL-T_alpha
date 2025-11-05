@@ -206,22 +206,31 @@ class KGEnrichmentService:
 
     def __init__(
         self,
-        neo4j_driver: AsyncDriver,
-        redis_client: AsyncRedis,
-        config: KGConfig
+        neo4j_driver: Optional[AsyncDriver] = None,
+        redis_client: Optional[AsyncRedis] = None,
+        config: Optional[KGConfig] = None
     ):
         """
         Initialize KG enrichment service.
 
         Args:
-            neo4j_driver: Neo4j async driver
-            redis_client: Redis async client
-            config: KG configuration
+            neo4j_driver: Neo4j async driver (optional, uses default if None)
+            redis_client: Redis async client (optional, disables caching if None)
+            config: KG configuration (optional, uses defaults if None)
         """
         self.neo4j_driver = neo4j_driver
         self.redis = redis_client
         self.config = config
         self.logger = logger
+
+        # Graceful degradation flags
+        self.neo4j_available = neo4j_driver is not None
+        self.redis_available = redis_client is not None
+
+        if not self.neo4j_available:
+            self.logger.warning("Neo4j driver not provided - KG enrichment will be limited")
+        if not self.redis_available:
+            self.logger.warning("Redis client not provided - caching disabled")
 
     # ==========================================
     # Main Enrichment Method
@@ -239,23 +248,42 @@ class KGEnrichmentService:
 
         Raises:
             ValueError: If intent type not supported
-            ConnectionError: If Neo4j/Redis unavailable
         """
         start_time = datetime.utcnow()
 
         try:
+            # Graceful degradation: if Neo4j not available, return empty context
+            if not self.neo4j_available:
+                self.logger.warning("Neo4j unavailable - returning empty enriched context")
+                return EnrichedContext(
+                    intent_result=intent_result,
+                    norms=[],
+                    sentenze=[],
+                    dottrina=[],
+                    contributions=[],
+                    controversy_flags=[],
+                    enrichment_metadata={
+                        "cache_hit": False,
+                        "query_time_ms": 0,
+                        "sources_queried": [],
+                        "degraded_mode": True,
+                        "reason": "neo4j_unavailable"
+                    }
+                )
+
             # Generate cache key from intent + concept
             cache_key = self._generate_cache_key(intent_result)
 
-            # Try Redis cache first
-            cached = await self._get_from_cache(cache_key)
-            if cached:
-                self.logger.debug(f"Cache HIT for {cache_key}")
-                enriched = EnrichedContext(**cached)
-                enriched.enrichment_metadata["cache_hit"] = True
-                return enriched
+            # Try Redis cache first (if available)
+            if self.redis_available:
+                cached = await self._get_from_cache(cache_key)
+                if cached:
+                    self.logger.debug(f"Cache HIT for {cache_key}")
+                    enriched = EnrichedContext(**cached)
+                    enriched.enrichment_metadata["cache_hit"] = True
+                    return enriched
 
-            self.logger.debug(f"Cache MISS for {cache_key}, querying Neo4j...")
+            self.logger.debug(f"Cache {'MISS' if self.redis_available else 'DISABLED'} for {cache_key}, querying Neo4j...")
 
             # Query Neo4j for all sources in parallel
             norms, sentenze, dottrina, contributions, controversies = await asyncio.gather(
@@ -529,7 +557,10 @@ class KGEnrichmentService:
         return f"kg_enrich:{intent_result.intent.value}:{key_hash}"
 
     async def _get_from_cache(self, key: str) -> Optional[Dict[str, Any]]:
-        """Get enriched context from Redis cache."""
+        """Get enriched context from Redis cache (if Redis available)."""
+        if not self.redis_available:
+            return None
+
         try:
             cached = await self.redis.get(key)
             if cached:
@@ -540,9 +571,12 @@ class KGEnrichmentService:
             return None
 
     async def _cache_result(self, key: str, data: Dict[str, Any]) -> bool:
-        """Cache enriched context in Redis for 24h."""
+        """Cache enriched context in Redis for 24h (if Redis available)."""
+        if not self.redis_available:
+            return False
+
         try:
-            ttl = self.config.cache_ttl_seconds
+            ttl = self.config.cache.ttl_seconds if self.config else 86400  # 24h default
             await self.redis.setex(
                 key,
                 ttl,
@@ -555,7 +589,11 @@ class KGEnrichmentService:
             return False
 
     async def invalidate_cache(self, pattern: str = "kg_enrich:*") -> int:
-        """Invalidate cache entries matching pattern."""
+        """Invalidate cache entries matching pattern (if Redis available)."""
+        if not self.redis_available:
+            self.logger.warning("Redis not available - cannot invalidate cache")
+            return 0
+
         try:
             keys = await self.redis.keys(pattern)
             if keys:
@@ -572,12 +610,22 @@ class KGEnrichmentService:
     # ==========================================
 
     async def get_cache_stats(self) -> Dict[str, Any]:
-        """Get Redis cache statistics."""
+        """Get Redis cache statistics (if Redis available)."""
+        if not self.redis_available:
+            return {
+                "redis_available": False,
+                "used_memory": "N/A",
+                "connected_clients": 0,
+                "cache_enabled": False
+            }
+
         try:
             info = await self.redis.info()
             return {
+                "redis_available": True,
                 "used_memory": info.get("used_memory_human", "unknown"),
                 "connected_clients": info.get("connected_clients", 0),
+                "cache_enabled": True,
                 "total_commands_processed": info.get("total_commands_processed", 0),
                 "instantaneous_ops_per_sec": info.get("instantaneous_ops_per_sec", 0)
             }

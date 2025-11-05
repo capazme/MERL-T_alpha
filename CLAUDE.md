@@ -6,47 +6,69 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **MERL-T (Multi-Expert Legal Retrieval Transformer)** is an AI-powered architecture for legal research, compliance monitoring, and regulatory analysis. Sponsored by ALIS (Artificial Legal Intelligence Society), this repository contains both **comprehensive technical documentation** and **working implementation code**.
 
-**Current Status**: **Phase 1 Complete** (RLCF Core + Learning Layer)
+**Current Status**: **Phase 1 Complete** (RLCF Core) + **Phase 2 Partial** (KG Enrichment & Pipeline Integration - Week 3 Complete)
 
 This repository includes:
 - **Comprehensive documentation** (architectural specifications, research papers, technical designs)
-- **Working RLCF implementation** (backend, frontend, tests - Phase 1)
+- **Working RLCF implementation** (backend, frontend, tests - Phase 1 complete)
+- **Knowledge Graph Integration** (Normattiva, Cassazione, Dottrina, Community sources - Phase 2 Week 3 complete)
+- **Full Pipeline Integration** (Intent → KG → RLCF → Feedback - Week 3 complete)
+- **Feedback Loops** (RLCF aggregation with authority weighting, NER learning loop)
 - **CLI tools** for administration and user operations
 - **Docker configuration** for development and production deployment
-- **Test suite** with 2,278 lines of test code and 85%+ coverage
+- **Test suite** with 5,000+ lines of test code and 85%+ coverage (Phase 1+2 combined)
 
 ## Repository Structure
 
-### Implementation Code (Phase 1 - Complete)
+### Implementation Code (Phase 1 Complete + Phase 2 Week 3 Complete)
 
 ```
 MERL-T_alpha/
 ├── backend/
-│   └── rlcf_framework/        # RLCF Core implementation (1,734 lines)
-│       ├── models.py           # SQLAlchemy 2.0 async models
-│       ├── schemas.py          # Pydantic validation schemas
-│       ├── main.py             # FastAPI application (50+ endpoints)
-│       ├── authority_module.py # Authority scoring (A_u(t) formula)
-│       ├── aggregation_engine.py # Uncertainty-preserving aggregation
-│       ├── bias_analysis.py    # Bias detection algorithms
-│       ├── ai_service.py       # OpenRouter LLM integration
-│       ├── database.py         # Async DB setup
-│       ├── config.py           # YAML configuration loader
-│       ├── cli/                # CLI tools (rlcf-cli, rlcf-admin)
-│       ├── task_handlers/      # Polymorphic task handlers
-│       └── services/           # Shared services
+│   ├── rlcf_framework/         # RLCF Core implementation (1,734 lines)
+│   │   ├── models.py           # SQLAlchemy 2.0 async models
+│   │   ├── schemas.py          # Pydantic validation schemas
+│   │   ├── main.py             # FastAPI application (50+ endpoints)
+│   │   ├── authority_module.py # Authority scoring (A_u(t) formula)
+│   │   ├── aggregation_engine.py # Uncertainty-preserving aggregation
+│   │   ├── bias_analysis.py    # Bias detection algorithms
+│   │   ├── ai_service.py       # OpenRouter LLM integration
+│   │   ├── database.py         # Async DB setup
+│   │   ├── config.py           # YAML configuration loader
+│   │   ├── cli/                # CLI tools (rlcf-cli, rlcf-admin)
+│   │   ├── task_handlers/      # Polymorphic task handlers
+│   │   ├── services/           # Shared services
+│   │   └── rlcf_feedback_processor.py # RLCF expert vote aggregation (520 lines)
+│   ├── preprocessing/          # NEW: Preprocessing layer (Phase 2)
+│   │   ├── kg_enrichment_service.py # Multi-source KG enrichment (700 lines)
+│   │   ├── cypher_queries.py    # Neo4j Cypher query builder (500 lines)
+│   │   ├── models_kg.py         # KG data models (400 lines)
+│   │   ├── kg_config.yaml       # KG service configuration
+│   │   ├── ner_feedback_loop.py # NER learning loop (500 lines)
+│   │   ├── normattiva_sync_job.py # Normattiva sync service (400 lines)
+│   │   └── contribution_processor.py # Community source processing (400 lines)
+│   └── orchestration/          # NEW: Orchestration layer (Phase 2)
+│       ├── pipeline_orchestrator.py # Full pipeline coordinator (720 lines)
+│       ├── intent_classifier.py # Intent classification service
+│       └── pipeline_integration.py # FastAPI pipeline router (330 lines)
 ├── frontend/
 │   └── rlcf-web/               # React 19 application
 │       ├── src/                # TypeScript source code
 │       ├── components/         # React components
 │       └── package.json        # Vite + TanStack Query + Zustand
 ├── tests/
-│   └── rlcf/                   # Test suite (2,278 lines, 85%+ coverage)
-│       ├── test_authority_module.py
-│       ├── test_aggregation_engine.py
-│       ├── test_bias_analysis.py
-│       ├── test_models.py
-│       └── conftest.py
+│   ├── rlcf/                   # RLCF tests (2,278 lines, 85%+ coverage)
+│   │   ├── test_authority_module.py
+│   │   ├── test_aggregation_engine.py
+│   │   ├── test_bias_analysis.py
+│   │   ├── test_models.py
+│   │   └── conftest.py
+│   ├── preprocessing/          # NEW: Preprocessing tests (Phase 2)
+│   │   ├── test_kg_complete.py # KG service tests (2,156 lines, 100+ tests)
+│   │   └── KG_TEST_SUMMARY.md  # KG test documentation
+│   └── integration/            # NEW: Integration tests (Phase 2)
+│       ├── test_full_pipeline_integration.py # Pipeline tests (850 lines, 50+ tests)
+│       └── FULL_PIPELINE_INTEGRATION_SUMMARY.md # Integration documentation
 ├── docs/                       # Comprehensive documentation
 │   ├── 01-introduction/
 │   ├── 02-methodology/
@@ -54,6 +76,7 @@ MERL-T_alpha/
 │   ├── 04-implementation/
 │   ├── 05-governance/
 │   ├── 06-resources/
+│   ├── 08-iteration/           # Iteration planning
 │   ├── IMPLEMENTATION_ROADMAP.md
 │   └── TECHNOLOGY_RECOMMENDATIONS.md
 ├── infrastructure/             # Deployment configs
@@ -370,6 +393,129 @@ The system is designed for **EU AI Act compliance** as a high-risk AI system (le
 
 See `docs/05-governance/ai-act-compliance.md` for details.
 
+## Phase 2 Week 3 Implementation Summary (Nov 2025)
+
+### Knowledge Graph Enrichment System (3,500+ LOC)
+
+A complete multi-source legal knowledge graph integration system with 5 data sources:
+
+**Backend Components**:
+- `backend/preprocessing/kg_enrichment_service.py` (700 lines) - Main service coordinator
+  - Async enrichment with caching (Redis)
+  - Multi-source aggregation (Normattiva, Cassazione, Dottrina, Community, RLCF)
+  - Dual-provenance tracking (PostgreSQL + Neo4j)
+
+- `backend/preprocessing/cypher_queries.py` (500 lines) - Neo4j integration
+  - 20+ Cypher query templates
+  - Entity resolution across sources
+  - Temporal version management
+
+- `backend/preprocessing/models_kg.py` (400 lines) - Data models
+  - EnrichedContext with multi-source tracking
+  - Temporal versioning by source type
+  - Uncertainty scoring (0.0-1.0 per source)
+
+- `backend/preprocessing/ner_feedback_loop.py` (500 lines) - NER learning
+  - 4 correction types: MISSING_ENTITY, SPURIOUS_ENTITY, WRONG_BOUNDARY, WRONG_TYPE
+  - Automatic training example generation
+  - Performance tracking (F1, precision, recall)
+  - Batch retraining coordination
+
+- `backend/preprocessing/normattiva_sync_job.py` (400 lines) - Normattiva sync
+  - Daily sync job for official norms
+  - Change detection and incremental updates
+  - Legal gazette (Gazzetta Ufficiale) integration
+
+- `backend/preprocessing/contribution_processor.py` (400 lines) - Community sources
+  - Processing for crowdsourced legal contributions
+  - Voting-based consensus mechanism
+  - Expert authority-weighted decisions
+
+**Test Coverage** (100+ test cases, 2,156 lines):
+- Enrichment service tests (caching, multi-source, error handling)
+- Cypher query tests (entity resolution, temporal queries)
+- RLCF quorum detection tests
+- Controversy flagging tests (RLCF vs official source conflicts)
+- Versioning and archive strategy tests
+- Community voting workflow tests
+- Normattiva sync tests
+- Database model integrity tests
+
+### Full Pipeline Integration (2,920+ LOC)
+
+End-to-end coordination of Intent Classification → KG Enrichment → RLCF Processing → Feedback Loops:
+
+**Backend Components**:
+- `backend/orchestration/pipeline_orchestrator.py` (720 lines) - Pipeline coordinator
+  - Async execution of 7 pipeline stages
+  - PipelineContext for state management across stages
+  - Comprehensive execution logging and timing
+  - Error handling and recovery
+  - Feedback loop preparation
+
+- `backend/rlcf_framework/rlcf_feedback_processor.py` (520 lines) - RLCF aggregation
+  - Expert vote aggregation with authority weighting
+  - Shannon entropy-based uncertainty preservation
+  - Dynamic quorum by entity type:
+    - Norma (official): 3 experts, 0.80 authority
+    - Sentenza (case law): 4 experts, 0.85 authority
+    - Dottrina (academic): 5 experts, 0.75 authority
+  - Controversy detection (polarized disagreement)
+  - Batch processing and distributed feedback
+
+- `backend/rlcf_framework/pipeline_integration.py` (330 lines) - FastAPI router
+  - 5 new endpoints (/pipeline/query, /feedback/submit, /ner/correct, /stats, /health)
+  - Service initialization and lifecycle management
+  - Dependency injection for all components
+
+**New API Endpoints**:
+- `POST /pipeline/query` - Execute full legal query pipeline
+- `POST /pipeline/feedback/submit` - Submit expert feedback on results
+- `POST /pipeline/ner/correct` - Submit NER corrections for model training
+- `GET /pipeline/stats` - Pipeline performance statistics
+- `GET /pipeline/health` - Component health check
+
+**Test Coverage** (50+ test cases, 850 lines):
+- End-to-end pipeline execution tests
+- RLCF integration with authority weighting
+- NER feedback loop processing
+- Feedback distribution to appropriate targets
+- Error handling and recovery tests
+- Performance and latency tracking
+
+### Key Technical Innovations
+
+1. **Multi-Source Enrichment**
+   - 5 independent data sources with different update cadences
+   - Source-specific confidence scoring
+   - Conflict detection and resolution strategies
+   - Temporal versioning per source type
+
+2. **Uncertainty-Preserving Aggregation**
+   - Shannon entropy quantifies expert disagreement
+   - Disagreement is preserved as valuable information
+   - Not forced consensus but thoughtful synthesis
+   - Dynamic thresholds per entity type
+
+3. **Authority-Weighted Feedback**
+   - Authority score: `A_u(t) = α·B_u + β·T_u(t-1) + γ·P_u(t)`
+   - Base authority (credentials), temporal authority (recent accuracy), performance (task success)
+   - Weighted vote aggregation per expert
+   - Controversy flagging for polarized votes
+
+4. **Comprehensive Logging**
+   - PipelineContext captures full execution trace
+   - Stage timestamps and error messages
+   - Feedback targets and distribution records
+   - Audit trail for all decisions
+
+5. **NER Learning Loop**
+   - Continuous model improvement from expert corrections
+   - 4 correction types for different error patterns
+   - Automatic training dataset generation
+   - Performance metrics tracking (F1, precision, recall)
+   - Coordinated batch retraining
+
 ## Implementation Guides (NEW - Nov 2025)
 
 **CRITICAL**: Two new comprehensive guides have been added for transitioning from documentation to implementation:
@@ -451,8 +597,10 @@ Start with these files in order:
 4. `docs/03-architecture/02-orchestration-layer.md` - Most detailed architecture doc (100+ pages)
 5. `docs/02-methodology/rlcf/guides/quick-start.md` - Practical usage guide
 
-### For Working with the Codebase (Phase 1)
+### For Working with the Codebase (Phase 1 + Phase 2 Week 3)
 **Start here if you want to understand or modify the implementation**:
+
+**Phase 1 (RLCF Core)**:
 1. `README.md` - Quick start, architecture overview, development guide
 2. `INTEGRATION_TEST_REPORT.md` - Complete validation of Phase 1 implementation
 3. `backend/rlcf_framework/models.py` - Database models (SQLAlchemy 2.0)
@@ -461,6 +609,18 @@ Start with these files in order:
 6. `backend/rlcf_framework/aggregation_engine.py` - Uncertainty-preserving aggregation
 7. `backend/rlcf_framework/cli/commands.py` - CLI tools implementation
 8. `tests/rlcf/` - Test suite (read `conftest.py` first for fixtures)
+
+**Phase 2 Week 3 (KG + Pipeline Integration)**:
+1. `backend/preprocessing/kg_enrichment_service.py` - Multi-source KG enrichment (700 lines)
+2. `backend/preprocessing/cypher_queries.py` - Neo4j query builder for 5 data sources
+3. `backend/preprocessing/ner_feedback_loop.py` - NER model learning loop (500 lines)
+4. `backend/orchestration/pipeline_orchestrator.py` - Pipeline coordinator (720 lines)
+5. `backend/rlcf_framework/rlcf_feedback_processor.py` - RLCF vote aggregation (520 lines)
+6. `backend/rlcf_framework/pipeline_integration.py` - FastAPI router for pipeline endpoints
+7. `tests/preprocessing/test_kg_complete.py` - KG tests (2,156 lines, 100+ test cases)
+8. `tests/integration/test_full_pipeline_integration.py` - Pipeline tests (850 lines, 50+ test cases)
+9. `tests/preprocessing/KG_TEST_SUMMARY.md` - KG test documentation
+10. `FULL_PIPELINE_INTEGRATION_SUMMARY.md` - Complete pipeline integration documentation
 
 ### For Implementation & Building Future Phases
 **Essential reading for Phases 2-7**:
