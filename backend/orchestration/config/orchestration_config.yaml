@@ -194,9 +194,18 @@ iteration:
     # Consensus-based stop
     expert_consensus_threshold: 0.80  # Stop if 80%+ experts agree
 
-    # Quality-based stop (LLM evaluation)
+    # Quality-based stop (RLCF evaluation)
     quality_evaluation: true
-    quality_threshold: 0.80
+    quality_threshold: 0.80  # Stop if RLCF quality score ≥ 80%
+
+    # User satisfaction stop
+    user_rating_threshold: 4.0  # Stop if user rating ≥ 4.0/5.0
+
+    # Improvement tracking
+    min_improvement_delta: 0.05  # Stop if improvement < 5% between iterations
+
+    # Convergence detection
+    convergence_window: 2  # Check last N iterations for stability
 
     # Force stop conditions
     max_iterations_reached: true

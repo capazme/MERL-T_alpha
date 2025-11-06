@@ -3,9 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
-[![Phase](https://img.shields.io/badge/Phase-1%20Complete%20%2B%202%20Week%203-brightgreen.svg)](docs/IMPLEMENTATION_ROADMAP.md)
+[![Phase](https://img.shields.io/badge/Phase-1%20Complete%20%2B%202%20Week%203%20%2B%20Week%206%20Day%202-brightgreen.svg)](docs/IMPLEMENTATION_ROADMAP.md)
 [![Coverage](https://img.shields.io/badge/Coverage-85%25%2B-brightgreen.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-150%2B%20Cases-blue.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-200%2B%20Cases-blue.svg)](tests/)
 
 **MERL-T** is an AI-powered architecture for legal research, compliance monitoring, and regulatory analysis. Sponsored by **ALIS** (Artificial Legal Intelligence Society), it implements a novel **RLCF (Reinforcement Learning from Community Feedback)** framework for aligning legal AI systems with expert knowledge.
 
