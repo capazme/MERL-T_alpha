@@ -1,15 +1,15 @@
 # MERL-T Next Steps Roadmap
 
-**Current Status**: Week 6 COMPLETE ✅ (Orchestration Layer with full API)
+**Current Status**: Week 7 COMPLETE ✅ (Preprocessing Integration)
 **Date**: January 2025
-**Total LOC Implemented**: ~18,287 (Week 6) + Previous phases
+**Total LOC Implemented**: ~24,125 (Week 6-7) + Previous phases
 
 ---
 
 ## Table of Contents
 
-1. [Week 6 Achievements](#week-6-achievements)
-2. [Immediate Next Steps (Week 7)](#immediate-next-steps-week-7)
+1. [Week 6-7 Achievements](#week-6-7-achievements)
+2. [Immediate Next Steps (Week 8)](#immediate-next-steps-week-8)
 3. [Short-Term Priorities (Weeks 8-10)](#short-term-priorities-weeks-8-10)
 4. [Medium-Term Goals (Weeks 11-15)](#medium-term-goals-weeks-11-15)
 5. [Critical Path Dependencies](#critical-path-dependencies)
@@ -17,9 +17,9 @@
 
 ---
 
-## Week 6 Achievements
+## Week 6-7 Achievements
 
-### ✅ Completed Components (18,287 LOC)
+### ✅ Week 6: Orchestration Layer (18,287 LOC)
 
 **Day 1-2: Router + Retrieval Layer** (~6,600 LOC)
 - LLM Router with ExecutionPlan generation
@@ -66,9 +66,40 @@
 **Health** (1):
 - `GET /health` - Component status check
 
+### ✅ Week 7: Preprocessing Integration (5,838 LOC)
+
+**Days 1-3: Interface Unification + Integration** (~688 LOC)
+- Unified QueryUnderstandingResult as single standard (eliminated IntentResult duplication)
+- Modified kg_enrichment_service.py to accept QueryUnderstandingResult directly
+- Integrated preprocessing_node into LangGraph workflow
+- Changed workflow entry point from "router" to "preprocessing"
+- Updated docker-compose.yml with PostgreSQL orchestration, Neo4j, Redis services
+- Added preprocessing configuration section to orchestration_config.yaml
+
+**Days 4-5: Testing + Documentation** (~5,150 LOC)
+- **test_preprocessing_integration.py** (15 tests, ~600 LOC): Module-level integration tests
+- **test_workflow_with_preprocessing.py** (7 tests, ~500 LOC): End-to-end workflow tests
+- **test_graceful_degradation.py** (11 tests, ~550 LOC): Resilience and failure scenario tests
+- **WEEK7_PREPROCESSING_COMPLETE.md** (~3,500 LOC): Comprehensive technical documentation
+
+**Key Features**:
+- Query Understanding with 6 intent types (NORM_SEARCH, INTERPRETATION, COMPLIANCE_CHECK, etc.)
+- KG enrichment with 5 data sources (norms, sentenze, dottrina, contributions, controversy_flags)
+- Preprocessing runs ONCE at workflow start (not in iteration loop)
+- 3-level graceful degradation (Neo4j offline, Redis offline, LLM fails)
+- 33 comprehensive test cases with mocking for external dependencies
+- Complete state propagation verification across all workflow nodes
+
+**Test Results**:
+- ✅ 33 test cases passing
+- ✅ Interface unification successful (no adapters needed)
+- ✅ Complete workflow execution from START → END verified
+- ✅ Graceful degradation scenarios validated
+- ✅ State validity preserved after failures
+
 ---
 
-## Immediate Next Steps (Week 7)
+## Immediate Next Steps (Week 8)
 
 ### Priority 1: Database Integration (Days 1-2) 🔴 HIGH
 
@@ -678,20 +709,26 @@ Week 15 (Production Deployment)
 
 **Week 6 Achievement**: Complete orchestration layer with 11-endpoint REST API ✅
 
+**Week 7 Achievement**: Preprocessing integration into LangGraph workflow ✅
+- Interface unification (QueryUnderstandingResult as standard)
+- Preprocessing node integrated as workflow entry point
+- 33 comprehensive test cases with graceful degradation
+- Complete documentation (WEEK7_PREPROCESSING_COMPLETE.md)
+
 **Next Immediate Steps**:
-1. **Week 7 Days 1-2**: Database integration (PostgreSQL + Redis) 🔴
-2. **Week 7 Days 3-4**: Preprocessing integration (Query Understanding + KG Enrichment) 🔴
-3. **Week 7 Day 5**: Authentication & rate limiting 🟡
-4. **Week 8**: Admin interface + monitoring
-5. **Week 9**: React frontend
-6. **Week 10**: RLCF retraining pipeline
+1. **Week 8 Days 1-2**: Database integration (PostgreSQL + Redis) 🔴
+2. **Week 8 Days 3-4**: Query Understanding LLM integration (remove mock values) 🔴
+3. **Week 8 Day 5**: Authentication & rate limiting 🟡
+4. **Week 9**: Admin interface + monitoring
+5. **Week 10**: React frontend
+6. **Week 11**: RLCF retraining pipeline
 
-**Critical Path**: Database → Preprocessing → Admin → Frontend → Production
+**Critical Path**: Database → Query Understanding → Admin → Frontend → Production
 
-**Estimated Timeline to Production**: 9 weeks (Week 7-15)
+**Estimated Timeline to Production**: 8 weeks (Week 8-15)
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: January 2025
-**Status**: Ready for Week 7 implementation
+**Document Version**: 1.1
+**Last Updated**: January 2025 (Week 7 Complete)
+**Status**: Ready for Week 8 implementation

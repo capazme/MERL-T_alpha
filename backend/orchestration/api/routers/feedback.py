@@ -312,7 +312,7 @@ async def get_feedback_stats() -> Dict[str, Any]:
     try:
         logger.info("Feedback stats requested")
 
-        stats = feedback_processor.get_feedback_stats()
+        stats = await feedback_processor.get_feedback_stats()
 
         logger.info(
             f"Feedback stats: user={stats['user_feedback_count']}, "

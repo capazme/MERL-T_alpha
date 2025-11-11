@@ -18,6 +18,7 @@ from ..schemas.stats import (
     RetrainingEvent,
 )
 from ..services.feedback_processor import FeedbackProcessor
+from ..services.persistence_service import persistence_service
 
 logger = logging.getLogger(__name__)
 
@@ -92,44 +93,54 @@ async def get_pipeline_stats(period: str = "last_7_days") -> PipelineStatsRespon
     try:
         logger.info(f"Pipeline stats requested for period={period}")
 
-        # TODO: Query PostgreSQL/TimescaleDB for actual metrics
-        # For now, return mock data
+        # Parse period to days
+        days_mapping = {
+            "last_7_days": 7,
+            "last_30_days": 30,
+            "last_90_days": 90,
+        }
+        days = days_mapping.get(period, 7)
 
-        # Mock stage performance data
+        # Get real pipeline stats from database
+        db_stats = await persistence_service.get_pipeline_stats(days=days)
+
+        # TODO: Extract per-stage performance from execution_trace JSONB
+        # For now, use mock stage performance data
         stages_performance = {
             "query_understanding": StagePerformance(
                 avg_ms=245.3,
                 p95_ms=320.0,
-                count=1543
+                count=db_stats["total_queries"]
             ),
             "kg_enrichment": StagePerformance(
                 avg_ms=50.2,
                 p95_ms=80.0,
-                count=1543
+                count=db_stats["total_queries"]
             ),
             "router": StagePerformance(
                 avg_ms=1800.5,
                 p95_ms=2500.0,
-                count=1543
+                count=db_stats["total_queries"]
             ),
             "retrieval": StagePerformance(
                 avg_ms=280.4,
                 p95_ms=450.0,
-                count=1543
+                count=db_stats["total_queries"]
             ),
             "experts": StagePerformance(
                 avg_ms=2100.6,
                 p95_ms=3500.0,
-                count=1543
+                count=db_stats["total_queries"]
             ),
             "synthesis": StagePerformance(
                 avg_ms=800.2,
                 p95_ms=1200.0,
-                count=1543
+                count=db_stats["total_queries"]
             ),
         }
 
-        # Mock expert usage data
+        # TODO: Extract expert usage from execution_trace JSONB
+        # For now, use mock expert usage data
         expert_usage = ExpertUsageStats(
             literal_interpreter=0.92,
             systemic_teleological=0.68,
@@ -137,23 +148,24 @@ async def get_pipeline_stats(period: str = "last_7_days") -> PipelineStatsRespon
             precedent_analyst=0.45,
         )
 
-        # Mock agent usage data
+        # TODO: Extract agent usage from execution_trace JSONB
+        # For now, use mock agent usage data
         agent_usage = {
             "kg_agent": 0.85,
             "api_agent": 0.72,
             "vectordb_agent": 0.68,
         }
 
-        # Build response
+        # Build response with real data
         response = PipelineStatsResponse(
             period=period,
-            queries_total=1543,
-            avg_response_time_ms=2456.7,
-            p95_response_time_ms=4200.0,
-            p99_response_time_ms=5800.0,
-            success_rate=0.987,
+            queries_total=db_stats["total_queries"],
+            avg_response_time_ms=2456.7,  # TODO: Calculate from timestamps
+            p95_response_time_ms=4200.0,  # TODO: Calculate from timestamps
+            p99_response_time_ms=5800.0,  # TODO: Calculate from timestamps
+            success_rate=db_stats["success_rate"],
             stages_performance=stages_performance,
-            avg_iterations=1.2,
+            avg_iterations=1.2,  # TODO: Extract from execution_trace
             expert_usage=expert_usage,
             agent_usage=agent_usage,
         )
@@ -237,13 +249,22 @@ async def get_feedback_stats(period: str = "last_30_days") -> FeedbackStatsRespo
     try:
         logger.info(f"Feedback stats requested for period={period}")
 
-        # Get real-time feedback counts from FeedbackProcessor
-        feedback_stats = feedback_processor.get_feedback_stats()
+        # Parse period to days
+        days_mapping = {
+            "last_7_days": 7,
+            "last_30_days": 30,
+            "last_90_days": 90,
+        }
+        days = days_mapping.get(period, 30)
 
-        # TODO: Query PostgreSQL for historical feedback data and ratings
-        # For now, combine real counts with mock historical data
+        # Get real feedback stats from database
+        db_feedback_stats = await persistence_service.get_feedback_stats(days=days)
 
-        # Mock model improvements
+        # Get real-time counts from FeedbackProcessor (for thresholds)
+        realtime_stats = await feedback_processor.get_feedback_stats()
+
+        # TODO: Query model improvement metrics from ML pipeline
+        # For now, use mock model improvements
         model_improvements = {
             "concept_mapping_accuracy": ModelImprovementMetric(
                 before=0.78,
@@ -257,7 +278,8 @@ async def get_feedback_stats(period: str = "last_30_days") -> FeedbackStatsRespo
             ),
         }
 
-        # Mock retraining events
+        # TODO: Query retraining events from ML pipeline logs
+        # For now, use mock retraining events
         retraining_events = [
             RetrainingEvent(
                 model="ner_model",
@@ -283,7 +305,8 @@ async def get_feedback_stats(period: str = "last_30_days") -> FeedbackStatsRespo
             ),
         ]
 
-        # Mock feedback distribution
+        # TODO: Calculate feedback distribution from user_feedback table
+        # For now, use mock feedback distribution
         feedback_distribution = {
             "1": 12,
             "2": 23,
@@ -292,21 +315,16 @@ async def get_feedback_stats(period: str = "last_30_days") -> FeedbackStatsRespo
             "5": 165,
         }
 
-        # Calculate average rating from distribution
-        total_ratings = sum(feedback_distribution.values())
-        if total_ratings > 0:
-            weighted_sum = sum(int(rating) * count for rating, count in feedback_distribution.items())
-            avg_user_rating = weighted_sum / total_ratings
-        else:
-            avg_user_rating = 0.0
+        # Use average rating from database
+        avg_user_rating = db_feedback_stats["avg_user_rating"]
 
         # Build response
         response = FeedbackStatsResponse(
             period=period,
-            user_feedback_count=feedback_stats["user_feedback_count"],
+            user_feedback_count=db_feedback_stats["user_feedback_count"],
             avg_user_rating=avg_user_rating,
-            rlcf_expert_feedback_count=feedback_stats["rlcf_feedback_count"],
-            ner_corrections_count=feedback_stats["ner_corrections_count"],
+            rlcf_expert_feedback_count=db_feedback_stats["rlcf_feedback_count"],
+            ner_corrections_count=db_feedback_stats["ner_corrections_count"],
             model_improvements=model_improvements,
             retraining_events=retraining_events,
             feedback_distribution=feedback_distribution,

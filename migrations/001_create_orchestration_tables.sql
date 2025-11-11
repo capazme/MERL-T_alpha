@@ -1,20 +1,26 @@
 -- ============================================================================
--- MERL-T Orchestration Database Schema
--- Migration: 001_create_orchestration_tables.sql
--- Description: Core tables for orchestration API persistence
--- Author: MERL-T Team
--- Date: January 2025
+-- MERL-T Orchestration API - Database Migration 001
+-- ============================================================================
+-- Description: Initial schema for orchestration API
+-- Created: Week 8 - Database Integration
+-- Author: Claude Code
+--
+-- This migration creates 5 core tables for the orchestration API:
+-- 1. queries - Main query tracking
+-- 2. query_results - Answer storage (1:1 with queries)
+-- 3. user_feedback - User ratings and comments (1:N with queries)
+-- 4. rlcf_feedback - Expert corrections with authority weighting (1:N with queries)
+-- 5. ner_corrections - NER entity corrections for training (1:N with queries)
 -- ============================================================================
 
--- Enable UUID extension for generating unique IDs
+-- Enable UUID extension for PostgreSQL (if not already enabled)
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Enable pg_trgm for text search optimization
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- ============================================================================
 -- TABLE: queries
--- Description: Core query tracking table
+-- ============================================================================
+-- Core query tracking table storing all legal queries with metadata,
+-- execution status, and timing information.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS queries (
@@ -32,11 +38,9 @@ CREATE TABLE IF NOT EXISTS queries (
 
     -- Execution Status
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    -- Status values: 'pending', 'processing', 'completed', 'failed', 'timeout'
 
     -- Execution Options
     options JSONB DEFAULT '{}'::jsonb,
-    -- Stores max_iterations, timeout_ms, return_trace, etc.
 
     -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -50,84 +54,86 @@ CREATE TABLE IF NOT EXISTS queries (
     )
 );
 
--- Indexes for queries table
-CREATE INDEX idx_queries_session_id ON queries(session_id);
-CREATE INDEX idx_queries_user_id ON queries(user_id);
-CREATE INDEX idx_queries_created_at ON queries(created_at DESC);
-CREATE INDEX idx_queries_status ON queries(status);
-CREATE INDEX idx_queries_session_created ON queries(session_id, created_at DESC);
+-- Create indexes for queries table
+CREATE INDEX IF NOT EXISTS idx_queries_trace_id ON queries(trace_id);
+CREATE INDEX IF NOT EXISTS idx_queries_session_id ON queries(session_id);
+CREATE INDEX IF NOT EXISTS idx_queries_user_id ON queries(user_id);
+CREATE INDEX IF NOT EXISTS idx_queries_status ON queries(status);
+CREATE INDEX IF NOT EXISTS idx_queries_created_at ON queries(created_at);
 
--- GIN index for JSONB query_context searchability
-CREATE INDEX idx_queries_query_context_gin ON queries USING GIN (query_context);
+-- Add comment to queries table
+COMMENT ON TABLE queries IS 'Main query tracking table for all legal queries';
+COMMENT ON COLUMN queries.trace_id IS 'Unique trace identifier for request tracing';
+COMMENT ON COLUMN queries.status IS 'Execution status: pending, processing, completed, failed, timeout';
+COMMENT ON COLUMN queries.query_context IS 'Preprocessed query context (intent, entities, complexity)';
+COMMENT ON COLUMN queries.enriched_context IS 'KG-enriched context (norms, concepts, relationships)';
 
--- Text search index for query_text
-CREATE INDEX idx_queries_query_text_trgm ON queries USING GIN (query_text gin_trgm_ops);
 
 -- ============================================================================
 -- TABLE: query_results
--- Description: Stores query answers and execution traces
+-- ============================================================================
+-- Query result table storing answers, execution traces, and metadata.
+-- 1:1 relationship with queries table.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS query_results (
     -- Primary Key
-    result_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    result_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
 
-    -- Foreign Key to queries
+    -- Foreign Key to Query (unique = 1:1 relationship)
     trace_id VARCHAR(50) NOT NULL UNIQUE,
 
     -- Answer Data
     primary_answer TEXT NOT NULL,
     confidence NUMERIC(4, 3) NOT NULL DEFAULT 0.0,
-    -- confidence: 0.000 to 1.000
 
     legal_basis JSONB DEFAULT '[]'::jsonb,
-    -- Array of {norm_id, norm_title, article, relevance, text_excerpt}
-
     alternatives JSONB DEFAULT '[]'::jsonb,
-    -- Array of {alternative_answer, confidence, reasoning}
 
     uncertainty_preserved BOOLEAN DEFAULT FALSE,
     sources_consulted JSONB DEFAULT '[]'::jsonb,
 
     -- Execution Trace
     execution_trace JSONB DEFAULT '{}'::jsonb,
-    -- Stores: stages_executed, iterations, stop_reason, experts_consulted, agents_used, total_time_ms, errors
 
     -- Metadata
     metadata JSONB DEFAULT '{}'::jsonb,
-    -- Stores: complexity_score, intent_detected, concepts_identified, norms_consulted, jurisprudence_consulted
 
     -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     -- Constraints
-    CONSTRAINT fk_query_results_trace_id FOREIGN KEY (trace_id)
-        REFERENCES queries(trace_id) ON DELETE CASCADE,
     CONSTRAINT query_results_confidence_check CHECK (
         confidence >= 0.0 AND confidence <= 1.0
-    )
+    ),
+    CONSTRAINT fk_query_results_trace_id FOREIGN KEY (trace_id)
+        REFERENCES queries(trace_id) ON DELETE CASCADE
 );
 
--- Indexes for query_results table
-CREATE INDEX idx_query_results_trace_id ON query_results(trace_id);
-CREATE INDEX idx_query_results_confidence ON query_results(confidence DESC);
-CREATE INDEX idx_query_results_created_at ON query_results(created_at DESC);
+-- Create indexes for query_results table
+CREATE INDEX IF NOT EXISTS idx_query_results_trace_id ON query_results(trace_id);
+CREATE INDEX IF NOT EXISTS idx_query_results_created_at ON query_results(created_at);
 
--- GIN indexes for JSONB fields
-CREATE INDEX idx_query_results_legal_basis_gin ON query_results USING GIN (legal_basis);
-CREATE INDEX idx_query_results_execution_trace_gin ON query_results USING GIN (execution_trace);
-CREATE INDEX idx_query_results_metadata_gin ON query_results USING GIN (metadata);
+-- Add comments to query_results table
+COMMENT ON TABLE query_results IS 'Query answer storage with execution traces (1:1 with queries)';
+COMMENT ON COLUMN query_results.confidence IS 'Answer confidence score (0.0-1.0)';
+COMMENT ON COLUMN query_results.legal_basis IS 'Array of legal basis objects (norms, articles, precedents)';
+COMMENT ON COLUMN query_results.alternatives IS 'Array of alternative interpretation objects';
+COMMENT ON COLUMN query_results.execution_trace IS 'Full execution trace (agents, experts, iterations)';
+
 
 -- ============================================================================
 -- TABLE: user_feedback
--- Description: User feedback with ratings and comments
+-- ============================================================================
+-- User feedback table storing ratings (1-5 stars) and optional comments.
+-- 1:N relationship with queries table.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS user_feedback (
     -- Primary Key
-    feedback_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    feedback_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
 
-    -- Foreign Key to queries
+    -- Foreign Key to Query
     trace_id VARCHAR(50) NOT NULL,
 
     -- User Identification
@@ -135,43 +141,43 @@ CREATE TABLE IF NOT EXISTS user_feedback (
 
     -- Feedback Data
     rating INTEGER NOT NULL,
-    -- Rating: 1-5 stars
-
     feedback_text TEXT,
-
     categories JSONB DEFAULT '{}'::jsonb,
-    -- Optional detailed ratings: {accuracy: 4, completeness: 3, clarity: 5, legal_soundness: 4}
 
     -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     -- Constraints
-    CONSTRAINT fk_user_feedback_trace_id FOREIGN KEY (trace_id)
-        REFERENCES queries(trace_id) ON DELETE CASCADE,
     CONSTRAINT user_feedback_rating_check CHECK (
         rating >= 1 AND rating <= 5
-    )
+    ),
+    CONSTRAINT fk_user_feedback_trace_id FOREIGN KEY (trace_id)
+        REFERENCES queries(trace_id) ON DELETE CASCADE
 );
 
--- Indexes for user_feedback table
-CREATE INDEX idx_user_feedback_trace_id ON user_feedback(trace_id);
-CREATE INDEX idx_user_feedback_user_id ON user_feedback(user_id);
-CREATE INDEX idx_user_feedback_rating ON user_feedback(rating);
-CREATE INDEX idx_user_feedback_created_at ON user_feedback(created_at DESC);
+-- Create indexes for user_feedback table
+CREATE INDEX IF NOT EXISTS idx_user_feedback_trace_id ON user_feedback(trace_id);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_user_id ON user_feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_created_at ON user_feedback(created_at);
 
--- GIN index for categories JSONB
-CREATE INDEX idx_user_feedback_categories_gin ON user_feedback USING GIN (categories);
+-- Add comments to user_feedback table
+COMMENT ON TABLE user_feedback IS 'User ratings and feedback for query results (1:N with queries)';
+COMMENT ON COLUMN user_feedback.rating IS 'User rating (1-5 stars)';
+COMMENT ON COLUMN user_feedback.categories IS 'Feedback categories (correctness, completeness, clarity)';
+
 
 -- ============================================================================
 -- TABLE: rlcf_feedback
--- Description: RLCF expert feedback with corrections and authority weighting
+-- ============================================================================
+-- RLCF expert feedback table storing corrections with authority weighting.
+-- 1:N relationship with queries table.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS rlcf_feedback (
     -- Primary Key
-    feedback_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    feedback_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
 
-    -- Foreign Key to queries
+    -- Foreign Key to Query
     trace_id VARCHAR(50) NOT NULL,
 
     -- Expert Identification
@@ -179,18 +185,11 @@ CREATE TABLE IF NOT EXISTS rlcf_feedback (
 
     -- Authority Weighting
     authority_score NUMERIC(4, 3) NOT NULL,
-    -- authority_score: 0.000 to 1.000
 
     -- Corrections Data
     corrections JSONB NOT NULL DEFAULT '{}'::jsonb,
-    -- Structure: {
-    --   concept_mapping: {issue: "...", correction: {...}},
-    --   routing_decision: {issue: "...", improved_plan: {...}},
-    --   answer_quality: {validated_answer: "...", position: "...", reasoning: "...", missing_norms: [...]}
-    -- }
 
     overall_rating INTEGER NOT NULL,
-    -- Rating: 1-5 for overall query result quality
 
     -- Training Examples
     training_examples_generated INTEGER DEFAULT 0,
@@ -200,37 +199,41 @@ CREATE TABLE IF NOT EXISTS rlcf_feedback (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     -- Constraints
-    CONSTRAINT fk_rlcf_feedback_trace_id FOREIGN KEY (trace_id)
-        REFERENCES queries(trace_id) ON DELETE CASCADE,
     CONSTRAINT rlcf_feedback_authority_check CHECK (
         authority_score >= 0.0 AND authority_score <= 1.0
     ),
     CONSTRAINT rlcf_feedback_rating_check CHECK (
         overall_rating >= 1 AND overall_rating <= 5
-    )
+    ),
+    CONSTRAINT fk_rlcf_feedback_trace_id FOREIGN KEY (trace_id)
+        REFERENCES queries(trace_id) ON DELETE CASCADE
 );
 
--- Indexes for rlcf_feedback table
-CREATE INDEX idx_rlcf_feedback_trace_id ON rlcf_feedback(trace_id);
-CREATE INDEX idx_rlcf_feedback_expert_id ON rlcf_feedback(expert_id);
-CREATE INDEX idx_rlcf_feedback_authority_score ON rlcf_feedback(authority_score DESC);
-CREATE INDEX idx_rlcf_feedback_created_at ON rlcf_feedback(created_at DESC);
-CREATE INDEX idx_rlcf_feedback_scheduled ON rlcf_feedback(scheduled_for_retraining)
-    WHERE scheduled_for_retraining = TRUE;
+-- Create indexes for rlcf_feedback table
+CREATE INDEX IF NOT EXISTS idx_rlcf_feedback_trace_id ON rlcf_feedback(trace_id);
+CREATE INDEX IF NOT EXISTS idx_rlcf_feedback_expert_id ON rlcf_feedback(expert_id);
+CREATE INDEX IF NOT EXISTS idx_rlcf_feedback_scheduled ON rlcf_feedback(scheduled_for_retraining);
+CREATE INDEX IF NOT EXISTS idx_rlcf_feedback_created_at ON rlcf_feedback(created_at);
 
--- GIN index for corrections JSONB
-CREATE INDEX idx_rlcf_feedback_corrections_gin ON rlcf_feedback USING GIN (corrections);
+-- Add comments to rlcf_feedback table
+COMMENT ON TABLE rlcf_feedback IS 'RLCF expert corrections with authority weighting (1:N with queries)';
+COMMENT ON COLUMN rlcf_feedback.authority_score IS 'Expert authority score (0.0-1.0) based on A_u(t) formula';
+COMMENT ON COLUMN rlcf_feedback.corrections IS 'Expert corrections object with field-level changes';
+COMMENT ON COLUMN rlcf_feedback.scheduled_for_retraining IS 'Flag for batch retraining (triggered at threshold)';
+
 
 -- ============================================================================
 -- TABLE: ner_corrections
--- Description: NER entity extraction corrections for model training
+-- ============================================================================
+-- NER correction table storing entity extraction corrections for model training.
+-- 1:N relationship with queries table.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS ner_corrections (
     -- Primary Key
-    correction_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    correction_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
 
-    -- Foreign Key to queries
+    -- Foreign Key to Query
     trace_id VARCHAR(50) NOT NULL,
 
     -- Expert Identification
@@ -238,18 +241,9 @@ CREATE TABLE IF NOT EXISTS ner_corrections (
 
     -- Correction Type
     correction_type VARCHAR(20) NOT NULL,
-    -- Types: 'MISSING_ENTITY', 'SPURIOUS_ENTITY', 'WRONG_BOUNDARY', 'WRONG_TYPE'
 
     -- Correction Data
     correction_data JSONB NOT NULL,
-    -- Structure: {
-    --   text_span: "...",
-    --   start_char: 37,
-    --   end_char: 46,
-    --   correct_label: "PERSON",
-    --   incorrect_label: "ORG" (optional),
-    --   attributes: {...} (optional)
-    -- }
 
     -- Training Example
     training_example_generated BOOLEAN DEFAULT TRUE,
@@ -259,26 +253,46 @@ CREATE TABLE IF NOT EXISTS ner_corrections (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     -- Constraints
-    CONSTRAINT fk_ner_corrections_trace_id FOREIGN KEY (trace_id)
-        REFERENCES queries(trace_id) ON DELETE CASCADE,
     CONSTRAINT ner_corrections_type_check CHECK (
         correction_type IN ('MISSING_ENTITY', 'SPURIOUS_ENTITY', 'WRONG_BOUNDARY', 'WRONG_TYPE')
-    )
+    ),
+    CONSTRAINT fk_ner_corrections_trace_id FOREIGN KEY (trace_id)
+        REFERENCES queries(trace_id) ON DELETE CASCADE
 );
 
--- Indexes for ner_corrections table
-CREATE INDEX idx_ner_corrections_trace_id ON ner_corrections(trace_id);
-CREATE INDEX idx_ner_corrections_expert_id ON ner_corrections(expert_id);
-CREATE INDEX idx_ner_corrections_type ON ner_corrections(correction_type);
-CREATE INDEX idx_ner_corrections_created_at ON ner_corrections(created_at DESC);
-CREATE INDEX idx_ner_corrections_scheduled ON ner_corrections(scheduled_for_retraining)
-    WHERE scheduled_for_retraining = TRUE;
+-- Create indexes for ner_corrections table
+CREATE INDEX IF NOT EXISTS idx_ner_corrections_trace_id ON ner_corrections(trace_id);
+CREATE INDEX IF NOT EXISTS idx_ner_corrections_expert_id ON ner_corrections(expert_id);
+CREATE INDEX IF NOT EXISTS idx_ner_corrections_type ON ner_corrections(correction_type);
+CREATE INDEX IF NOT EXISTS idx_ner_corrections_scheduled ON ner_corrections(scheduled_for_retraining);
+CREATE INDEX IF NOT EXISTS idx_ner_corrections_created_at ON ner_corrections(created_at);
 
--- GIN index for correction_data JSONB
-CREATE INDEX idx_ner_corrections_data_gin ON ner_corrections USING GIN (correction_data);
+-- Add comments to ner_corrections table
+COMMENT ON TABLE ner_corrections IS 'NER entity extraction corrections for model training (1:N with queries)';
+COMMENT ON COLUMN ner_corrections.correction_type IS 'Type: MISSING_ENTITY, SPURIOUS_ENTITY, WRONG_BOUNDARY, WRONG_TYPE';
+COMMENT ON COLUMN ner_corrections.correction_data IS 'Correction data with entity details and spans';
+
 
 -- ============================================================================
--- TRIGGER FUNCTIONS
+-- Additional Indexes for Performance
+-- ============================================================================
+
+-- Composite index for query history pagination
+CREATE INDEX IF NOT EXISTS idx_queries_user_created ON queries(user_id, created_at DESC);
+
+-- Composite index for status tracking
+CREATE INDEX IF NOT EXISTS idx_queries_status_created ON queries(status, created_at DESC);
+
+-- Index for JSONB query_context (GIN index for efficient JSONB queries)
+CREATE INDEX IF NOT EXISTS idx_queries_query_context_gin ON queries USING gin(query_context);
+CREATE INDEX IF NOT EXISTS idx_queries_enriched_context_gin ON queries USING gin(enriched_context);
+
+-- Index for JSONB execution_trace (GIN index for trace queries)
+CREATE INDEX IF NOT EXISTS idx_query_results_execution_trace_gin ON query_results USING gin(execution_trace);
+
+
+-- ============================================================================
+-- Triggers for updated_at Timestamp
 -- ============================================================================
 
 -- Function to update updated_at timestamp
@@ -291,78 +305,61 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger for queries table
-CREATE TRIGGER trigger_queries_updated_at
+CREATE TRIGGER update_queries_updated_at
     BEFORE UPDATE ON queries
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- ============================================================================
--- VIEWS FOR ANALYTICS
--- ============================================================================
-
--- View: Query performance metrics
-CREATE OR REPLACE VIEW v_query_performance AS
-SELECT
-    DATE(q.created_at) AS query_date,
-    COUNT(*) AS total_queries,
-    COUNT(CASE WHEN q.status = 'completed' THEN 1 END) AS completed_queries,
-    COUNT(CASE WHEN q.status = 'failed' THEN 1 END) AS failed_queries,
-    COUNT(CASE WHEN q.status = 'timeout' THEN 1 END) AS timeout_queries,
-    ROUND(AVG(EXTRACT(EPOCH FROM (q.completed_at - q.created_at)) * 1000), 2) AS avg_response_time_ms,
-    ROUND(AVG(qr.confidence), 3) AS avg_confidence
-FROM queries q
-LEFT JOIN query_results qr ON q.trace_id = qr.trace_id
-WHERE q.status = 'completed'
-GROUP BY DATE(q.created_at)
-ORDER BY query_date DESC;
-
--- View: Feedback statistics
-CREATE OR REPLACE VIEW v_feedback_stats AS
-SELECT
-    DATE(uf.created_at) AS feedback_date,
-    COUNT(*) AS total_user_feedback,
-    ROUND(AVG(uf.rating), 2) AS avg_user_rating,
-    COUNT(CASE WHEN uf.rating >= 4 THEN 1 END) AS positive_feedback_count,
-    COUNT(CASE WHEN uf.rating <= 2 THEN 1 END) AS negative_feedback_count
-FROM user_feedback uf
-GROUP BY DATE(uf.created_at)
-ORDER BY feedback_date DESC;
-
--- View: RLCF expert activity
-CREATE OR REPLACE VIEW v_rlcf_expert_activity AS
-SELECT
-    rf.expert_id,
-    COUNT(*) AS total_feedback,
-    ROUND(AVG(rf.authority_score), 3) AS avg_authority_score,
-    SUM(rf.training_examples_generated) AS total_training_examples,
-    COUNT(CASE WHEN rf.scheduled_for_retraining THEN 1 END) AS scheduled_retraining_count,
-    MAX(rf.created_at) AS last_feedback_at
-FROM rlcf_feedback rf
-GROUP BY rf.expert_id
-ORDER BY total_feedback DESC;
 
 -- ============================================================================
--- GRANTS (if using specific database users)
+-- Grant Permissions (adjust as needed for your environment)
 -- ============================================================================
 
--- Grant permissions to orchestration API user
--- Uncomment and adjust based on your user setup
--- GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO orchestration_api;
--- GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO orchestration_api;
--- GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO orchestration_api;
+-- Grant all privileges to merl_t user (development)
+-- Uncomment and adjust for production environment
+
+-- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO merl_t;
+-- GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO merl_t;
+-- GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO merl_t;
+
 
 -- ============================================================================
--- INITIAL DATA (Optional)
+-- Verification Queries
 -- ============================================================================
 
--- No initial data required for orchestration tables
+-- After running this migration, verify with:
+--
+-- -- List all tables
+-- \dt
+--
+-- -- Check table structure
+-- \d queries
+-- \d query_results
+-- \d user_feedback
+-- \d rlcf_feedback
+-- \d ner_corrections
+--
+-- -- Verify indexes
+-- \di
+--
+-- -- Check constraints
+-- SELECT conname, contype, conrelid::regclass, pg_get_constraintdef(oid)
+-- FROM pg_constraint
+-- WHERE conrelid IN ('queries'::regclass, 'query_results'::regclass,
+--                    'user_feedback'::regclass, 'rlcf_feedback'::regclass,
+--                    'ner_corrections'::regclass);
+
 
 -- ============================================================================
--- MIGRATION COMPLETE
+-- Migration Complete
 -- ============================================================================
 
--- Migration 001 completed successfully
--- Tables created: queries, query_results, user_feedback, rlcf_feedback, ner_corrections
--- Indexes created: 29 total (primary keys, foreign keys, GIN indexes)
--- Views created: v_query_performance, v_feedback_stats, v_rlcf_expert_activity
--- Triggers created: trigger_queries_updated_at
+-- Log successful migration
+DO $$
+BEGIN
+    RAISE NOTICE 'Migration 001 completed successfully';
+    RAISE NOTICE 'Created tables: queries, query_results, user_feedback, rlcf_feedback, ner_corrections';
+    RAISE NOTICE 'Created % indexes', (SELECT count(*) FROM pg_indexes WHERE schemaname = 'public');
+    RAISE NOTICE 'Database schema version: 001';
+END
+$$;

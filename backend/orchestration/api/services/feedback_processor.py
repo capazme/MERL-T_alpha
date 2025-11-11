@@ -18,6 +18,7 @@ from ..schemas.feedback import (
     NERCorrectionRequest,
     FeedbackResponse,
 )
+from .persistence_service import persistence_service
 
 logger = logging.getLogger(__name__)
 
@@ -31,16 +32,11 @@ class FeedbackProcessor:
 
     def __init__(self):
         """Initialize Feedback Processor."""
-        # In-memory storage (TODO: Replace with PostgreSQL persistence)
-        self._user_feedback_store: Dict[str, Dict[str, Any]] = {}
-        self._rlcf_feedback_store: Dict[str, Dict[str, Any]] = {}
-        self._ner_corrections_store: Dict[str, Dict[str, Any]] = {}
-
         # Retraining thresholds
         self.rlcf_retrain_threshold = 10  # Retrain after 10 RLCF corrections
         self.ner_retrain_threshold = 20   # Retrain after 20 NER corrections
 
-        logger.info("FeedbackProcessor initialized")
+        logger.info("FeedbackProcessor initialized with database persistence")
 
     def _generate_feedback_id(self, feedback_type: str) -> str:
         """Generate unique feedback ID."""
@@ -91,22 +87,19 @@ class FeedbackProcessor:
             f"rating={feedback.rating}"
         )
 
-        # Store feedback (TODO: Replace with database)
-        feedback_data = {
-            "feedback_id": feedback_id,
-            "trace_id": feedback.trace_id,
-            "user_id": feedback.user_id,
-            "rating": feedback.rating,
-            "feedback_text": feedback.feedback_text,
-            "categories": feedback.categories.model_dump() if feedback.categories else None,
-            "timestamp": datetime.utcnow(),
-        }
-        self._user_feedback_store[feedback_id] = feedback_data
-
-        logger.info(
-            f"[{feedback_id}] User feedback stored successfully. "
-            f"Total user feedback: {len(self._user_feedback_store)}"
-        )
+        # Save feedback to database
+        try:
+            await persistence_service.save_user_feedback(
+                trace_id=feedback.trace_id,
+                rating=feedback.rating,
+                user_id=feedback.user_id,
+                feedback_text=feedback.feedback_text,
+                categories=feedback.categories.model_dump() if feedback.categories else None,
+            )
+            logger.info(f"[{feedback_id}] User feedback saved to database")
+        except Exception as e:
+            logger.error(f"[{feedback_id}] Failed to save user feedback: {e}")
+            raise
 
         # Build response
         response = FeedbackResponse(
@@ -166,22 +159,28 @@ class FeedbackProcessor:
                 f"{feedback.corrections.answer_quality.position}"
             )
 
-        # Store feedback (TODO: Replace with database)
-        feedback_data = {
-            "feedback_id": feedback_id,
-            "trace_id": feedback.trace_id,
-            "expert_id": feedback.expert_id,
-            "authority_score": feedback.authority_score,
-            "corrections": feedback.corrections.model_dump(),
-            "overall_rating": feedback.overall_rating,
-            "training_examples_generated": training_examples_count,
-            "timestamp": datetime.utcnow(),
-        }
-        self._rlcf_feedback_store[feedback_id] = feedback_data
+        # Check if retraining threshold will be reached
+        current_count = await persistence_service.get_rlcf_feedback_count()
+        scheduled_for_retraining = (current_count + 1) >= self.rlcf_retrain_threshold
 
-        # Check if retraining threshold reached
-        current_count = len(self._rlcf_feedback_store)
-        scheduled_for_retraining = current_count >= self.rlcf_retrain_threshold
+        # Save feedback to database
+        try:
+            await persistence_service.save_rlcf_feedback(
+                trace_id=feedback.trace_id,
+                expert_id=feedback.expert_id,
+                authority_score=feedback.authority_score,
+                corrections=feedback.corrections.model_dump(),
+                overall_rating=feedback.overall_rating,
+                training_examples_generated=training_examples_count,
+                scheduled_for_retraining=scheduled_for_retraining,
+            )
+            logger.info(f"[{feedback_id}] RLCF feedback saved to database")
+        except Exception as e:
+            logger.error(f"[{feedback_id}] Failed to save RLCF feedback: {e}")
+            raise
+
+        # Update count after save
+        current_count = current_count + 1
         next_retrain_date = self._calculate_next_retrain_date(
             current_count,
             self.rlcf_retrain_threshold
@@ -229,20 +228,27 @@ class FeedbackProcessor:
             f"for trace_id={correction.trace_id}, type={correction.correction_type}"
         )
 
-        # Store correction (TODO: Replace with database)
-        correction_data = {
-            "feedback_id": feedback_id,
-            "trace_id": correction.trace_id,
-            "expert_id": correction.expert_id,
-            "correction_type": correction.correction_type,
-            "correction": correction.correction.model_dump(),
-            "timestamp": datetime.utcnow(),
-        }
-        self._ner_corrections_store[feedback_id] = correction_data
+        # Check if retraining threshold will be reached
+        current_count = await persistence_service.get_ner_corrections_count()
+        scheduled_for_retraining = (current_count + 1) >= self.ner_retrain_threshold
 
-        # Check if retraining threshold reached
-        current_count = len(self._ner_corrections_store)
-        scheduled_for_retraining = current_count >= self.ner_retrain_threshold
+        # Save correction to database
+        try:
+            await persistence_service.save_ner_correction(
+                trace_id=correction.trace_id,
+                expert_id=correction.expert_id,
+                correction_type=correction.correction_type,
+                correction_data=correction.correction.model_dump(),
+                training_example_generated=True,
+                scheduled_for_retraining=scheduled_for_retraining,
+            )
+            logger.info(f"[{feedback_id}] NER correction saved to database")
+        except Exception as e:
+            logger.error(f"[{feedback_id}] Failed to save NER correction: {e}")
+            raise
+
+        # Update count after save
+        current_count = current_count + 1
         next_retrain_date = self._calculate_next_retrain_date(
             current_count,
             self.ner_retrain_threshold
@@ -268,21 +274,25 @@ class FeedbackProcessor:
 
         return response
 
-    def get_feedback_stats(self) -> Dict[str, Any]:
+    async def get_feedback_stats(self) -> Dict[str, Any]:
         """
         Get feedback statistics for analytics.
 
         Returns:
             Dictionary with feedback counts and retraining status
         """
+        # Get counts from database
+        rlcf_count = await persistence_service.get_rlcf_feedback_count()
+        ner_count = await persistence_service.get_ner_corrections_count()
+
         return {
-            "user_feedback_count": len(self._user_feedback_store),
-            "rlcf_feedback_count": len(self._rlcf_feedback_store),
-            "ner_corrections_count": len(self._ner_corrections_store),
+            "user_feedback_count": 0,  # TODO: Add count method for user feedback
+            "rlcf_feedback_count": rlcf_count,
+            "ner_corrections_count": ner_count,
             "rlcf_retrain_threshold": self.rlcf_retrain_threshold,
             "ner_retrain_threshold": self.ner_retrain_threshold,
-            "rlcf_retraining_ready": len(self._rlcf_feedback_store) >= self.rlcf_retrain_threshold,
-            "ner_retraining_ready": len(self._ner_corrections_store) >= self.ner_retrain_threshold,
+            "rlcf_retraining_ready": rlcf_count >= self.rlcf_retrain_threshold,
+            "ner_retraining_ready": ner_count >= self.ner_retrain_threshold,
         }
 
     async def trigger_retraining(self, model_type: str) -> Dict[str, Any]:
@@ -299,15 +309,15 @@ class FeedbackProcessor:
 
         # TODO: Implement actual retraining pipeline
         # This would:
-        # 1. Collect training examples from feedback stores
+        # 1. Collect training examples from database
         # 2. Prepare training dataset
         # 3. Submit retraining job to ML pipeline
-        # 4. Clear processed feedback from stores
+        # 4. Mark processed feedback as completed
 
         if model_type == "rlcf":
-            training_examples = len(self._rlcf_feedback_store)
+            training_examples = await persistence_service.get_rlcf_feedback_count()
         elif model_type == "ner":
-            training_examples = len(self._ner_corrections_store)
+            training_examples = await persistence_service.get_ner_corrections_count()
         else:
             raise ValueError(f"Unknown model type: {model_type}")
 

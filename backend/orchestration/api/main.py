@@ -17,6 +17,8 @@ from fastapi.exceptions import RequestValidationError
 
 from .routers import query_router, feedback_router, stats_router
 from .schemas.health import HealthResponse, ComponentStatus
+from .database import init_db, close_db, get_database_info
+from .services.cache_service import cache_service
 
 # Configure logging
 logging.basicConfig(
@@ -297,7 +299,29 @@ async def startup_event():
     logger.info("MERL-T API v0.2.0 starting...")
     logger.info("=" * 80)
     logger.info("Initializing components...")
-    # TODO: Initialize database connections, load models, etc.
+
+    # Initialize database
+    try:
+        logger.info("Initializing database connection...")
+        await init_db()
+        db_info = get_database_info()
+        logger.info(f"Database initialized: {db_info['database_type']} ({db_info['database_url']})")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        raise
+
+    # Initialize Redis cache
+    try:
+        logger.info("Initializing Redis cache...")
+        redis_connected = await cache_service.ping()
+        if redis_connected:
+            logger.info("Redis cache connected successfully")
+        else:
+            logger.warning("Redis cache not available (disabled or connection failed)")
+    except Exception as e:
+        logger.warning(f"Redis cache initialization failed: {e}")
+        logger.warning("Continuing without cache...")
+
     logger.info("MERL-T API ready to serve requests")
     logger.info("Documentation available at: /docs")
     logger.info("=" * 80)
@@ -308,6 +332,22 @@ async def shutdown_event():
     """Application shutdown event."""
     logger.info("=" * 80)
     logger.info("MERL-T API shutting down...")
-    # TODO: Close database connections, cleanup resources, etc.
+
+    # Close Redis cache connections
+    try:
+        logger.info("Closing Redis cache connections...")
+        await cache_service.close()
+        logger.info("Redis cache connections closed")
+    except Exception as e:
+        logger.warning(f"Error closing Redis cache: {e}")
+
+    # Close database connections
+    try:
+        logger.info("Closing database connections...")
+        await close_db()
+        logger.info("Database connections closed")
+    except Exception as e:
+        logger.error(f"Error closing database connections: {e}")
+
     logger.info("Shutdown complete")
     logger.info("=" * 80)

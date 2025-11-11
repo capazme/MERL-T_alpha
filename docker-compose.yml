@@ -67,6 +67,14 @@ services:
 
       # Sentenze API (placeholder/mock - configure when available)
       - SENTENZE_API_URL=http://localhost:5001
+
+      # Week 7 - Preprocessing & Orchestration Database
+      - ORCHESTRATION_DATABASE_URL=postgresql+asyncpg://merl_t:merl_t_password@postgres-orchestration:5432/orchestration_db
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=merl_t_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     command: uvicorn backend.rlcf_framework.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
@@ -148,6 +156,31 @@ services:
     restart: unless-stopped
     profiles:
       - postgres  # Only start if explicitly requested: docker-compose --profile postgres up
+
+  # ===========================================================================
+  # PostgreSQL Orchestration (Week 7 - separate database for orchestration API)
+  # ===========================================================================
+  postgres-orchestration:
+    image: postgres:16-alpine
+    container_name: merl-t-postgres-orchestration
+    ports:
+      - "5433:5432"  # Different port to avoid conflict with RLCF postgres
+    environment:
+      - POSTGRES_USER=merl_t
+      - POSTGRES_PASSWORD=merl_t_password
+      - POSTGRES_DB=orchestration_db
+    volumes:
+      - postgres_orchestration_data:/var/lib/postgresql/data
+      # Mount migration file for auto-initialization
+      - ./migrations/001_create_orchestration_tables.sql:/docker-entrypoint-initdb.d/001_create_orchestration_tables.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U merl_t"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - week7  # Profile for Week 7: docker-compose --profile week7 up
 
   # ===========================================================================
   # Neo4j (Phase 2+ - Knowledge Graph)
@@ -244,8 +277,11 @@ volumes:
   # SQLite data (default)
   data:
 
-  # PostgreSQL
+  # PostgreSQL (RLCF)
   postgres_data:
+
+  # PostgreSQL Orchestration (Week 7)
+  postgres_orchestration_data:
 
   # Neo4j (Phase 2+)
   neo4j_data:

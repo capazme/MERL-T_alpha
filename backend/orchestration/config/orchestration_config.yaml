@@ -31,6 +31,35 @@ llm_router:
 
 
 # ==============================================
+# Preprocessing Configuration (Week 7)
+# ==============================================
+preprocessing:
+  # Execution strategy
+  execution_mode: "sequential"  # Query understanding → KG enrichment
+  timeout_seconds: 5  # Total preprocessing timeout
+
+  # Query Understanding
+  query_understanding:
+    enabled: true
+    use_llm: true  # Use OpenRouter LLM for intent classification
+    timeout_seconds: 2
+    fallback_to_heuristic: true  # Use regex patterns if LLM fails
+
+  # KG Enrichment
+  kg_enrichment:
+    enabled: true
+    require_neo4j: false  # Continue without Neo4j (graceful degradation)
+    require_redis: false  # Continue without Redis (no caching)
+    timeout_seconds: 3
+    cache_ttl_seconds: 86400  # 24 hours
+    max_results_per_source:
+      norms: 10
+      sentenze: 5
+      dottrina: 5
+      contributions: 3
+
+
+# ==============================================
 # Retrieval Agents Configuration
 # ==============================================
 retrieval_agents:

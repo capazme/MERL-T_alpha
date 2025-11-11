@@ -21,6 +21,8 @@ from ..schemas.query import (
     AlternativeInterpretation,
 )
 from ...langgraph_workflow import create_merlt_workflow
+from .persistence_service import persistence_service
+from .cache_service import cache_service
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +61,15 @@ class QueryExecutor:
         """
         Convert QueryRequest to initial MEGLTState.
 
+        IMPORTANT: This creates PLACEHOLDER values for query_context and enriched_context.
+        These placeholders are IMMEDIATELY REPLACED by the preprocessing_node (first node in workflow).
+
+        Workflow flow:
+        1. _build_initial_state() creates initial state with placeholders
+        2. preprocessing_node runs query_understanding.analyze_query() → replaces intent, complexity, entities
+        3. preprocessing_node runs kg_enrichment_service.enrich_context() → replaces norms, sentenze, dottrina
+        4. router_node receives state with REAL preprocessing data
+
         Args:
             request: QueryRequest from API
             trace_id: Generated trace ID
@@ -67,10 +78,11 @@ class QueryExecutor:
             Initial state dict compatible with MEGLTState TypedDict
         """
         # Build query_context from request
+        # NOTE: intent and complexity are PLACEHOLDERS - preprocessing_node will replace them
         query_context = {
             "query": request.query,
-            "intent": "unknown",  # Will be determined by preprocessing
-            "complexity": 0.5,    # Will be calculated by preprocessing
+            "intent": "unknown",  # PLACEHOLDER: preprocessing_node calls analyze_query() to get real intent
+            "complexity": 0.5,    # PLACEHOLDER: preprocessing_node calculates real complexity
             "temporal_reference": None,
             "jurisdiction": "nazionale",
         }
@@ -86,11 +98,12 @@ class QueryExecutor:
             if request.context.previous_queries:
                 query_context["previous_queries"] = request.context.previous_queries
 
-        # Build enriched_context (placeholder - preprocessing will populate)
+        # Build enriched_context PLACEHOLDER
+        # NOTE: This is a minimal placeholder - preprocessing_node will populate with real KG data
         enriched_context = {
-            "concepts": [],
-            "entities": [],
-            "norms": [],
+            "concepts": [],  # PLACEHOLDER: preprocessing_node fills with legal concepts from KG
+            "entities": [],  # PLACEHOLDER: preprocessing_node fills with NER entities
+            "norms": [],     # PLACEHOLDER: preprocessing_node fills with related norms from Neo4j
         }
 
         # Build initial MEGLTState
@@ -248,6 +261,62 @@ class QueryExecutor:
             errors=final_state.get("errors", []),
         )
 
+    def _extract_sources_consulted(self, final_state: Dict[str, Any]) -> list[Dict[str, Any]]:
+        """
+        Extract sources_consulted from agent_results.
+
+        Builds a list of all sources consulted during retrieval:
+        - Knowledge Graph (Neo4j)
+        - API sources (Norma Controller, Sentenze API)
+        - Vector Database (Qdrant)
+
+        Args:
+            final_state: MEGLTState after workflow completion
+
+        Returns:
+            List of source dicts with metadata
+        """
+        sources = []
+        agent_results = final_state.get("agent_results", {})
+
+        # Extract KG Agent sources
+        kg_result = agent_results.get("kg_agent", {})
+        if kg_result:
+            sources.append({
+                "source_type": "knowledge_graph",
+                "source_name": "Neo4j Knowledge Graph",
+                "items_retrieved": len(kg_result.get("data", [])),
+                "execution_time_ms": kg_result.get("execution_time_ms", 0.0),
+                "success": kg_result.get("success", False),
+                "tasks_executed": kg_result.get("tasks_executed", 0),
+            })
+
+        # Extract API Agent sources
+        api_result = agent_results.get("api_agent", {})
+        if api_result:
+            sources.append({
+                "source_type": "api",
+                "source_name": api_result.get("source", "Norma Controller API"),
+                "items_retrieved": len(api_result.get("data", [])),
+                "execution_time_ms": api_result.get("execution_time_ms", 0.0),
+                "success": api_result.get("success", False),
+                "tasks_executed": api_result.get("tasks_executed", 0),
+            })
+
+        # Extract VectorDB Agent sources
+        vectordb_result = agent_results.get("vectordb_agent", {})
+        if vectordb_result:
+            sources.append({
+                "source_type": "vector_database",
+                "source_name": "Qdrant Vector Database",
+                "items_retrieved": len(vectordb_result.get("data", [])),
+                "execution_time_ms": vectordb_result.get("execution_time_ms", 0.0),
+                "success": vectordb_result.get("success", False),
+                "tasks_executed": vectordb_result.get("tasks_executed", 0),
+            })
+
+        return sources
+
     def _extract_metadata(self, final_state: Dict[str, Any]) -> AnswerMetadata:
         """
         Extract AnswerMetadata from final state.
@@ -320,6 +389,22 @@ class QueryExecutor:
         logger.info(f"[{trace_id}] Starting query execution: {request.query[:50]}...")
 
         start_time = time.time()
+        start_timestamp = datetime.utcnow()
+
+        # Save query to database with pending status
+        try:
+            await persistence_service.save_query(
+                trace_id=trace_id,
+                query_text=request.query,
+                session_id=request.session_id,
+                user_id=None,  # TODO: Extract from auth context
+                query_context=request.context.model_dump() if request.context else None,
+                options=request.options.model_dump() if request.options else None,
+            )
+            logger.info(f"[{trace_id}] Query saved to database with status=pending")
+        except Exception as e:
+            logger.warning(f"[{trace_id}] Failed to save query to database: {e}")
+            # Continue execution even if database save fails
 
         try:
             # Get compiled workflow app
@@ -327,6 +412,17 @@ class QueryExecutor:
 
             # Build initial state
             initial_state = self._build_initial_state(request, trace_id)
+
+            # Update query status to processing
+            try:
+                await persistence_service.update_query_status(
+                    trace_id=trace_id,
+                    status="processing",
+                    started_at=datetime.utcnow(),
+                )
+                logger.info(f"[{trace_id}] Query status updated to processing")
+            except Exception as e:
+                logger.warning(f"[{trace_id}] Failed to update query status: {e}")
 
             # Execute workflow with timeout
             timeout_ms = request.options.timeout_ms if request.options else 30000
@@ -366,11 +462,68 @@ class QueryExecutor:
                 f"(confidence: {answer.confidence:.2f})"
             )
 
+            # Save query result to database
+            try:
+                # Extract sources consulted from agent_results
+                sources_consulted = self._extract_sources_consulted(final_state)
+
+                await persistence_service.save_query_result(
+                    trace_id=trace_id,
+                    primary_answer=answer.primary_answer,
+                    confidence=answer.confidence,
+                    legal_basis=[lb.model_dump() for lb in answer.legal_basis],
+                    alternatives=[alt.model_dump() for alt in answer.alternative_interpretations] if answer.alternative_interpretations else [],
+                    uncertainty_preserved=answer.uncertainty_preserved,
+                    sources_consulted=sources_consulted,
+                    execution_trace=execution_trace.model_dump() if execution_trace else {},
+                    metadata=metadata.model_dump(),
+                )
+                logger.info(f"[{trace_id}] Query result saved to database (sources: {len(sources_consulted)})")
+            except Exception as e:
+                logger.warning(f"[{trace_id}] Failed to save query result: {e}")
+
+            # Update query status to completed
+            try:
+                await persistence_service.update_query_status(
+                    trace_id=trace_id,
+                    status="completed",
+                    completed_at=datetime.utcnow(),
+                )
+                logger.info(f"[{trace_id}] Query status updated to completed")
+            except Exception as e:
+                logger.warning(f"[{trace_id}] Failed to update query status: {e}")
+
+            # Cache query status in Redis
+            try:
+                await cache_service.set_query_status(
+                    trace_id=trace_id,
+                    status_data={
+                        "trace_id": trace_id,
+                        "status": "completed",
+                        "result": response.model_dump(),
+                    },
+                    ttl_hours=24,
+                )
+                logger.info(f"[{trace_id}] Query status cached in Redis")
+            except Exception as e:
+                logger.warning(f"[{trace_id}] Failed to cache query status: {e}")
+
             return response
 
         except asyncio.TimeoutError:
             elapsed_ms = (time.time() - start_time) * 1000
             logger.error(f"[{trace_id}] Query execution timeout after {elapsed_ms:.0f}ms")
+
+            # Update query status to timeout
+            try:
+                await persistence_service.update_query_status(
+                    trace_id=trace_id,
+                    status="timeout",
+                    completed_at=datetime.utcnow(),
+                )
+            except Exception as db_error:
+                logger.warning(f"[{trace_id}] Failed to update status to timeout: {db_error}")
+
             raise
 
         except Exception as e:
@@ -379,4 +532,15 @@ class QueryExecutor:
                 f"[{trace_id}] Query execution failed after {elapsed_ms:.0f}ms: {str(e)}",
                 exc_info=True
             )
+
+            # Update query status to failed
+            try:
+                await persistence_service.update_query_status(
+                    trace_id=trace_id,
+                    status="failed",
+                    completed_at=datetime.utcnow(),
+                )
+            except Exception as db_error:
+                logger.warning(f"[{trace_id}] Failed to update status to failed: {db_error}")
+
             raise

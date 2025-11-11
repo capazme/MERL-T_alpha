@@ -32,9 +32,13 @@ from redis import Redis
 from redis.asyncio import Redis as AsyncRedis
 from pydantic import BaseModel, Field
 
-# Assume these exist from previous weeks
-from backend.orchestration.intent_classifier import IntentResult, IntentType
-from backend.preprocessing.config.kg_config import KGConfig
+# Import from query_understanding (unified interface - Week 7)
+from .query_understanding import QueryUnderstandingResult, QueryIntentType
+try:
+    from .config.kg_config import KGConfig
+except ImportError:
+    # Fallback if config not available
+    KGConfig = None
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +161,7 @@ class ControversyFlag(BaseModel):
 
 class EnrichedContext(BaseModel):
     """Complete enriched context from KG for expert modules."""
-    intent_result: IntentResult = Field(..., description="Original intent classification")
+    query_understanding: QueryUnderstandingResult = Field(..., description="Original query understanding result")
     norms: List[NormaContext] = Field(default=[], description="Related norms")
     sentenze: List[SentenzaContext] = Field(default=[], description="Related case law")
     dottrina: List[DoctrineContext] = Field(default=[], description="Academic commentary")
@@ -172,10 +176,10 @@ class EnrichedContext(BaseModel):
     class Config:
         schema_extra = {
             "example": {
-                "intent_result": {
-                    "classification_id": "cls_123",
-                    "intent": "contract_interpretation",
-                    "confidence": 0.92
+                "query_understanding": {
+                    "query_id": "qu_123",
+                    "intent": "norm_search",
+                    "intent_confidence": 0.92
                 },
                 "norms": [],
                 "sentenze": [],
@@ -236,12 +240,12 @@ class KGEnrichmentService:
     # Main Enrichment Method
     # ==========================================
 
-    async def enrich_context(self, intent_result: IntentResult) -> EnrichedContext:
+    async def enrich_context(self, query_understanding: QueryUnderstandingResult) -> EnrichedContext:
         """
-        Main method: enrich intent classification with KG context.
+        Main method: enrich query understanding with KG context.
 
         Args:
-            intent_result: Result from intent classifier
+            query_understanding: Result from query understanding module
 
         Returns:
             EnrichedContext with all related legal information
@@ -256,7 +260,7 @@ class KGEnrichmentService:
             if not self.neo4j_available:
                 self.logger.warning("Neo4j unavailable - returning empty enriched context")
                 return EnrichedContext(
-                    intent_result=intent_result,
+                    query_understanding=query_understanding,
                     norms=[],
                     sentenze=[],
                     dottrina=[],
@@ -272,7 +276,7 @@ class KGEnrichmentService:
                 )
 
             # Generate cache key from intent + concept
-            cache_key = self._generate_cache_key(intent_result)
+            cache_key = self._generate_cache_key(query_understanding)
 
             # Try Redis cache first (if available)
             if self.redis_available:
@@ -287,16 +291,16 @@ class KGEnrichmentService:
 
             # Query Neo4j for all sources in parallel
             norms, sentenze, dottrina, contributions, controversies = await asyncio.gather(
-                self._query_related_norms(intent_result),
-                self._query_related_sentenze(intent_result),
-                self._query_doctrine(intent_result),
-                self._query_contributions(intent_result),
-                self._query_controversy_flags(intent_result)
+                self._query_related_norms(query_understanding),
+                self._query_related_sentenze(query_understanding),
+                self._query_doctrine(query_understanding),
+                self._query_contributions(query_understanding),
+                self._query_controversy_flags(query_understanding)
             )
 
             # Build enriched context
             enriched = EnrichedContext(
-                intent_result=intent_result,
+                query_understanding=query_understanding,
                 norms=norms,
                 sentenze=sentenze,
                 dottrina=dottrina,
@@ -332,12 +336,12 @@ class KGEnrichmentService:
     # Query Methods (Intent-Specific)
     # ==========================================
 
-    async def _query_related_norms(self, intent_result: IntentResult) -> List[NormaContext]:
-        """Query norms related to intent classification."""
+    async def _query_related_norms(self, query_understanding: QueryUnderstandingResult) -> List[NormaContext]:
+        """Query norms related to query understanding."""
         try:
             async with self.neo4j_driver.session() as session:
-                # Intent-specific query patterns
-                if intent_result.intent == IntentType.CONTRACT_INTERPRETATION:
+                # Intent-specific query patterns (using QueryIntentType)
+                if query_understanding.intent == QueryIntentType.INTERPRETATION:
                     query = """
                     MATCH (c:ConceptoGiuridico)-[:APPLICA_A]->(n:Norma)
                     WHERE c.nome CONTAINS $concept OR n.descrizione CONTAINS $concept
@@ -348,7 +352,7 @@ class KGEnrichmentService:
                     ORDER BY n.confidence DESC
                     LIMIT 10
                     """
-                elif intent_result.intent == IntentType.COMPLIANCE_QUESTION:
+                elif query_understanding.intent == QueryIntentType.COMPLIANCE_CHECK:
                     query = """
                     MATCH (n:Norma)-[:IMPONE]->(m:ModalitaGiuridica)
                     WHERE m.tipo_modalita IN ['obbligo', 'divieto']
@@ -360,7 +364,7 @@ class KGEnrichmentService:
                     ORDER BY m.tipo_modalita DESC
                     LIMIT 10
                     """
-                elif intent_result.intent == IntentType.NORM_EXPLANATION:
+                elif query_understanding.intent == QueryIntentType.NORM_SEARCH:
                     query = """
                     MATCH (n:Norma)-[:ESPRIME_PRINCIPIO]->(p:PrincipioGiuridico)
                     WHERE p.nome CONTAINS $concept OR n.descrizione CONTAINS $concept
@@ -371,7 +375,7 @@ class KGEnrichmentService:
                     ORDER BY p.livello DESC
                     LIMIT 10
                     """
-                else:  # PRECEDENT_SEARCH
+                else:  # DOCUMENT_DRAFTING, RISK_SPOTTING, UNKNOWN
                     query = """
                     MATCH (n:Norma)
                     WHERE n.estremi CONTAINS $concept OR n.descrizione CONTAINS $concept
@@ -385,7 +389,7 @@ class KGEnrichmentService:
 
                 result = await session.run(
                     query,
-                    concept=intent_result.query or ""
+                    concept=query_understanding.original_query or ""
                 )
 
                 norms = []
@@ -406,8 +410,8 @@ class KGEnrichmentService:
             self.logger.error(f"Error querying norms: {str(e)}", exc_info=True)
             return []
 
-    async def _query_related_sentenze(self, intent_result: IntentResult) -> List[SentenzaContext]:
-        """Query case law (sentenze) related to intent."""
+    async def _query_related_sentenze(self, query_understanding: QueryUnderstandingResult) -> List[SentenzaContext]:
+        """Query case law (sentenze) related to query understanding."""
         try:
             async with self.neo4j_driver.session() as session:
                 query = """
@@ -420,7 +424,7 @@ class KGEnrichmentService:
                 LIMIT 5
                 """
 
-                result = await session.run(query, concept=intent_result.query or "")
+                result = await session.run(query, concept=query_understanding.original_query or "")
 
                 sentenze = []
                 async for record in result:
@@ -440,7 +444,7 @@ class KGEnrichmentService:
             self.logger.error(f"Error querying sentenze: {str(e)}", exc_info=True)
             return []
 
-    async def _query_doctrine(self, intent_result: IntentResult) -> List[DoctrineContext]:
+    async def _query_doctrine(self, query_understanding: QueryUnderstandingResult) -> List[DoctrineContext]:
         """Query academic doctrine (commentaries)."""
         try:
             async with self.neo4j_driver.session() as session:
@@ -457,7 +461,7 @@ class KGEnrichmentService:
                 LIMIT 5
                 """
 
-                result = await session.run(query, concept=intent_result.query or "")
+                result = await session.run(query, concept=query_understanding.original_query or "")
 
                 dottrina = []
                 async for record in result:
@@ -478,7 +482,7 @@ class KGEnrichmentService:
             self.logger.error(f"Error querying doctrine: {str(e)}", exc_info=True)
             return []
 
-    async def _query_contributions(self, intent_result: IntentResult) -> List[ContributionContext]:
+    async def _query_contributions(self, query_understanding: QueryUnderstandingResult) -> List[ContributionContext]:
         """Query community contributions."""
         try:
             async with self.neo4j_driver.session() as session:
@@ -494,7 +498,7 @@ class KGEnrichmentService:
                 LIMIT 3
                 """
 
-                result = await session.run(query, concept=intent_result.query or "")
+                result = await session.run(query, concept=query_understanding.original_query or "")
 
                 contributions = []
                 async for record in result:
@@ -515,7 +519,7 @@ class KGEnrichmentService:
             self.logger.error(f"Error querying contributions: {str(e)}", exc_info=True)
             return []
 
-    async def _query_controversy_flags(self, intent_result: IntentResult) -> List[ControversyFlag]:
+    async def _query_controversy_flags(self, query_understanding: QueryUnderstandingResult) -> List[ControversyFlag]:
         """Query controversial items flagged by RLCF."""
         try:
             async with self.neo4j_driver.session() as session:
@@ -526,7 +530,7 @@ class KGEnrichmentService:
                 RETURN n.estremi as estremi, n.controversy_details as controversy_details
                 """
 
-                result = await session.run(query, concept=intent_result.query or "")
+                result = await session.run(query, concept=query_understanding.original_query or "")
 
                 flags = []
                 async for record in result:
@@ -549,12 +553,12 @@ class KGEnrichmentService:
     # Caching Methods
     # ==========================================
 
-    def _generate_cache_key(self, intent_result: IntentResult) -> str:
-        """Generate cache key from intent result."""
-        concept = (intent_result.query or "").lower()
-        key_data = f"{intent_result.intent.value}:{concept}"
+    def _generate_cache_key(self, query_understanding: QueryUnderstandingResult) -> str:
+        """Generate cache key from query understanding result."""
+        concept = (query_understanding.original_query or "").lower()
+        key_data = f"{query_understanding.intent.value}:{concept}"
         key_hash = md5(key_data.encode()).hexdigest()[:12]
-        return f"kg_enrich:{intent_result.intent.value}:{key_hash}"
+        return f"kg_enrich:{query_understanding.intent.value}:{key_hash}"
 
     async def _get_from_cache(self, key: str) -> Optional[Dict[str, Any]]:
         """Get enriched context from Redis cache (if Redis available)."""

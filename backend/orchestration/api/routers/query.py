@@ -20,6 +20,8 @@ from ..schemas.query import (
     QueryRetrieveResponse,
 )
 from ..services.query_executor import QueryExecutor
+from ..services.cache_service import cache_service
+from ..services.persistence_service import persistence_service
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +32,6 @@ router = APIRouter(
 
 # Global QueryExecutor instance (singleton pattern)
 query_executor = QueryExecutor()
-
-# In-memory cache for query status (TODO: Replace with Redis/PostgreSQL persistence)
-_query_status_cache = {}
 
 
 @router.post(
@@ -94,17 +93,8 @@ async def execute_query(request: QueryRequest) -> QueryResponse:
     try:
         logger.info(f"Received query: {request.query[:100]}...")
 
-        # Execute query via QueryExecutor
+        # Execute query via QueryExecutor (handles caching and database persistence)
         response = await query_executor.execute_query(request)
-
-        # Cache status (for GET /query/status endpoint)
-        _query_status_cache[response.trace_id] = {
-            "trace_id": response.trace_id,
-            "status": "completed",
-            "result": response,
-            "started_at": response.timestamp,
-            "completed_at": response.timestamp,
-        }
 
         logger.info(f"[{response.trace_id}] Query executed successfully")
         return response
@@ -179,30 +169,61 @@ async def get_query_status(trace_id: str) -> QueryStatus:
     """
     logger.info(f"Status request for trace_id: {trace_id}")
 
-    # Check in-memory cache (TODO: Replace with Redis/PostgreSQL)
-    if trace_id not in _query_status_cache:
+    # Try Redis cache first
+    cached_status = await cache_service.get_query_status(trace_id)
+
+    if cached_status:
+        logger.info(f"[{trace_id}] Status found in Redis cache")
+        # Build QueryStatus response from cache
+        query_status = QueryStatus(
+            trace_id=cached_status["trace_id"],
+            status=cached_status["status"],
+            current_stage=cached_status.get("current_stage"),
+            progress_percent=100.0 if cached_status["status"] == "completed" else None,
+            started_at=cached_status.get("started_at"),
+            completed_at=cached_status.get("completed_at"),
+            estimated_completion_ms=None,
+            result=cached_status.get("result"),
+            error=cached_status.get("error"),
+        )
+        return query_status
+
+    # Fallback to database
+    logger.info(f"[{trace_id}] Cache miss, checking database...")
+    query = await persistence_service.get_query(trace_id)
+
+    if not query:
         logger.warning(f"Trace ID not found: {trace_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Query with trace_id '{trace_id}' not found. It may have expired or never existed."
         )
 
-    cached_status = _query_status_cache[trace_id]
+    # Get result if completed
+    result = None
+    if query.status == "completed":
+        query_result = await persistence_service.get_query_result(trace_id)
+        if query_result:
+            result = {
+                "answer": query_result.primary_answer,
+                "confidence": float(query_result.confidence),
+                "legal_basis": query_result.legal_basis,
+            }
 
     # Build QueryStatus response
     query_status = QueryStatus(
-        trace_id=cached_status["trace_id"],
-        status=cached_status["status"],
-        current_stage=cached_status.get("current_stage"),
-        progress_percent=100.0 if cached_status["status"] == "completed" else None,
-        started_at=cached_status["started_at"],
-        completed_at=cached_status.get("completed_at"),
+        trace_id=query.trace_id,
+        status=query.status,
+        current_stage=None,
+        progress_percent=100.0 if query.status == "completed" else None,
+        started_at=query.started_at,
+        completed_at=query.completed_at,
         estimated_completion_ms=None,
-        result=cached_status.get("result"),
-        error=cached_status.get("error"),
+        result=result,
+        error=None,
     )
 
-    logger.info(f"[{trace_id}] Status: {query_status.status}")
+    logger.info(f"[{trace_id}] Status: {query_status.status} (from database)")
     return query_status
 
 
@@ -270,45 +291,38 @@ async def get_query_history(
     """
     logger.info(f"Query history request for user_id={user_id}, limit={limit}, offset={offset}")
 
-    # TODO: Query PostgreSQL for user's query history
-    # For now, return mock data from in-memory cache
-
-    # Filter queries for this user
-    user_queries = [
-        query_data for query_data in _query_status_cache.values()
-        if query_data.get("result") and query_data["result"].session_id == user_id
-    ]
-
-    # Apply date filter if provided
-    if since:
-        from datetime import datetime as dt
-        since_date = dt.fromisoformat(since.replace('Z', '+00:00'))
-        user_queries = [
-            q for q in user_queries
-            if q["started_at"] >= since_date
-        ]
-
-    # Sort by timestamp descending (most recent first)
-    user_queries.sort(key=lambda q: q["started_at"], reverse=True)
-
-    # Get total count before pagination
-    total = len(user_queries)
-
-    # Apply pagination
-    paginated_queries = user_queries[offset:offset + limit]
+    # Get query history from database
+    queries, total = await persistence_service.get_query_history(
+        user_id=user_id,
+        limit=limit,
+        offset=offset,
+    )
 
     # Build QueryHistoryItem list
     history_items = []
-    for query_data in paginated_queries:
-        result: QueryResponse = query_data["result"]
+    for query in queries:
+        # Get query result for confidence (if completed)
+        confidence = None
+        if query.status == "completed":
+            query_result = await persistence_service.get_query_result(query.trace_id)
+            if query_result:
+                confidence = float(query_result.confidence)
+
+        # Get user feedback rating (if any)
+        rating = None
+        user_feedbacks = await persistence_service.get_user_feedback_by_trace(query.trace_id)
+        if user_feedbacks:
+            # Take most recent rating
+            rating = user_feedbacks[-1].rating
+
         history_items.append(
             QueryHistoryItem(
-                trace_id=result.trace_id,
-                query_text=result.answer.primary_answer[:100] + "...",  # Truncate for history
-                timestamp=result.timestamp,
-                rating=None,  # TODO: Fetch from feedback store
-                answered=True,
-                confidence=result.answer.confidence,
+                trace_id=query.trace_id,
+                query_text=query.query_text[:100] + "..." if len(query.query_text) > 100 else query.query_text,
+                timestamp=query.created_at,
+                rating=rating,
+                answered=(query.status == "completed"),
+                confidence=confidence,
             )
         )
 
@@ -375,29 +389,57 @@ async def retrieve_query(trace_id: str) -> QueryRetrieveResponse:
     """
     logger.info(f"Query retrieve request for trace_id={trace_id}")
 
-    # Check in-memory cache (TODO: Replace with PostgreSQL)
-    if trace_id not in _query_status_cache:
+    # Get query from database
+    query = await persistence_service.get_query(trace_id)
+    if not query:
         logger.warning(f"Trace ID not found: {trace_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Query with trace_id '{trace_id}' not found."
         )
 
-    cached_query = _query_status_cache[trace_id]
-    result: QueryResponse = cached_query["result"]
+    # Get query result
+    query_result = await persistence_service.get_query_result(trace_id)
+    if not query_result:
+        logger.warning(f"Query result not found for trace_id={trace_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Query result not found for trace_id '{trace_id}'."
+        )
 
-    # TODO: Fetch feedback from feedback stores
-    feedback_list = []
+    # Fetch feedback from stores
+    user_feedbacks = await persistence_service.get_user_feedback_by_trace(trace_id)
+    feedback_list = [
+        {
+            "feedback_type": "user",
+            "rating": fb.rating,
+            "text": fb.feedback_text,
+            "timestamp": fb.created_at.isoformat() if fb.created_at else None,
+        }
+        for fb in user_feedbacks
+    ]
+
+    # Reconstruct Answer object
+    from ..schemas.query import Answer
+    answer = Answer(
+        primary_answer=query_result.primary_answer,
+        confidence=float(query_result.confidence),
+        legal_basis=[],  # TODO: Reconstruct LegalBasis objects from JSON
+        jurisprudence=None,
+        alternative_interpretations=None,
+        uncertainty_preserved=query_result.uncertainty_preserved,
+        consensus_level=None,
+    )
 
     # Build response
     response = QueryRetrieveResponse(
-        trace_id=result.trace_id,
-        query=result.answer.primary_answer[:100] + "...",  # TODO: Store original query
-        answer=result.answer,
-        execution_trace=result.execution_trace,
-        metadata=result.metadata,
+        trace_id=query.trace_id,
+        query=query.query_text,
+        answer=answer,
+        execution_trace=query_result.execution_trace,
+        metadata=query_result.metadata,
         feedback=feedback_list,
-        timestamp=result.timestamp,
+        timestamp=query.created_at,
     )
 
     logger.info(f"[{trace_id}] Query retrieved successfully")

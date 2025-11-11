@@ -3,23 +3,24 @@ LangGraph Workflow for MERL-T Legal AI System.
 
 This module implements the complete end-to-end workflow using LangGraph:
 - State management across all components
-- 6 nodes: Router, Retrieval, Experts, Synthesis, Iteration, Refinement
+- 7 nodes: Preprocessing, Router, Retrieval, Experts, Synthesis, Iteration, Refinement
 - Conditional routing for multi-turn iteration
 - Full error handling and observability
 
-Architecture:
-    START → router → retrieval → experts → synthesis → iteration
-             ↑                                           ↓
-             |                                      (decision)
-             |                                           ↓
-             +---- refinement <-- (if continue)
-                                  ↓
-                             (if stop) → END
+Architecture (Week 7 - updated):
+    START → preprocessing → router → retrieval → experts → synthesis → iteration
+                             ↑                                           ↓
+                             |                                      (decision)
+                             |                                           ↓
+                             +---- refinement <-- (if continue)
+                                                  ↓
+                                             (if stop) → END
 """
 
 import logging
 import asyncio
 import time
+import os
 from typing import TypedDict, Annotated, Sequence, Optional, Dict, Any
 from datetime import datetime
 import operator
@@ -39,6 +40,10 @@ from backend.orchestration.experts.base import ExpertContext
 from backend.orchestration.experts.synthesizer import Synthesizer
 from backend.orchestration.iteration.controller import IterationController
 from backend.orchestration.iteration.models import IterationContext
+
+# Import preprocessing components (Week 7)
+from backend.preprocessing import query_understanding
+from backend.preprocessing.kg_enrichment_service import KGEnrichmentService
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +99,184 @@ class MEGLTState(TypedDict):
     execution_time_ms: float
     tokens_used: int
     errors: Annotated[Sequence[str], operator.add]  # Accumulate errors
+
+
+# ============================================================================
+# Node 0: Preprocessing Node (Week 7 - NEW)
+# ============================================================================
+
+async def preprocessing_node(state: MEGLTState) -> MEGLTState:
+    """
+    Execute preprocessing: query understanding + KG enrichment.
+
+    Populates:
+    - state["query_context"] with real values (intent, complexity, entities, concepts)
+    - state["enriched_context"] with KG data (norms, sentenze, dottrina, contributions)
+
+    Input state fields:
+    - original_query
+    - query_context (with user-provided context from API request)
+
+    Output state fields:
+    - query_context (updated with intent, complexity, entities, concepts)
+    - enriched_context (KG data from Neo4j + preprocessing metadata)
+    - errors (if preprocessing fails)
+    """
+    logger.info(f"[{state['trace_id']}] Preprocessing node: analyzing query")
+
+    start_time = time.time()
+
+    try:
+        # ========== Step 1: Query Understanding ==========
+        logger.debug(f"[{state['trace_id']}] Running query understanding...")
+        qu_start = time.time()
+
+        qu_result = await query_understanding.analyze_query(
+            query=state["original_query"],
+            query_id=state["trace_id"],
+            use_llm=True  # Use LLM for intent classification (Phase 1)
+        )
+
+        qu_elapsed_ms = (time.time() - qu_start) * 1000
+        logger.info(
+            f"[{state['trace_id']}] Query understanding completed in {qu_elapsed_ms:.0f}ms: "
+            f"intent={qu_result.intent.value}, confidence={qu_result.intent_confidence:.2f}"
+        )
+
+        # ========== Step 2: Build updated query_context ==========
+        query_context = state["query_context"].copy()  # Preserve user-provided context
+
+        # Update with query understanding results
+        query_context.update({
+            "intent": qu_result.intent.value,
+            "intent_confidence": qu_result.intent_confidence,
+            "complexity": 1.0 - qu_result.overall_confidence,  # Inverse of confidence
+            "entities": [e.to_dict() for e in qu_result.entities],
+            "norm_references": qu_result.norm_references,
+            "legal_concepts": qu_result.legal_concepts,
+            "dates": qu_result.dates,
+            "needs_review": qu_result.needs_review,
+        })
+
+        # ========== Step 3: KG Enrichment (Optional - graceful degradation) ==========
+        enriched_context = {}
+
+        # Check if Neo4j is available
+        neo4j_available = os.getenv("NEO4J_URI") is not None
+
+        if neo4j_available:
+            try:
+                logger.debug(f"[{state['trace_id']}] Running KG enrichment...")
+                kg_start = time.time()
+
+                # Initialize Neo4j driver (lazy)
+                from neo4j import AsyncGraphDatabase
+                neo4j_driver = AsyncGraphDatabase.driver(
+                    os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+                    auth=(os.getenv("NEO4J_USER", "neo4j"), os.getenv("NEO4J_PASSWORD", "merl_t_password"))
+                )
+
+                # Initialize Redis client (optional)
+                redis_client = None
+                if os.getenv("REDIS_HOST"):
+                    from redis.asyncio import Redis as AsyncRedis
+                    redis_client = await AsyncRedis.from_url(
+                        f"redis://{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', '6379')}/0",
+                        decode_responses=True
+                    )
+
+                # Create KG enrichment service
+                kg_service = KGEnrichmentService(neo4j_driver, redis_client, config=None)
+
+                # Enrich context
+                enriched = await kg_service.enrich_context(qu_result)
+
+                kg_elapsed_ms = (time.time() - kg_start) * 1000
+                logger.info(
+                    f"[{state['trace_id']}] KG enrichment completed in {kg_elapsed_ms:.0f}ms: "
+                    f"{len(enriched.norms)} norms, {len(enriched.sentenze)} sentenze, "
+                    f"{len(enriched.dottrina)} dottrina, {len(enriched.contributions)} contributions"
+                )
+
+                # Convert to dict for state
+                enriched_context = {
+                    "norms": [n.model_dump() for n in enriched.norms],
+                    "sentenze": [s.model_dump() for s in enriched.sentenze],
+                    "dottrina": [d.model_dump() for d in enriched.dottrina],
+                    "contributions": [c.model_dump() for c in enriched.contributions],
+                    "controversy_flags": [cf.model_dump() for cf in enriched.controversy_flags],
+                    "enrichment_metadata": enriched.enrichment_metadata,
+                    "query_understanding": qu_result.to_dict(),  # Store full QU result
+                }
+
+                # Close connections
+                if redis_client:
+                    await redis_client.close()
+                await neo4j_driver.close()
+
+            except Exception as kg_error:
+                logger.error(
+                    f"[{state['trace_id']}] KG enrichment failed: {kg_error}",
+                    exc_info=True
+                )
+                # Continue with fallback enriched_context
+                enriched_context = {
+                    "concepts": qu_result.legal_concepts,
+                    "entities": [e.to_dict() for e in qu_result.entities],
+                    "norms": qu_result.norm_references,
+                    "enrichment_metadata": {
+                        "cache_hit": False,
+                        "query_time_ms": 0,
+                        "sources_queried": [],
+                        "degraded_mode": True,
+                        "reason": f"kg_error: {str(kg_error)}"
+                    },
+                    "query_understanding": qu_result.to_dict(),
+                }
+        else:
+            logger.warning(f"[{state['trace_id']}] Neo4j not available - skipping KG enrichment")
+            # Fallback: use query understanding data only
+            enriched_context = {
+                "concepts": qu_result.legal_concepts,
+                "entities": [e.to_dict() for e in qu_result.entities],
+                "norms": qu_result.norm_references,
+                "enrichment_metadata": {
+                    "cache_hit": False,
+                    "query_time_ms": 0,
+                    "sources_queried": [],
+                    "degraded_mode": True,
+                    "reason": "neo4j_unavailable"
+                },
+                "query_understanding": qu_result.to_dict(),
+            }
+
+        # ========== Step 4: Return updated state ==========
+        elapsed_ms = (time.time() - start_time) * 1000
+
+        logger.info(
+            f"[{state['trace_id']}] Preprocessing completed in {elapsed_ms:.0f}ms"
+        )
+
+        return {
+            **state,
+            "query_context": query_context,
+            "enriched_context": enriched_context,
+            "execution_time_ms": state.get("execution_time_ms", 0.0) + elapsed_ms
+        }
+
+    except Exception as e:
+        elapsed_ms = (time.time() - start_time) * 1000
+        logger.error(
+            f"[{state['trace_id']}] Preprocessing node failed after {elapsed_ms:.0f}ms: {e}",
+            exc_info=True
+        )
+
+        # Return state with error (workflow continues with mock values from query_executor)
+        return {
+            **state,
+            "errors": [f"Preprocessing failed: {str(e)}"],
+            "execution_time_ms": state.get("execution_time_ms", 0.0) + elapsed_ms
+        }
 
 
 # ============================================================================
@@ -702,24 +885,27 @@ def create_merlt_workflow() -> StateGraph:
     """
     Build complete MERL-T workflow with LangGraph.
 
-    Graph structure:
-    START → router → retrieval → experts → synthesis → iteration
-             ↑                                           ↓
-             |                                      (decision)
-             |                                           ↓
-             +---- refinement <-- (if continue)
-                                  ↓
-                             (if stop) → END
+    Graph structure (Week 7 - with preprocessing):
+    START → preprocessing → router → retrieval → experts → synthesis → iteration
+                             ↑                                           ↓
+                             |                                      (decision)
+                             |                                           ↓
+                             +---- refinement <-- (if continue)
+                                                  ↓
+                                             (if stop) → END
+
+    Note: Preprocessing runs ONCE at the start. Refinement loops back to router (not preprocessing).
 
     Returns:
         Compiled LangGraph StateGraph ready for execution
     """
-    logger.info("Building MERL-T LangGraph workflow...")
+    logger.info("Building MERL-T LangGraph workflow (Week 7 with preprocessing)...")
 
     # Create graph
     workflow = StateGraph(MEGLTState)
 
-    # Add all 6 nodes
+    # Add all 7 nodes (Week 7: added preprocessing)
+    workflow.add_node("preprocessing", preprocessing_node)  # NEW - Week 7
     workflow.add_node("router", router_node)
     workflow.add_node("retrieval", retrieval_node)
     workflow.add_node("experts", experts_node)
@@ -728,7 +914,8 @@ def create_merlt_workflow() -> StateGraph:
     workflow.add_node("refinement", refinement_node)
 
     # Define linear edges (main flow)
-    workflow.set_entry_point("router")
+    workflow.set_entry_point("preprocessing")  # CHANGED: was "router"
+    workflow.add_edge("preprocessing", "router")  # NEW: preprocessing → router
     workflow.add_edge("router", "retrieval")
     workflow.add_edge("retrieval", "experts")
     workflow.add_edge("experts", "synthesis")
@@ -745,11 +932,12 @@ def create_merlt_workflow() -> StateGraph:
     )
 
     # Loop back: Refinement → Router for next iteration
+    # IMPORTANT: Loop goes to router, NOT preprocessing (preprocessing runs once!)
     workflow.add_edge("refinement", "router")
 
     # Compile
     app = workflow.compile()
 
-    logger.info("MERL-T workflow compiled successfully")
+    logger.info("MERL-T workflow compiled successfully (7 nodes with preprocessing)")
 
     return app

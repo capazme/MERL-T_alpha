@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **MERL-T (Multi-Expert Legal Retrieval Transformer)** is an AI-powered architecture for legal research, compliance monitoring, and regulatory analysis. Sponsored by ALIS (Artificial Legal Intelligence Society), this repository contains both **comprehensive technical documentation** and **working implementation code**.
 
-**Current Status**: **Phase 1 Complete** (RLCF Core) + **Phase 2 Partial** (KG Enrichment & Pipeline Integration - Week 3 Complete) + **Week 6 COMPLETE** (Orchestration Layer with full API - Days 1-5 finished)
+**Current Status**: **Phase 1 Complete** (RLCF Core) + **Phase 2 Partial** (KG Enrichment & Pipeline Integration - Week 3 Complete) + **Week 6 COMPLETE** (Orchestration Layer with full API - Days 1-5 finished) + **Week 7 COMPLETE** (Preprocessing Integration - Days 1-5 finished)
 
 This repository includes:
 - **Comprehensive documentation** (architectural specifications, research papers, technical designs)
@@ -901,6 +901,16 @@ Start with these files in order:
 12. `tests/orchestration/test_api_feedback.py` - Feedback API tests (230 lines, 13 tests)
 13. `tests/orchestration/test_api_stats.py` - Stats API tests (331 lines, 14 tests)
 14. `docs/08-iteration/WEEK6_DAY5_API_COMPLETE.md` - Complete API documentation ✅
+
+**Week 7 (Preprocessing Integration - Days 1-5)** ✅:
+1. `backend/preprocessing/kg_enrichment_service.py` - Unified KG enrichment (~400 LOC modified)
+2. `backend/orchestration/langgraph_workflow.py` - Preprocessing node + graph update (~230 LOC added)
+3. `docker-compose.yml` - PostgreSQL orchestration + Week 7 profile (~30 LOC)
+4. `backend/orchestration/config/orchestration_config.yaml` - Preprocessing config (~28 LOC)
+5. `tests/orchestration/test_preprocessing_integration.py` - Module tests (15 test cases, 600 LOC)
+6. `tests/orchestration/test_workflow_with_preprocessing.py` - E2E tests (7 test cases, 500 LOC)
+7. `tests/orchestration/test_graceful_degradation.py` - Resilience tests (11 test cases, 550 LOC)
+8. `docs/08-iteration/WEEK7_PREPROCESSING_COMPLETE.md` - Complete Week 7 documentation ✅
 
 ### For Implementation & Building Future Phases
 **Essential reading for Phases 2-7**:
