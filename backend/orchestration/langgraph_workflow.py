@@ -28,7 +28,7 @@ import operator
 from langgraph.graph import StateGraph, END
 
 # Import orchestration components
-from backend.orchestration.llm_router import LLMRouter
+from backend.orchestration.llm_router import RouterService
 from backend.orchestration.agents import KGAgent, APIAgent, VectorDBAgent
 from backend.orchestration.experts import (
     LiteralInterpreter,
@@ -133,8 +133,7 @@ async def preprocessing_node(state: MEGLTState) -> MEGLTState:
 
         qu_result = await query_understanding.analyze_query(
             query=state["original_query"],
-            query_id=state["trace_id"],
-            use_llm=True  # Use LLM for intent classification (Phase 1)
+            query_id=state["trace_id"]
         )
 
         qu_elapsed_ms = (time.time() - qu_start) * 1000
@@ -306,7 +305,7 @@ async def router_node(state: MEGLTState) -> MEGLTState:
     start_time = time.time()
 
     try:
-        router = LLMRouter()
+        router = RouterService()
 
         # Build context with refinement instructions if iterating
         context = state["query_context"].copy()

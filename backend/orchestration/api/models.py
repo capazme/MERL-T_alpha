@@ -21,6 +21,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -150,8 +151,8 @@ class QueryResult(Base):
     # Execution Trace
     execution_trace = Column(JSONB, default={})
 
-    # Metadata
-    metadata = Column(JSONB, default={})
+    # Query Metadata
+    query_metadata = Column(JSONB, default={})
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, index=True)
@@ -179,7 +180,7 @@ class QueryResult(Base):
             "uncertainty_preserved": self.uncertainty_preserved,
             "sources_consulted": self.sources_consulted,
             "execution_trace": self.execution_trace,
-            "metadata": self.metadata,
+            "metadata": self.query_metadata,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

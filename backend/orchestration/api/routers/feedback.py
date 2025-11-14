@@ -20,6 +20,12 @@ from ..schemas.feedback import (
     NERCorrectionRequest,
     FeedbackResponse,
 )
+from ..schemas.examples import (
+    USER_FEEDBACK_EXAMPLES,
+    RLCF_FEEDBACK_EXAMPLES,
+    NER_CORRECTION_EXAMPLES,
+    ERROR_RESPONSE_EXAMPLES,
+)
 from ..services.feedback_processor import FeedbackProcessor
 
 logger = logging.getLogger(__name__)
@@ -65,8 +71,26 @@ This feedback is used to:
                 }
             }
         },
-        400: {"description": "Invalid feedback request"},
-        500: {"description": "Internal server error"}
+        400: {
+            "description": "Invalid feedback request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "validation_error": ERROR_RESPONSE_EXAMPLES["validation_error"]
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "internal_error": ERROR_RESPONSE_EXAMPLES["internal_error"]
+                    }
+                }
+            }
+        }
     }
 )
 async def submit_user_feedback(
@@ -151,8 +175,26 @@ Expert corrections are **authority-weighted** based on demonstrated competence.
                 }
             }
         },
-        400: {"description": "Invalid RLCF feedback request"},
-        500: {"description": "Internal server error"}
+        400: {
+            "description": "Invalid RLCF feedback request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "validation_error": ERROR_RESPONSE_EXAMPLES["validation_error"]
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "internal_error": ERROR_RESPONSE_EXAMPLES["internal_error"]
+                    }
+                }
+            }
+        }
     }
 )
 async def submit_rlcf_feedback(
@@ -239,8 +281,26 @@ NER corrections are accumulated and trigger batch retraining when threshold is r
                 }
             }
         },
-        400: {"description": "Invalid NER correction request"},
-        500: {"description": "Internal server error"}
+        400: {
+            "description": "Invalid NER correction request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "validation_error": ERROR_RESPONSE_EXAMPLES["validation_error"]
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "internal_error": ERROR_RESPONSE_EXAMPLES["internal_error"]
+                    }
+                }
+            }
+        }
     }
 )
 async def submit_ner_correction(

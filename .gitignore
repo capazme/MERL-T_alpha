@@ -1,33 +1,96 @@
 # Python
 __pycache__/
 *.pyc
-.env
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual Environments
 venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+*.env
 
 # Node
 node_modules/
+/node_modules/
 dist/
 .npm/
+package-lock.json
 
 # IDE
 .vscode/
+.vscode/settings.json
 .idea/
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Test coverage
+# Test Coverage
 .coverage
+.coverage.*
 htmlcov/
 .pytest_cache/
+.mypy_cache/
+.tox/
+.nox/
 
-# Package builds
+# Package Builds
 *.egg-info/
+*.egg
 build/
 dist/
+wheels/
+*.whl
 
 # Logs
 *.log
+logs/
+*.log.*
 
-# Config backups
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
+*.rdb
+dump.rdb
+
+# Config Backups
 backend/rlcf_framework/config_backups/
+*_backups/
+config_backups/
+
+# Temporary Test Scripts (root only)
+/test_*.py
+!/tests/
+
+# Documentation Builds
+docs/_build/
+site/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Redis
+dump.rdb
+*.rdb

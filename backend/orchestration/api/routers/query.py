@@ -19,6 +19,11 @@ from ..schemas.query import (
     QueryHistoryItem,
     QueryRetrieveResponse,
 )
+from ..schemas.examples import (
+    QUERY_REQUEST_EXAMPLES,
+    QUERY_RESPONSE_EXAMPLES,
+    ERROR_RESPONSE_EXAMPLES,
+)
 from ..services.query_executor import QueryExecutor
 from ..services.cache_service import cache_service
 from ..services.persistence_service import persistence_service
@@ -51,30 +56,57 @@ The query flows through:
 6. **Iteration**: Multi-turn refinement if needed
 
 Returns the final answer with confidence, legal basis, execution trace, and metadata.
+
+**Try different examples** using the dropdown in the request body to see various query scenarios.
     """,
     responses={
         200: {
             "description": "Query executed successfully",
             "content": {
                 "application/json": {
-                    "example": {
-                        "trace_id": "QRY-20250105-abc123",
-                        "answer": {
-                            "primary_answer": "Un contratto firmato da un minorenne è annullabile...",
-                            "confidence": 0.87,
-                            "legal_basis": [{"norm_id": "cc-art-2", "relevance": 0.95}]
-                        },
-                        "metadata": {
-                            "complexity_score": 0.68,
-                            "intent_detected": "validità_atto"
-                        }
+                    "examples": QUERY_RESPONSE_EXAMPLES
+                }
+            }
+        },
+        400: {
+            "description": "Invalid query request - validation failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "validation_error": ERROR_RESPONSE_EXAMPLES["validation_error"]
                     }
                 }
             }
         },
-        400: {"description": "Invalid query request"},
-        408: {"description": "Query execution timeout"},
-        500: {"description": "Internal server error"}
+        408: {
+            "description": "Query execution timeout",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "timeout": ERROR_RESPONSE_EXAMPLES["timeout"]
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "internal_error": ERROR_RESPONSE_EXAMPLES["internal_error"]
+                    }
+                }
+            }
+        }
+    },
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "examples": QUERY_REQUEST_EXAMPLES
+                }
+            }
+        }
     }
 )
 async def execute_query(request: QueryRequest) -> QueryResponse:
@@ -437,7 +469,7 @@ async def retrieve_query(trace_id: str) -> QueryRetrieveResponse:
         query=query.query_text,
         answer=answer,
         execution_trace=query_result.execution_trace,
-        metadata=query_result.metadata,
+        metadata=query_result.query_metadata,
         feedback=feedback_list,
         timestamp=query.created_at,
     )

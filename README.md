@@ -3,11 +3,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
-[![Phase](https://img.shields.io/badge/Phase-1%20Complete%20%2B%202%20Week%203%20%2B%20Week%206%20Day%202-brightgreen.svg)](docs/IMPLEMENTATION_ROADMAP.md)
+[![Phase](https://img.shields.io/badge/Phase-Week%209%20Complete-brightgreen.svg)](CHANGELOG.md)
 [![Coverage](https://img.shields.io/badge/Coverage-85%25%2B-brightgreen.svg)]()
 [![Tests](https://img.shields.io/badge/Tests-200%2B%20Cases-blue.svg)](tests/)
 
 **MERL-T** is an AI-powered architecture for legal research, compliance monitoring, and regulatory analysis. Sponsored by **ALIS** (Artificial Legal Intelligence Society), it implements a novel **RLCF (Reinforcement Learning from Community Feedback)** framework for aligning legal AI systems with expert knowledge.
+
+**📚 Documentation**: [Architecture](ARCHITECTURE.md) | [API Docs](docs/api/) | [Contributing](CONTRIBUTING.md) | [Changelog](CHANGELOG.md) | [Security](SECURITY.md)
 
 ---
 
@@ -69,6 +71,42 @@ MERL-T (Multi-Expert Legal Retrieval Transformer) is a comprehensive system for 
 - **Mathematical Rigor**: Formally defined authority scores, aggregation algorithms, and bias detection
 
 📖 **Read the full RLCF paper**: [`docs/02-methodology/rlcf/RLCF.md`](docs/02-methodology/rlcf/RLCF.md)
+
+### 📄 Scientific Papers
+
+**NEW**: We have published two complementary academic papers:
+
+#### 1. Architecture & Epistemology (Theoretical Foundation)
+
+📄 **[Operationalizing Legal Epistemology: A Multi-Expert Pipeline Architecture for Trustworthy Legal AI](docs/MERL-T_Architecture_Paper.md)** (~14 pages)
+
+**Focus**: Theoretical foundations and architectural design principles
+
+The paper develops:
+- **Epistemic Analysis**: Law's dual structure (principles vs. rules) and implications for AI design
+- **Knowledge Graph Theory**: Formal model as epistemic structure with typed relationships
+- **Multi-Expert Framework**: Why 4 specialized experts (not 1 monolith), grounded in legal philosophy
+- **Orchestration Theory**: LLM-based deliberative planning vs. traditional gating networks
+- **Synthesis Logic**: Convergent vs. divergent modes for preserving epistemic plurality
+- **Comparative Analysis**: Why this architecture is theoretically necessary
+
+**Target Audience**: AI researchers, legal scholars, system architects
+**Suitable for**: *Artificial Intelligence and Law*, *Journal of Legal Analysis*, *AI* journal
+
+#### 2. Complete System & Validation (Implementation)
+
+📄 **[MERL-T: A Multi-Expert Architecture for Trustworthy Artificial Legal Intelligence](docs/MERL-T_Scientific_Paper.md)** (7 pages)
+
+**Focus**: Complete system description with empirical validation
+
+The paper covers:
+- **RLCF Framework**: Mathematical formulation with dynamic authority scoring
+- **5-Layer Architecture**: Preprocessing, Orchestration, Reasoning, Storage, Learning
+- **4 Expert Types**: Literal Interpreter, Systemic-Teleological, Principles Balancer, Precedent Analyst
+- **Empirical Results**: 34% improvement in factual grounding (97% claim traceability), 40% increase in practitioner trust
+- **EU AI Act Compliance**: Responsible-by-design approach for high-risk legal systems
+
+**Target Audience**: Practitioners, implementers, applied researchers
 
 ### 🎬 Interactive RLCF Simulation
 
@@ -559,8 +597,13 @@ docker-compose up -d
 
 We welcome contributions from legal experts, AI researchers, and developers!
 
+**📖 Please read**:
+- **[Contributing Guide](CONTRIBUTING.md)** - Development setup, coding standards, PR process
+- **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community guidelines
+- **[Security Policy](SECURITY.md)** - Reporting vulnerabilities
+
 **How to contribute**:
-1. Read [`docs/02-methodology/rlcf/development/contributing.md`](docs/02-methodology/rlcf/development/contributing.md)
+1. Read the [Contributing Guide](CONTRIBUTING.md)
 2. Fork the repository
 3. Create a feature branch (`git checkout -b feature/amazing-feature`)
 4. Make your changes (ensure tests pass: `pytest tests/`)
@@ -570,8 +613,9 @@ We welcome contributions from legal experts, AI researchers, and developers!
 **Areas where we need help**:
 - 🧑‍⚖️ **Legal experts**: Annotate datasets, provide feedback on legal reasoning
 - 🧠 **AI/ML researchers**: Improve RLCF algorithms, LLM integration
-- 💻 **Developers**: Implement Phases 2-6, frontend enhancements
+- 💻 **Developers**: Implement future phases, frontend enhancements
 - 📚 **Technical writers**: Documentation improvements
+- 🔒 **Security researchers**: Vulnerability testing and security audits
 
 ---
 

@@ -19,6 +19,13 @@ from .routers import query_router, feedback_router, stats_router
 from .schemas.health import HealthResponse, ComponentStatus
 from .database import init_db, close_db, get_database_info
 from .services.cache_service import cache_service
+from .openapi_config import get_custom_openapi_schema, add_rate_limiting_documentation
+from .openapi_tags import (
+    get_tags_metadata,
+    get_servers_config,
+    get_external_docs,
+    TERMS_OF_SERVICE_URL
+)
 
 # Configure logging
 logging.basicConfig(
@@ -55,9 +62,10 @@ This API provides access to the complete MERL-T pipeline:
 
 ## Getting Started
 
-1. Submit a legal query via `POST /query/execute`
-2. Retrieve the answer with confidence, legal basis, and alternative interpretations
-3. Provide feedback via `POST /feedback/*` endpoints (coming soon)
+1. **Authenticate**: Click the "Authorize" button and enter your API key
+2. Submit a legal query via `POST /query/execute`
+3. Retrieve the answer with confidence, legal basis, and alternative interpretations
+4. Provide feedback via `POST /feedback/*` endpoints to improve the system
 
 For more information, see the [MERL-T Documentation](https://github.com/ALIS-ai/MERL-T).
     """,
@@ -70,6 +78,17 @@ For more information, see the [MERL-T Documentation](https://github.com/ALIS-ai/
         "name": "MIT License",
         "url": "https://opensource.org/licenses/MIT",
     },
+    terms_of_service=TERMS_OF_SERVICE_URL,
+    servers=get_servers_config(),
+    openapi_tags=get_tags_metadata(),
+    swagger_ui_parameters={
+        "persistAuthorization": True,  # Remember API key across page reloads
+        "displayRequestDuration": True,  # Show request duration in Swagger UI
+        "filter": True,  # Enable endpoint filtering
+        "tryItOutEnabled": True,  # Enable "Try it out" by default
+    },
+    docs_url="/docs",  # Swagger UI
+    redoc_url="/redoc",  # ReDoc alternative documentation
 )
 
 # ============================================================================
@@ -154,6 +173,50 @@ async def log_requests(request: Request, call_next):
 app.include_router(query_router)
 app.include_router(feedback_router)
 app.include_router(stats_router)
+
+# ============================================================================
+# Custom OpenAPI Schema
+# ============================================================================
+
+def custom_openapi():
+    """
+    Generate custom OpenAPI schema with enhanced security and documentation.
+
+    This function is called once to generate the OpenAPI schema, which is then
+    cached for subsequent requests.
+
+    Returns:
+        Custom OpenAPI 3.1.0 schema with API key authentication and rate limiting.
+    """
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    # Generate custom schema using our configuration
+    openapi_schema = get_custom_openapi_schema(
+        app=app,
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        tags=get_tags_metadata(),
+        servers=get_servers_config()
+    )
+
+    # Add rate limiting documentation
+    add_rate_limiting_documentation(openapi_schema)
+
+    # Add external documentation
+    openapi_schema["externalDocs"] = get_external_docs()
+
+    # Cache the schema
+    app.openapi_schema = openapi_schema
+    logger.info("Custom OpenAPI schema generated with API key authentication")
+
+    return app.openapi_schema
+
+
+# Override the default OpenAPI schema generation
+app.openapi = custom_openapi
 
 # ============================================================================
 # Root Endpoints

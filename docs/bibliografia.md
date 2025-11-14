@@ -2,12 +2,119 @@
 
 ## Indice
 
+0. [Paper Scientifico MERL-T](#0-paper-scientifico-merl-t) ⭐ **NUOVO**
 1. [Expert Knowledge Aggregation e Computational Peer Review](#1-expert-knowledge-aggregation-e-computational-peer-review)
 2. [Constitutional AI e Democratic Governance](#2-constitutional-ai-e-democratic-governance)
 3. [Uncertainty Quantification e Epistemic Diversity](#3-uncertainty-quantification-e-epistemic-diversity)
 4. [Legal AI e Domini Normativi Complessi](#4-legal-ai-e-domini-normativi-complessi)
 5. [Peer Assessment Enhancement con AI](#5-peer-assessment-enhancement-con-ai)
 6. [Implicazioni per il Paper RLCF](#6-implicazioni-per-il-paper-rlcf)
+
+---
+
+## 0. Paper Scientifici MERL-T
+
+### 0.1 Operationalizing Legal Epistemology: A Multi-Expert Pipeline Architecture (Paper Teorico)
+
+**Citazione completa:**
+ALIS Research Group. "Operationalizing Legal Epistemology: A Multi-Expert Pipeline Architecture for Trustworthy Legal AI." *ALIS Technical Reports*, November 2025. Available at: [`docs/MERL-T_Architecture_Paper.md`](MERL-T_Architecture_Paper.md)
+
+**Descrizione:**
+Paper teorico (~14 pagine) che sviluppa i fondamenti epistemologici e architetturali di MERL-T. Focus su teoria del knowledge graph, giustificazione multi-expert, orchestration LLM-based, e sintesi che preserva pluralità epistemica.
+
+**Contenuti principali:**
+
+1. **Analisi Epistemologica**: La struttura duale del diritto (principi vs. regole) e implicazioni per architettura AI
+   - 4 metodologie interpretative: Literal, Systemic-Teleological, Principled, Precedential
+   - Perché servono esperti separati (non 1 monolite)
+
+2. **Teoria del Knowledge Graph**: Modello formale come struttura epistemica
+   - Schema formale: $G = (V, E, \lambda, \tau)$ con 20+ tipi di nodi
+   - Relazioni tipizzate esplicite (REGULATES, INTERPRETS, CONFLICTS\_WITH, BALANCES)
+   - Versioning temporale per multivigenza
+   - Contrasto con vector embeddings (perché KG esplicito è necessario)
+
+3. **Framework Multi-Expert**: Giustificazione teorica della specializzazione metodologica
+   - Ogni expert incarna un commitment epistemico distinto
+   - Argomento da coerenza interna: metodologie mutualmente esclusive in singola catena
+   - Argomento da specializzazione: contesto appropriato per ciascuna metodologia
+   - Argomento da trasparenza: scelta metodologica visibile
+
+4. **Teoria dell'Orchestration**: LLM Router come deliberative planning
+   - Contrasto con gating networks (interpretabilità, adattabilità, learning)
+   - Iteration as refinement: cicli multi-turn con stop criteria
+
+5. **Logica della Sintesi**: Convergent vs. Divergent
+   - Quando preservare disagreement (ambiguità genuina)
+   - Quando estrarre consensus (accordo sostanziale con ragionamenti diversi)
+
+**Rilevanza Teorica:**
+Questo paper dimostra che le scelte architetturali seguono *necessariamente* dai requisiti epistemologici del ragionamento giuridico. Non è engineering arbitrario, ma design principled basato su analisi filosofica del diritto.
+
+**Citazione BibTeX:**
+```bibtex
+@article{merl_t_architecture_2025,
+  title={Operationalizing Legal Epistemology: A Multi-Expert Pipeline Architecture for Trustworthy Legal AI},
+  author={ALIS Research Group},
+  journal={ALIS Technical Reports},
+  year={2025},
+  month={November},
+  institution={Artificial Legal Intelligence Society},
+  url={https://github.com/alis-legal/merl-t}
+}
+```
+
+---
+
+### 0.2 MERL-T: A Multi-Expert Architecture for Trustworthy Artificial Legal Intelligence (Paper Implementativo)
+
+**Citazione completa:**
+ALIS Research Group. "MERL-T: A Multi-Expert Architecture for Trustworthy Artificial Legal Intelligence." *ALIS Technical Reports*, November 2025. Available at: [`docs/MERL-T_Scientific_Paper.md`](MERL-T_Scientific_Paper.md)
+
+**Descrizione:**
+Paper scientifico completo (7 pagine) che presenta l'architettura MERL-T e la validazione empirica del framework RLCF. Il paper integra fondamenti teorici, implementazione pratica, e risultati sperimentali per un sistema di Artificial Legal Intelligence affidabile e trasparente.
+
+**Contenuti principali:**
+
+1. **RLCF Framework**: Formalizzazione matematica con:
+   - Dynamic Authority Scoring: $A_u(t) = \alpha \cdot B_u + \beta \cdot T_u(t-1) + \gamma \cdot P_u(t)$
+   - Uncertainty-Preserving Aggregation: Shannon entropy normalizzata $\delta = -\frac{1}{\log|P|} \sum_{p \in P} \rho(p) \log \rho(p)$
+   - 6-Dimensional Bias Detection: $B_{total} = \sqrt{\sum_{i=1}^{6} b_i^2}$
+
+2. **Architettura a 5 Layer**:
+   - **Preprocessing**: Query Understanding + Knowledge Graph Enrichment (5 sources)
+   - **Orchestration**: LLM Router (100% LLM-based) + 3 Retrieval Agents (KG, API, VectorDB)
+   - **Reasoning**: 4 Expert Types (Literal Interpreter, Systemic-Teleological, Principles Balancer, Precedent Analyst)
+   - **Storage**: Multi-database (PostgreSQL, Neo4j, Qdrant, Redis)
+   - **Learning**: RLCF feedback loops con authority weighting
+
+3. **Risultati Empirici**:
+   - **Factual Grounding**: 97% claim traceability (34% improvement vs generic LLMs)
+   - **Expert Selection**: 87% accuracy in appropriate expert activation
+   - **User Trust**: 8.7/10 confidence rating (40% increase vs opaque systems)
+   - **RLCF Effectiveness**: 0.78 correlation between predicted authority and expert quality
+
+4. **EU AI Act Compliance**:
+   - Transparency via end-to-end provenance tracking
+   - Human oversight mechanisms (augmentation, not automation)
+   - Bias detection integral to architecture
+   - Data governance and audit trails
+
+**Rilevanza per RLCF:**
+Questo paper costituisce la sintesi completa e rigorosa del framework RLCF e della sua implementazione in MERL-T. Dimostra empiricamente l'efficacia dell'approccio multi-expert con community alignment per AI legale affidabile.
+
+**Citazione BibTeX:**
+```bibtex
+@article{merl_t_2025,
+  title={MERL-T: A Multi-Expert Architecture for Trustworthy Artificial Legal Intelligence},
+  author={ALIS Research Group},
+  journal={ALIS Technical Reports},
+  year={2025},
+  month={November},
+  institution={Artificial Legal Intelligence Society},
+  url={https://github.com/alis-legal/merl-t}
+}
+```
 
 ---
 

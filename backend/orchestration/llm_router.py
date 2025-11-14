@@ -34,7 +34,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, field_validator
 
 # Import OpenRouter service from Phase 1
-from backend.rlcf_framework.ai_service import AIService
+from backend.rlcf_framework.ai_service import openrouter_service
 
 # Import configuration
 from backend.orchestration.config import get_orchestration_config
@@ -172,18 +172,18 @@ class RouterService:
 
     def __init__(
         self,
-        ai_service: Optional[AIService] = None,
+        ai_service: Optional[Any] = None,
         config: Optional[Any] = None
     ):
         """
         Initialize Router Service.
 
         Args:
-            ai_service: AIService instance (from Phase 1). If None, creates new one.
+            ai_service: OpenRouterService instance (from Phase 1). If None, uses global instance.
             config: OrchestrationConfig. If None, loads from global config.
         """
         self.config = config or get_orchestration_config()
-        self.ai_service = ai_service or AIService()
+        self.ai_service = ai_service or openrouter_service
 
         # Load prompt template
         self.prompt_template = self._load_prompt_template(

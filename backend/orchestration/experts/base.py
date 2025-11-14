@@ -23,7 +23,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 # Import AI service from Phase 1
-from backend.rlcf_framework.ai_service import AIService
+from backend.rlcf_framework.ai_service import openrouter_service
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +175,7 @@ class ReasoningExpert(ABC):
         self.max_tokens = self.config.get("max_tokens", 2000)
 
         # AI service (from Phase 1)
-        self.ai_service = AIService()
+        self.ai_service = openrouter_service
 
         # Load prompt template
         self.prompt_template = self._load_prompt_template()

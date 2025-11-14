@@ -45,21 +45,27 @@ is_postgres = DATABASE_URL.startswith("postgresql")
 if is_sqlite and "aiosqlite" not in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("sqlite:///", "sqlite+aiosqlite:///")
 
-# Create async engine
-engine: AsyncEngine = create_async_engine(
-    DATABASE_URL,
-    # SQLite-specific settings
-    connect_args={"check_same_thread": False} if is_sqlite else {},
-    # Connection pooling
-    pool_size=10 if is_postgres else 5,
-    max_overflow=20 if is_postgres else 10,
-    pool_pre_ping=True,  # Verify connections before use
-    pool_recycle=3600,   # Recycle connections after 1 hour
-    # Logging
-    echo=os.getenv("SQL_ECHO", "false").lower() == "true",
-    # Performance
-    future=True,
-)
+# Create async engine with appropriate settings
+if is_sqlite:
+    # SQLite doesn't support pool_size/max_overflow
+    engine: AsyncEngine = create_async_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        pool_pre_ping=True,
+        echo=os.getenv("SQL_ECHO", "false").lower() == "true",
+        future=True,
+    )
+else:
+    # PostgreSQL with connection pooling
+    engine: AsyncEngine = create_async_engine(
+        DATABASE_URL,
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+        echo=os.getenv("SQL_ECHO", "false").lower() == "true",
+        future=True,
+    )
 
 # ============================================================================
 # SQLite-Specific Event Listeners
@@ -136,6 +142,30 @@ async def close_db() -> None:
     This should be called on application shutdown.
     """
     await engine.dispose()
+
+
+# ============================================================================
+# Dependency Injection for FastAPI
+# ============================================================================
+
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """
+    FastAPI dependency that provides a database session.
+
+    Yields:
+        AsyncSession: Database session
+
+    Usage:
+        @app.get("/endpoint")
+        async def endpoint(session: AsyncSession = Depends(get_session)):
+            # Use session here
+            pass
+    """
+    async with SessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
 
 # ============================================================================
 # Session Dependency

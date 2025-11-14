@@ -24,7 +24,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from backend.rlcf_framework.ai_service import AIService
+from backend.rlcf_framework.ai_service import openrouter_service
 from .base import ExpertOpinion
 
 logger = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ class Synthesizer:
         self.max_tokens = self.config.get("max_tokens", 3000)
 
         # AI service
-        self.ai_service = AIService()
+        self.ai_service = openrouter_service
 
         # Load prompts
         self.convergent_prompt = self._load_prompt("synthesizer_convergent.txt")

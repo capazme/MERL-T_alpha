@@ -17,6 +17,7 @@ from ..schemas.stats import (
     ModelImprovementMetric,
     RetrainingEvent,
 )
+from ..schemas.examples import ERROR_RESPONSE_EXAMPLES
 from ..services.feedback_processor import FeedbackProcessor
 from ..services.persistence_service import persistence_service
 
@@ -74,7 +75,16 @@ Useful for:
                 }
             }
         },
-        500: {"description": "Internal server error"}
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "internal_error": ERROR_RESPONSE_EXAMPLES["internal_error"]
+                    }
+                }
+            }
+        }
     }
 )
 async def get_pipeline_stats(period: str = "last_7_days") -> PipelineStatsResponse:
@@ -230,7 +240,16 @@ Useful for:
                 }
             }
         },
-        500: {"description": "Internal server error"}
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "internal_error": ERROR_RESPONSE_EXAMPLES["internal_error"]
+                    }
+                }
+            }
+        }
     }
 )
 async def get_feedback_stats(period: str = "last_30_days") -> FeedbackStatsResponse:
