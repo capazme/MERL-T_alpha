@@ -8,7 +8,7 @@ import asyncio
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
 
 from ..schemas.query import (
@@ -27,6 +27,9 @@ from ..schemas.examples import (
 from ..services.query_executor import QueryExecutor
 from ..services.cache_service import cache_service
 from ..services.persistence_service import persistence_service
+from ..middleware.auth import verify_api_key
+from ..middleware.rate_limit import check_rate_limit
+from ..models import ApiKey
 
 logger = logging.getLogger(__name__)
 
@@ -109,18 +112,24 @@ Returns the final answer with confidence, legal basis, execution trace, and meta
         }
     }
 )
-async def execute_query(request: QueryRequest) -> QueryResponse:
+async def execute_query(
+    request: QueryRequest,
+    api_key: ApiKey = Depends(verify_api_key),
+    _rate_limit: None = Depends(check_rate_limit)
+) -> QueryResponse:
     """
     Execute a legal query through the complete MERL-T pipeline.
 
     Args:
         request: QueryRequest with query text, context, and options
+        api_key: Verified API key (injected by auth middleware)
+        _rate_limit: Rate limit check (injected by rate limit middleware)
 
     Returns:
         QueryResponse with answer, trace, and metadata
 
     Raises:
-        HTTPException: 400 for invalid request, 408 for timeout, 500 for errors
+        HTTPException: 400 for invalid request, 401 for auth, 408 for timeout, 429 for rate limit, 500 for errors
     """
     try:
         logger.info(f"Received query: {request.query[:100]}...")
@@ -186,18 +195,24 @@ Returns the current status, progress percentage, and result (if completed).
         404: {"description": "Query not found"}
     }
 )
-async def get_query_status(trace_id: str) -> QueryStatus:
+async def get_query_status(
+    trace_id: str,
+    api_key: ApiKey = Depends(verify_api_key),
+    _rate_limit: None = Depends(check_rate_limit)
+) -> QueryStatus:
     """
     Get execution status for a query by trace ID.
 
     Args:
         trace_id: Unique query trace identifier
+        api_key: Verified API key (injected by auth middleware)
+        _rate_limit: Rate limit check (injected by rate limit middleware)
 
     Returns:
         QueryStatus with current status and result (if completed)
 
     Raises:
-        HTTPException: 404 if trace_id not found
+        HTTPException: 401 for auth, 404 if trace_id not found, 429 for rate limit
     """
     logger.info(f"Status request for trace_id: {trace_id}")
 
@@ -304,7 +319,9 @@ async def get_query_history(
     user_id: str,
     limit: int = 50,
     offset: int = 0,
-    since: Optional[str] = None
+    since: Optional[str] = None,
+    api_key: ApiKey = Depends(verify_api_key),
+    _rate_limit: None = Depends(check_rate_limit)
 ) -> QueryHistoryResponse:
     """
     Get query history for a user.
@@ -314,12 +331,14 @@ async def get_query_history(
         limit: Maximum number of results (default: 50)
         offset: Pagination offset (default: 0)
         since: ISO date filter (optional)
+        api_key: Verified API key (injected by auth middleware)
+        _rate_limit: Rate limit check (injected by rate limit middleware)
 
     Returns:
         QueryHistoryResponse with paginated query list
 
     Raises:
-        HTTPException: 404 if user not found
+        HTTPException: 401 for auth, 404 if user not found, 429 for rate limit
     """
     logger.info(f"Query history request for user_id={user_id}, limit={limit}, offset={offset}")
 
@@ -406,18 +425,24 @@ Useful for:
         404: {"description": "Query not found"}
     }
 )
-async def retrieve_query(trace_id: str) -> QueryRetrieveResponse:
+async def retrieve_query(
+    trace_id: str,
+    api_key: ApiKey = Depends(verify_api_key),
+    _rate_limit: None = Depends(check_rate_limit)
+) -> QueryRetrieveResponse:
     """
     Retrieve complete query details by trace ID.
 
     Args:
         trace_id: Unique query trace identifier
+        api_key: Verified API key (injected by auth middleware)
+        _rate_limit: Rate limit check (injected by rate limit middleware)
 
     Returns:
         QueryRetrieveResponse with full query details
 
     Raises:
-        HTTPException: 404 if trace_id not found
+        HTTPException: 401 for auth, 404 if trace_id not found, 429 for rate limit
     """
     logger.info(f"Query retrieve request for trace_id={trace_id}")
 

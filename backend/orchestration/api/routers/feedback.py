@@ -12,7 +12,7 @@ Implements 3 feedback mechanisms:
 import logging
 from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 
 from ..schemas.feedback import (
     UserFeedbackRequest,
@@ -27,6 +27,9 @@ from ..schemas.examples import (
     ERROR_RESPONSE_EXAMPLES,
 )
 from ..services.feedback_processor import FeedbackProcessor
+from ..middleware.auth import verify_api_key
+from ..middleware.rate_limit import check_rate_limit
+from ..models import ApiKey
 
 logger = logging.getLogger(__name__)
 
@@ -94,19 +97,23 @@ This feedback is used to:
     }
 )
 async def submit_user_feedback(
-    feedback: UserFeedbackRequest
+    feedback: UserFeedbackRequest,
+    api_key: ApiKey = Depends(verify_api_key),
+    _rate_limit: None = Depends(check_rate_limit)
 ) -> FeedbackResponse:
     """
     Submit user feedback for a query answer.
 
     Args:
         feedback: UserFeedbackRequest with rating and comments
+        api_key: Verified API key (injected by auth middleware)
+        _rate_limit: Rate limit check (injected by rate limit middleware)
 
     Returns:
         FeedbackResponse with acceptance status
 
     Raises:
-        HTTPException: 400 for invalid request, 500 for errors
+        HTTPException: 400 for invalid request, 401 for auth, 429 for rate limit, 500 for errors
     """
     try:
         logger.info(
@@ -198,19 +205,23 @@ Expert corrections are **authority-weighted** based on demonstrated competence.
     }
 )
 async def submit_rlcf_feedback(
-    feedback: RLCFFeedbackRequest
+    feedback: RLCFFeedbackRequest,
+    api_key: ApiKey = Depends(verify_api_key),
+    _rate_limit: None = Depends(check_rate_limit)
 ) -> FeedbackResponse:
     """
     Submit RLCF expert feedback with detailed corrections.
 
     Args:
         feedback: RLCFFeedbackRequest with corrections and authority score
+        api_key: Verified API key (injected by auth middleware)
+        _rate_limit: Rate limit check (injected by rate limit middleware)
 
     Returns:
         FeedbackResponse with retraining schedule
 
     Raises:
-        HTTPException: 400 for invalid request, 500 for errors
+        HTTPException: 400 for invalid request, 401 for auth, 429 for rate limit, 500 for errors
     """
     try:
         logger.info(
@@ -304,19 +315,23 @@ NER corrections are accumulated and trigger batch retraining when threshold is r
     }
 )
 async def submit_ner_correction(
-    correction: NERCorrectionRequest
+    correction: NERCorrectionRequest,
+    api_key: ApiKey = Depends(verify_api_key),
+    _rate_limit: None = Depends(check_rate_limit)
 ) -> FeedbackResponse:
     """
     Submit NER correction for entity extraction errors.
 
     Args:
         correction: NERCorrectionRequest with correction type and data
+        api_key: Verified API key (injected by auth middleware)
+        _rate_limit: Rate limit check (injected by rate limit middleware)
 
     Returns:
         FeedbackResponse with retraining schedule
 
     Raises:
-        HTTPException: 400 for invalid request, 500 for errors
+        HTTPException: 400 for invalid request, 401 for auth, 429 for rate limit, 500 for errors
     """
     try:
         logger.info(
@@ -362,12 +377,22 @@ Returns:
 - Retraining readiness status
     """
 )
-async def get_feedback_stats() -> Dict[str, Any]:
+async def get_feedback_stats(
+    api_key: ApiKey = Depends(verify_api_key),
+    _rate_limit: None = Depends(check_rate_limit)
+) -> Dict[str, Any]:
     """
     Get feedback statistics.
 
+    Args:
+        api_key: Verified API key (injected by auth middleware)
+        _rate_limit: Rate limit check (injected by rate limit middleware)
+
     Returns:
         Dictionary with feedback counts and retraining status
+
+    Raises:
+        HTTPException: 401 for auth, 429 for rate limit, 500 for errors
     """
     try:
         logger.info("Feedback stats requested")
