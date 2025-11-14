@@ -1,5 +1,26 @@
 # Learning Layer Architecture (RLCF Framework)
 
+**Implementation Status**: 🚧 **PARZIALMENTE IMPLEMENTATO**
+**Current Version**: v0.1.0 (RLCF Core)
+**Last Updated**: November 2025
+
+**Implemented Components**:
+- ✅ RLCF Core Framework: Authority scoring, feedback aggregation, bias detection (Phase 1)
+- ✅ Authority Calculation: A_u(t) = α·B_u + β·T_u(t-1) + γ·P_u(t) formula implemented
+- ✅ Uncertainty Preservation: Shannon entropy-based disagreement quantification
+- ✅ Dynamic Configuration: Hot-reload YAML configs, backup/restore
+- ✅ Feedback API Endpoints: Submit feedback, batch feedback, NER corrections
+- ✅ Test Suite: 68 tests for RLCF core (90%+ coverage)
+- ⏳ Training Data Generator: Architecture defined, not yet implemented
+- ⏳ Model Retraining Pipeline: Architecture defined, not yet automated
+- ⏳ A/B Testing Framework: Architecture defined, not yet implemented
+- ⏳ 4 Learning Loops: Planned for future implementation
+
+**Code Location**: `backend/rlcf_framework/`, `backend/orchestration/api/routers/feedback.py`
+**Tests**: `tests/rlcf/`, `tests/orchestration/test_api_feedback.py`
+
+---
+
 ## 1. Introduction
 
 The **Learning Layer** implements the **Reinforcement Learning from Community Feedback (RLCF)** framework, enabling MERL-T to continuously evolve based on real-world usage and expert validation. This layer consists of:

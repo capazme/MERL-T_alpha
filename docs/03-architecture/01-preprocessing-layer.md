@@ -1,5 +1,22 @@
 # Preprocessing Layer Architecture
 
+**Implementation Status**: ✅ **COMPLETATO**
+**Current Version**: v0.7.0
+**Last Updated**: November 2025
+
+**Implemented Components**:
+- ✅ Query Understanding: Entity extraction, NER, intent classification
+- ✅ KG Enrichment Service: 5 data sources (Normattiva, Cassazione, Dottrina, Community, RLCF)
+- ✅ NER Feedback Loop: 4 correction types, automatic training dataset generation
+- ✅ LangGraph Integration: Preprocessing node in workflow
+- ✅ Graceful Degradation: Fallback when KG unavailable
+- ✅ Test Suite: 33 tests (93.9% success rate)
+
+**Code Location**: `backend/preprocessing/`
+**Tests**: `tests/orchestration/test_preprocessing_integration.py`, `test_workflow_with_preprocessing.py`, `test_graceful_degradation.py`
+
+---
+
 ## 1. Introduction
 
 The **Preprocessing Layer** is the entry point of the MERL-T pipeline, responsible for transforming raw user queries into structured, enriched representations that enable precise legal reasoning. This layer consists of two major subsystems:

@@ -1,5 +1,22 @@
 # Storage Layer Architecture
 
+**Implementation Status**: 🚧 **PARZIALMENTE IMPLEMENTATO**
+**Current Version**: v0.6.0
+**Last Updated**: November 2025
+
+**Implemented Components**:
+- ✅ PostgreSQL: Orchestration tables, authentication, API keys, usage tracking
+- ✅ Qdrant (VectorDB): Collection management, semantic search, 3 search patterns
+- ✅ E5-large Embeddings: 1024-dim multilingual embeddings
+- ✅ Data Ingestion Script: Multi-source support (Neo4j, JSON, PostgreSQL)
+- ⏳ Neo4j/Memgraph: Schema defined, KG enrichment service ready, not yet deployed in production
+- ⏳ Redis: Used for rate limiting, not yet for general caching
+
+**Code Location**: `backend/orchestration/services/qdrant_service.py`, `backend/orchestration/services/embedding_service.py`, `scripts/ingest_legal_corpus.py`
+**Tests**: `tests/orchestration/test_vectordb_agent.py`, `test_embedding_service.py`
+
+---
+
 ## 1. Introduction
 
 The **Storage Layer** is the foundation of MERL-T's knowledge infrastructure, consisting of three complementary storage systems plus a comprehensive data ingestion pipeline:

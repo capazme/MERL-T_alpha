@@ -1,5 +1,22 @@
 # Reasoning Layer Architecture
 
+**Implementation Status**: ✅ **COMPLETATO**
+**Current Version**: v0.6.0
+**Last Updated**: November 2025
+
+**Implemented Components**:
+- ✅ 4 Reasoning Experts: Literal Interpreter (450 LOC), Systemic-Teleological (500 LOC), Principles Balancer (550 LOC), Precedent Analyst (500 LOC)
+- ✅ Synthesizer: Opinion synthesis with contradiction handling (1,100 LOC)
+- ✅ Iteration Controller: Multi-turn reasoning with 6 stopping criteria (500 LOC)
+- ✅ ExpertContext: Unified context structure for expert execution
+- ✅ LangGraph Integration: Expert nodes, synthesis node, iteration loop
+- ✅ Test Suite: Expert tests + 25+ iteration controller tests
+
+**Code Location**: `backend/orchestration/experts/`, `backend/orchestration/iteration/`
+**Tests**: `tests/orchestration/test_experts.py`, `test_iteration_controller.py`
+
+---
+
 ## 1. Introduction
 
 The **Reasoning Layer** is where MERL-T performs legal analysis by leveraging specialized **Reasoning Experts**, each grounded in distinct legal epistemologies. This layer consists of:
