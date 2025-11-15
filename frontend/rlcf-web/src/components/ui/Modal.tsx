@@ -206,7 +206,7 @@ export const ConfirmModal = ({
           <Button
             onClick={onConfirm}
             disabled={isLoading}
-            isLoading={isLoading}
+            loading={isLoading}
             className={variantStyles[variant]}
           >
             {confirmText}
