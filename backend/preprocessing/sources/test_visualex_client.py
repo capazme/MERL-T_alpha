@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Quick test script for VisualeXClient integration.
+Quick test script for VisualexClient integration.
 
 Usage:
     # Start visualex API first
@@ -19,7 +19,7 @@ from pathlib import Path
 backend_path = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_path))
 
-from preprocessing.sources.visualex_client import VisualeXClient
+from preprocessing.sources.visualex_client import VisualexClient
 import structlog
 
 # Configure logging
@@ -40,7 +40,7 @@ async def test_single_article():
     log.info("TEST 1: Fetching single article (Art. 2043)")
     log.info("=" * 60)
 
-    async with VisualeXClient(base_url="http://localhost:5000") as client:
+    async with VisualexClient(base_url="http://localhost:5000") as client:
         response = await client.fetch_articles(
             tipo_atto="codice civile",
             articoli=["2043"]
@@ -72,7 +72,7 @@ async def test_batch_articles():
     log.info("TEST 2: Batch fetching articles 1-10")
     log.info("=" * 60)
 
-    async with VisualeXClient(base_url="http://localhost:5000") as client:
+    async with VisualexClient(base_url="http://localhost:5000") as client:
         # Progress callback
         def progress_callback(current, total):
             percent = (current / total) * 100
@@ -106,7 +106,7 @@ async def test_error_handling():
     log.info("TEST 3: Error handling (invalid article)")
     log.info("=" * 60)
 
-    async with VisualeXClient(base_url="http://localhost:5000") as client:
+    async with VisualexClient(base_url="http://localhost:5000") as client:
         response = await client.fetch_articles(
             tipo_atto="codice civile",
             articoli=["99999"]  # Invalid article number
@@ -126,7 +126,7 @@ async def test_connection_failure():
     log.info("TEST 4: Connection failure handling (wrong port)")
     log.info("=" * 60)
 
-    async with VisualeXClient(base_url="http://localhost:9999", max_retries=2) as client:
+    async with VisualexClient(base_url="http://localhost:9999", max_retries=2) as client:
         try:
             response = await client.fetch_articles(
                 tipo_atto="codice civile",

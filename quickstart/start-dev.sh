@@ -200,6 +200,7 @@ print_success "Virtual environment attivato (Python $PYTHON_VERSION)"
 print_warning "Installazione dipendenze Python (può richiedere qualche minuto)..."
 pip install -q --upgrade pip setuptools wheel
 pip install -q -e .
+pip install -q -r requirements.txt
 print_success "Dipendenze Python installate"
 
 # ============================================================================
@@ -229,6 +230,7 @@ print_step "6. Inizializzazione Database"
 if [ "$mode" = "1" ]; then
     # Modalità SQLite
     export DATABASE_URL="sqlite+aiosqlite:///./merl_t.db"
+    export ORCHESTRATION_DATABASE_URL="sqlite+aiosqlite:///./orchestration.db"
 
     if [ ! -f "merl_t.db" ]; then
         print_warning "Database SQLite non trovato. Creazione in corso..."
@@ -257,11 +259,14 @@ elif [ "$mode" = "2" ]; then
     print_warning "Attesa 15 secondi per l'inizializzazione dei database..."
     sleep 15
 
-    export DATABASE_URL="postgresql+asyncpg://merl_t:merl_t_password@localhost/merl_t_orchestration"
+    export DATABASE_URL="postgresql+asyncpg://merl_t:merl_t_password@localhost:5432/merl_t_db"
+    export ORCHESTRATION_DATABASE_URL="postgresql+asyncpg://merl_t:merl_t_password@localhost:5433/orchestration_db"
     export REDIS_URL="redis://localhost:6379"
     export QDRANT_HOST="localhost"
     export QDRANT_PORT="6333"
     export NEO4J_URI="bolt://localhost:7687"
+    export NEO4J_USER="neo4j"
+    export NEO4J_PASSWORD="merl_t_password"
 
     # Migrazioni
     rlcf-admin db migrate || print_warning "Migrazioni già eseguite"
@@ -299,11 +304,11 @@ mkdir -p logs
 
 # Avvia visualex (richiesto per KG ingestion) in background
 print_warning "Avvio visualex API (porta 5000)..."
-cd visualex
-nohup python app.py > ../logs/visualex.log 2>&1 &
+cd visualex/src
+nohup python -m visualex_api.main > ../../logs/visualex.log 2>&1 &
 VISUALEX_PID=$!
-echo $VISUALEX_PID > ../logs/visualex.pid
-cd ..
+echo $VISUALEX_PID > ../../logs/visualex.pid
+cd ../..
 print_success "visualex API avviato (PID: $VISUALEX_PID)"
 
 # Aspetta che si avvii
@@ -311,11 +316,9 @@ sleep 3
 
 # Avvia Backend Orchestration in background
 print_warning "Avvio Backend Orchestration API (porta 8000)..."
-cd backend/orchestration
-nohup uvicorn api.main:app --reload --port 8000 > ../../logs/orchestration.log 2>&1 &
+nohup uvicorn backend.orchestration.api.main:app --reload --port 8000 > logs/orchestration.log 2>&1 &
 ORCHESTRATION_PID=$!
-echo $ORCHESTRATION_PID > ../../logs/orchestration.pid
-cd ../..
+echo $ORCHESTRATION_PID > logs/orchestration.pid
 print_success "Backend Orchestration avviato (PID: $ORCHESTRATION_PID)"
 
 # Aspetta che si avvii
@@ -323,11 +326,9 @@ sleep 3
 
 # Avvia Backend RLCF in background
 print_warning "Avvio Backend RLCF API (porta 8001)..."
-cd backend/rlcf_framework
-nohup uvicorn main:app --reload --port 8001 > ../../logs/rlcf.log 2>&1 &
+nohup uvicorn backend.rlcf_framework.main:app --reload --port 8001 > logs/rlcf.log 2>&1 &
 RLCF_PID=$!
-echo $RLCF_PID > ../../logs/rlcf.pid
-cd ../..
+echo $RLCF_PID > logs/rlcf.pid
 print_success "Backend RLCF avviato (PID: $RLCF_PID)"
 
 # Aspetta che si avvii
@@ -335,11 +336,9 @@ sleep 3
 
 # Avvia Ingestion API in background
 print_warning "Avvio KG Ingestion API (porta 8002)..."
-cd backend/preprocessing/api
-nohup python main.py > ../../../logs/ingestion.log 2>&1 &
+nohup python -m backend.preprocessing.api.main > logs/ingestion.log 2>&1 &
 INGESTION_PID=$!
-echo $INGESTION_PID > ../../../logs/ingestion.pid
-cd ../../..
+echo $INGESTION_PID > logs/ingestion.pid
 print_success "KG Ingestion API avviato (PID: $INGESTION_PID)"
 
 # Aspetta che si avvii

@@ -6,9 +6,6 @@
 # - No code volume mounts (immutable containers)
 # - Optimized resource limits
 # - Production-grade security
-
-version: '3.8'
-
 services:
   # ===========================================================================
   # Backend Service (FastAPI - Production)

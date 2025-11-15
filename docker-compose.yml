@@ -3,9 +3,6 @@
 #
 # This runs the complete stack (backend + frontend + databases).
 # For development with native backend/frontend, use docker-compose.dev.yml instead.
-
-version: '3.8'
-
 services:
   # ===========================================================================
   # Backend Service (FastAPI)

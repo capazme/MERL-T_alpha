@@ -37,9 +37,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy import select, update, delete, and_
 
 # MERL-T imports
-from .sources.visualex_client import VisualeXClient, VisualeXResponse
+from .sources.visualex_client import VisualexClient, VisualexResponse
 from .models_kg import StagingEntity, EntityTypeEnum, SourceTypeEnum
-from .neo4j_graph_builder import Neo4jGraphBuilder
+from .neo4j_graph_builder import Neo4jLegalKnowledgeGraph
 from .document_ingestion.ingestion_pipeline import IngestionPipeline as DocumentIngestionPipeline
 
 log = structlog.get_logger(__name__)
@@ -238,8 +238,8 @@ class UnifiedIngestionPipeline:
         )
 
         # Clients (lazy initialization)
-        self._visualex_client: Optional[VisualeXClient] = None
-        self._neo4j_builder: Optional[Neo4jGraphBuilder] = None
+        self._visualex_client: Optional[VisualexClient] = None
+        self._neo4j_builder: Optional[Neo4jLegalKnowledgeGraph] = None
         self._document_pipeline: Optional[DocumentIngestionPipeline] = None
 
         log.info(
@@ -249,17 +249,17 @@ class UnifiedIngestionPipeline:
         )
 
     @property
-    def visualex_client(self) -> VisualeXClient:
+    def visualex_client(self) -> VisualexClient:
         """Lazy-load visualex client."""
         if self._visualex_client is None:
-            self._visualex_client = VisualeXClient(base_url=self.config.visualex_url)
+            self._visualex_client = VisualexClient(base_url=self.config.visualex_url)
         return self._visualex_client
 
     @property
-    def neo4j_builder(self) -> Neo4jGraphBuilder:
+    def neo4j_builder(self) -> Neo4jLegalKnowledgeGraph:
         """Lazy-load Neo4j graph builder."""
         if self._neo4j_builder is None:
-            self._neo4j_builder = Neo4jGraphBuilder(
+            self._neo4j_builder = Neo4jLegalKnowledgeGraph(
                 uri=self.config.neo4j_uri,
                 user=self.config.neo4j_user,
                 password=self.config.neo4j_password

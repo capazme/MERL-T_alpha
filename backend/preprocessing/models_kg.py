@@ -198,8 +198,8 @@ class StagingRelationship(Base):
     reviewer_id = Column(String(100), nullable=True, index=True)
     review_comments = Column(Text, nullable=True)
 
-    # Metadata
-    metadata = Column(PGJSON, default={})  # source_article, llm_model, etc.
+    # Extra metadata (renamed from 'metadata' to avoid SQLAlchemy reserved name)
+    extra_metadata = Column(PGJSON, default={})  # source_article, llm_model, etc.
 
     # Tracking
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -470,7 +470,7 @@ class Contribution(Base):
     # Voting
     upvote_count = Column(Integer, default=0)
     downvote_count = Column(Integer, default=0)
-    net_votes = Column(Integer, generated_always=True, nullable=True)
+    net_votes = Column(Integer, default=0)  # Computed as upvote_count - downvote_count
 
     # Status & confidence
     status = Column(String(20), default="pending", index=True)  # pending, voting, approved, rejected

@@ -37,3 +37,10 @@ SessionLocal = async_sessionmaker(
 )
 
 Base = declarative_base()
+
+
+# Dependency injection for FastAPI
+async def get_db():
+    """Yield database session for FastAPI dependencies."""
+    async with SessionLocal() as session:
+        yield session

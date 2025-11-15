@@ -27,10 +27,10 @@ from sqlalchemy.orm import declarative_base
 # ============================================================================
 
 # Get database URL from environment variable
-# Default to PostgreSQL for production-ready setup
+# Default to SQLite for development (change to PostgreSQL in production)
 DATABASE_URL = os.getenv(
     "ORCHESTRATION_DATABASE_URL",
-    "postgresql+asyncpg://merl_t:merl_t_password@localhost:5432/orchestration_db"
+    "sqlite+aiosqlite:///./orchestration.db"
 )
 
 # ============================================================================

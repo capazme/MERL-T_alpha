@@ -20,7 +20,7 @@ from ..schemas.query import (
     LegalBasis,
     AlternativeInterpretation,
 )
-from ...langgraph_workflow import create_merlt_workflow
+from backend.orchestration.langgraph_workflow import create_merlt_workflow
 from .persistence_service import persistence_service
 from .cache_service import cache_service
 

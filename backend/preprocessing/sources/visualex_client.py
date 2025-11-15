@@ -162,7 +162,7 @@ class NormaData:
 
 
 @dataclass
-class VisualeExResponse:
+class VisualexResponse:
     """Wrapper for visualex API response."""
     success: bool
     data: List[NormaData] = field(default_factory=list)
@@ -175,7 +175,7 @@ class VisualeExResponse:
 # Visualex Client
 # =============================================================================
 
-class VisualeXClient:
+class VisualexClient:
     """
     Async HTTP client for visualex API integration.
 
@@ -210,7 +210,7 @@ class VisualeXClient:
         self.session: Optional[aiohttp.ClientSession] = None
 
         log.info(
-            "VisualeXClient initialized",
+            "VisualexClient initialized",
             base_url=base_url,
             timeout=timeout,
             max_retries=max_retries
@@ -313,7 +313,7 @@ class VisualeXClient:
         data_versione: Optional[str] = None,
         allegato: Optional[str] = None,
         progress_callback: Optional[callable] = None
-    ) -> VisualeXResponse:
+    ) -> VisualexResponse:
         """
         Fetch multiple articles from a single legal norm.
 
@@ -328,10 +328,10 @@ class VisualeXClient:
             progress_callback: Optional callback for progress updates (called per article)
 
         Returns:
-            VisualeXResponse with fetched articles and errors
+            VisualexResponse with fetched articles and errors
 
         Example:
-            >>> async with VisualeXClient() as client:
+            >>> async with VisualexClient() as client:
             ...     response = await client.fetch_articles(
             ...         tipo_atto="codice civile",
             ...         articoli=["2043", "2044", "2045"]
@@ -411,7 +411,7 @@ class VisualeXClient:
                     if progress_callback:
                         await progress_callback(idx + 1, len(articoli))
 
-            return VisualeXResponse(
+            return VisualexResponse(
                 success=len(errors) == 0,
                 data=norma_data_list,
                 errors=errors,
@@ -421,7 +421,7 @@ class VisualeXClient:
 
         except Exception as e:
             log.error("Failed to fetch articles", error=str(e), exc_info=True)
-            return VisualeXResponse(
+            return VisualexResponse(
                 success=False,
                 errors=[str(e)],
                 total_errors=1
@@ -445,7 +445,7 @@ class VisualeXClient:
             Dict mapping article_number → BrocardiInfo
 
         Example:
-            >>> async with VisualeXClient() as client:
+            >>> async with VisualexClient() as client:
             ...     brocardi_data = await client.fetch_brocardi_info(
             ...         tipo_atto="codice civile",
             ...         articoli=["2043", "2044"]
@@ -500,7 +500,7 @@ class VisualeXClient:
         articoli: List[str],
         progress_callback: Optional[callable] = None,
         **kwargs
-    ) -> VisualeXResponse:
+    ) -> VisualexResponse:
         """
         Fetch articles WITH BrocardiInfo enrichment.
 
@@ -517,7 +517,7 @@ class VisualeXClient:
             **kwargs: Additional arguments (data, numero_atto, etc.)
 
         Returns:
-            VisualeXResponse with NormaData enriched with BrocardiInfo
+            VisualexResponse with NormaData enriched with BrocardiInfo
         """
         log.info(
             "Fetching articles WITH BrocardiInfo",
@@ -560,7 +560,7 @@ class VisualeXClient:
         batch_size: int = 50,
         include_brocardi: bool = True,
         progress_callback: Optional[callable] = None
-    ) -> VisualeXResponse:
+    ) -> VisualexResponse:
         """
         Fetch a batch of Codice Civile articles.
 
@@ -574,11 +574,11 @@ class VisualeXClient:
             progress_callback: Optional callback(current, total)
 
         Returns:
-            VisualeXResponse with all fetched articles
+            VisualexResponse with all fetched articles
 
         Example:
             >>> # Import articles 1-100 from Codice Civile with BrocardiInfo
-            >>> async with VisualeXClient() as client:
+            >>> async with VisualexClient() as client:
             ...     response = await client.fetch_codice_civile_batch(
             ...         1, 100, include_brocardi=True
             ...     )
@@ -640,7 +640,7 @@ class VisualeXClient:
             total_errors=len(all_errors)
         )
 
-        return VisualeXResponse(
+        return VisualexResponse(
             success=len(all_errors) == 0,
             data=all_data,
             errors=all_errors,
@@ -654,7 +654,7 @@ class VisualeXClient:
 # =============================================================================
 
 async def fetch_and_convert_to_neo4j(
-    client: VisualeXClient,
+    client: VisualexClient,
     tipo_atto: str,
     articoli: List[str],
     **kwargs
@@ -663,7 +663,7 @@ async def fetch_and_convert_to_neo4j(
     Fetch articles and convert to Neo4j entity format.
 
     Args:
-        client: VisualeXClient instance
+        client: VisualexClient instance
         tipo_atto: Type of legal act
         articoli: List of article numbers
         **kwargs: Additional arguments for fetch_articles()
@@ -672,7 +672,7 @@ async def fetch_and_convert_to_neo4j(
         Tuple of (neo4j_entities, errors)
 
     Example:
-        >>> async with VisualeXClient() as client:
+        >>> async with VisualexClient() as client:
         ...     entities, errors = await fetch_and_convert_to_neo4j(
         ...         client, "codice civile", ["2043", "2044"]
         ...     )
@@ -705,9 +705,9 @@ async def main():
         ]
     )
 
-    log.info("Testing VisualeXClient with Codice Civile articles")
+    log.info("Testing VisualexClient with Codice Civile articles")
 
-    async with VisualeXClient() as client:
+    async with VisualexClient() as client:
         # Test 1: Fetch single article
         log.info("Test 1: Fetching Art. 2043")
         response = await client.fetch_articles(

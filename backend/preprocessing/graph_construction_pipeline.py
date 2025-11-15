@@ -27,7 +27,7 @@ from datetime import datetime
 import structlog
 
 # MERL-T imports
-from .sources.visualex_client import VisualeXClient, NormaData
+from .sources.visualex_client import VisualexClient, NormaData
 from .llm_graph_extractor import LLMGraphExtractor, GraphExtractionResult
 from .unified_ingestion_pipeline import (
     UnifiedIngestionPipeline,
@@ -177,7 +177,7 @@ class GraphConstructionPipeline:
         self.stats = GraphConstructionStats()
 
         # Initialize components
-        self.visualex_client = VisualeXClient(base_url=config.visualex_url)
+        self.visualex_client = VisualexClient(base_url=config.visualex_url)
         self.llm_extractor = LLMGraphExtractor(
             openrouter_api_key=config.openrouter_api_key,
             model=config.llm_model,
