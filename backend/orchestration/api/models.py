@@ -27,9 +27,9 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from sqlalchemy.types import JSON
+from sqlalchemy.types import JSON  # Use JSON (not JSON) for SQLite compatibility
 
 from .database import Base
 
@@ -63,8 +63,8 @@ class Query(Base):
 
     # Query Data
     query_text = Column(Text, nullable=False)
-    query_context = Column(JSONB, default={})
-    enriched_context = Column(JSONB, default={})
+    query_context = Column(JSON, default={})
+    enriched_context = Column(JSON, default={})
 
     # Execution Status
     status = Column(
@@ -75,7 +75,7 @@ class Query(Base):
     )
 
     # Execution Options
-    options = Column(JSONB, default={})
+    options = Column(JSON, default={})
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, index=True)
@@ -142,17 +142,17 @@ class QueryResult(Base):
     primary_answer = Column(Text, nullable=False)
     confidence = Column(Numeric(4, 3), nullable=False, default=0.0)
 
-    legal_basis = Column(JSONB, default=[])
-    alternatives = Column(JSONB, default=[])
+    legal_basis = Column(JSON, default=[])
+    alternatives = Column(JSON, default=[])
 
     uncertainty_preserved = Column(Boolean, default=False)
-    sources_consulted = Column(JSONB, default=[])
+    sources_consulted = Column(JSON, default=[])
 
     # Execution Trace
-    execution_trace = Column(JSONB, default={})
+    execution_trace = Column(JSON, default={})
 
     # Query Metadata
-    query_metadata = Column(JSONB, default={})
+    query_metadata = Column(JSON, default={})
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, index=True)
@@ -214,7 +214,7 @@ class UserFeedback(Base):
     # Feedback Data
     rating = Column(Integer, nullable=False)
     feedback_text = Column(Text, nullable=True)
-    categories = Column(JSONB, default={})
+    categories = Column(JSON, default={})
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, index=True)
@@ -273,7 +273,7 @@ class RLCFFeedback(Base):
     authority_score = Column(Numeric(4, 3), nullable=False)
 
     # Corrections Data
-    corrections = Column(JSONB, nullable=False, default={})
+    corrections = Column(JSON, nullable=False, default={})
 
     overall_rating = Column(Integer, nullable=False)
 
@@ -344,7 +344,7 @@ class NERCorrection(Base):
     correction_type = Column(String(20), nullable=False, index=True)
 
     # Correction Data
-    correction_data = Column(JSONB, nullable=False)
+    correction_data = Column(JSON, nullable=False)
 
     # Training Example
     training_example_generated = Column(Boolean, default=True)

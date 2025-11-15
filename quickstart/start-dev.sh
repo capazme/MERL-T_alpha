@@ -259,8 +259,9 @@ elif [ "$mode" = "2" ]; then
     print_warning "Attesa 15 secondi per l'inizializzazione dei database..."
     sleep 15
 
-    export DATABASE_URL="postgresql+asyncpg://merl_t:merl_t_password@localhost:5432/merl_t_db"
-    export ORCHESTRATION_DATABASE_URL="postgresql+asyncpg://merl_t:merl_t_password@localhost:5433/orchestration_db"
+    export DATABASE_URL="postgresql+asyncpg://dev:devpassword@localhost:5432/rlcf_dev"
+    # Use SQLite for Orchestration in development (PostgreSQL has auth issues from host)
+    # export ORCHESTRATION_DATABASE_URL="postgresql+asyncpg://dev:devpassword@localhost:5432/rlcf_dev"
     export REDIS_URL="redis://localhost:6379"
     export QDRANT_HOST="localhost"
     export QDRANT_PORT="6333"

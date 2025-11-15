@@ -17,9 +17,9 @@ import logging
 # MERL-T imports
 from ..database import SessionLocal, get_db
 from ..models_extension import TrainedModel, EvaluationRun, AnnotationTask, ModelStatus
-from ..orchestration.model_manager import get_model_manager, ModelMetrics
-from ..preprocessing.ner_module import LegalSourceExtractionPipeline
-from ..preprocessing.label_mapping import get_label_manager
+from backend.orchestration.model_manager import get_model_manager, ModelMetrics
+from backend.preprocessing.ner_module import LegalSourceExtractionPipeline
+from backend.preprocessing.label_mapping import get_label_manager
 
 log = logging.getLogger(__name__)
 

@@ -120,7 +120,7 @@ class IntentClassification(Base):
     # Lifecycle
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     validated_at = Column(DateTime(timezone=True), nullable=True)
-    metadata = Column(JSON, nullable=True)  # Any additional metadata
+    extra_metadata = Column(JSON, nullable=True)  # Any additional metadata (renamed from metadata - reserved name)
 
     # Relationships
     feedback_records = relationship(
@@ -211,7 +211,7 @@ class IntentValidationFeedback(Base):
     # Lifecycle
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
-    metadata = Column(JSON, nullable=True)
+    extra_metadata = Column(JSON, nullable=True)  # Renamed from metadata - reserved name
 
     # Relationships
     classification = relationship(
