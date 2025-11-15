@@ -6,6 +6,7 @@ FastAPI router for query execution endpoints.
 
 import asyncio
 import logging
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status, Depends
@@ -223,11 +224,12 @@ async def get_query_status(
         logger.info(f"[{trace_id}] Status found in Redis cache")
         # Build QueryStatus response from cache
         query_status = QueryStatus(
-            trace_id=cached_status["trace_id"],
-            status=cached_status["status"],
+            trace_id=cached_status.get("trace_id", trace_id),
+            status=cached_status.get("status", "processing"),
             current_stage=cached_status.get("current_stage"),
-            progress_percent=100.0 if cached_status["status"] == "completed" else None,
-            started_at=cached_status.get("started_at"),
+            progress_percent=cached_status.get("progress_percent"),
+            stage_logs=cached_status.get("stage_logs"),
+            started_at=cached_status.get("started_at", datetime.utcnow()),
             completed_at=cached_status.get("completed_at"),
             estimated_completion_ms=None,
             result=cached_status.get("result"),

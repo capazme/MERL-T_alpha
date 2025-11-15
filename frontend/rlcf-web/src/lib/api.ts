@@ -17,7 +17,7 @@ const axiosInstance = axios.create({
   baseURL: 'http://127.0.0.1:8000',
   timeout: 70000, // 70s to allow for 60s backend timeout + margin
   headers: {
-    'X-API-KEY': 'supersecretkey'
+    'X-API-KEY': 'merl-t-admin-key-dev-only-change-in-production'  // Development admin key from migration
   }
 });
 
@@ -26,7 +26,7 @@ const rlcfAxios = axios.create({
   baseURL: 'http://127.0.0.1:8001',
   timeout: 70000, // 70s to allow for 60s backend timeout + margin
   headers: {
-    'X-API-KEY': 'supersecretkey'
+    'X-API-KEY': 'merl-t-admin-key-dev-only-change-in-production'  // Development admin key from migration
   }
 });
 
@@ -35,7 +35,7 @@ const ingestionAxios = axios.create({
   baseURL: 'http://127.0.0.1:8002',
   timeout: 60000, // Timeout più lungo per batch processing
   headers: {
-    'X-API-KEY': 'supersecretkey'
+    'X-API-KEY': 'merl-t-admin-key-dev-only-change-in-production'  // Development admin key from migration
   }
 });
 

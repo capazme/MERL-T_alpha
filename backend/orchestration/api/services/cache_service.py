@@ -85,11 +85,11 @@ class CacheService:
         ttl_hours: int = 24,
     ) -> bool:
         """
-        Cache query status.
+        Cache query status with merge support.
 
         Args:
             trace_id: Query trace identifier
-            status_data: Status data to cache
+            status_data: Status data to cache (merges with existing data)
             ttl_hours: Time-to-live in hours (default: 24h)
 
         Returns:
@@ -104,7 +104,30 @@ class CacheService:
                 return False
 
             key = f"query_status:{trace_id}"
-            value = json.dumps(status_data)
+
+            # Get existing status and merge with new data
+            existing_data = await self.get_query_status(trace_id)
+            if existing_data:
+                # Append to stage_logs if present (don't replace)
+                if "stage_logs" in existing_data and "stage_logs" in status_data:
+                    existing_data["stage_logs"].extend(status_data["stage_logs"])
+                    status_data["stage_logs"] = existing_data["stage_logs"]
+                # Merge: new data overwrites existing fields
+                merged_data = {**existing_data, **status_data}
+            else:
+                merged_data = status_data
+
+            # Add timestamp
+            from datetime import datetime as dt
+            merged_data["updated_at"] = dt.utcnow().isoformat()
+
+            # Serialize datetime objects to ISO format strings
+            def serialize_datetime(obj):
+                if isinstance(obj, dt):
+                    return obj.isoformat()
+                raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+            value = json.dumps(merged_data, default=serialize_datetime)
             ttl = timedelta(hours=ttl_hours)
 
             await redis.setex(key, ttl, value)
@@ -460,6 +483,40 @@ class CacheService:
         except Exception as e:
             print(f"Redis error in exists: {e}")
             return False
+
+    # ========================================================================
+    # Query Status Updates (Real-time Monitoring)
+    # ========================================================================
+    # Removed duplicate set_query_status method - using the one above with merge logic
+
+    async def get_query_status(self, trace_id: str) -> Optional[dict]:
+        """
+        Get current query execution status from Redis.
+
+        Args:
+            trace_id: Query trace ID
+
+        Returns:
+            dict: Status data or None if not found
+        """
+        if not self._enabled:
+            return None
+
+        try:
+            redis = await self.get_redis_client()
+            if redis is None:
+                return None
+
+            key = f"query_status:{trace_id}"
+            data = await redis.get(key)
+            if data:
+                import json
+                return json.loads(data)
+            return None
+
+        except Exception as e:
+            print(f"Redis error in get_query_status: {e}")
+            return None
 
     # ========================================================================
     # Health Check

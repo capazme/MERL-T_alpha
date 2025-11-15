@@ -257,7 +257,7 @@ elif [ "$mode" = "2" ]; then
     print_success "Database Docker avviati"
 
     print_warning "Attesa 15 secondi per l'inizializzazione dei database..."
-    sleep 15
+    sleep 7
 
     export DATABASE_URL="postgresql+asyncpg://dev:devpassword@localhost:5432/rlcf_dev"
     # Use SQLite for Orchestration in development (PostgreSQL has auth issues from host)
@@ -271,13 +271,7 @@ elif [ "$mode" = "2" ]; then
 
     # Migrazioni
     rlcf-admin db migrate || print_warning "Migrazioni già eseguite"
-
-    print_warning "Vuoi popolare il database con dati di esempio? [Y/n]"
-    read -r response
-    if [[ ! "$response" =~ ^([nN][oO]|[nN])$ ]]; then
-        rlcf-admin db seed --users 5 --tasks 10
-        print_success "Database popolato"
-    fi
+    print_success "Database PostgreSQL inizializzato"
 fi
 
 # ============================================================================
@@ -323,7 +317,7 @@ echo $ORCHESTRATION_PID > logs/orchestration.pid
 print_success "Backend Orchestration avviato (PID: $ORCHESTRATION_PID)"
 
 # Aspetta che si avvii
-sleep 10
+sleep 5
 
 # Avvia Backend RLCF in background
 print_warning "Avvio Backend RLCF API (porta 8001)..."
@@ -372,7 +366,8 @@ else
     echo "Controlla i log: logs/visualex.log"
 fi
 echo "Attendo altri 20 secondi per i servizi backend..."
-sleep 20
+sleep 10
+
 # Controlla Backend Orchestration
 if curl -s http://localhost:8000/health > /dev/null 2>&1; then
     print_success "Backend Orchestration: OK"

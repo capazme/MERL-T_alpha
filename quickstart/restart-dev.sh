@@ -22,7 +22,7 @@ echo -e "${NC}"
 
 # Stop tutto
 echo "Stopping services..."
-./stop-dev.sh
+./quickstart/stop-dev.sh
 
 # Aspetta un po'
 echo ""
@@ -32,4 +32,4 @@ sleep 3
 # Riavvia
 echo ""
 echo "Starting services..."
-./start-dev.sh
+./quickstart/start-dev.sh

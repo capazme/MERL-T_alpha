@@ -373,48 +373,23 @@ class QueryExecutor:
             synthesis_mode=provisional_answer.get("synthesis_mode"),
         )
 
-    async def execute_query(self, request: QueryRequest) -> QueryResponse:
+    async def _execute_workflow_background(
+        self,
+        request: QueryRequest,
+        trace_id: str,
+        initial_state: Dict[str, Any]
+    ):
         """
-        Execute complete MERL-T pipeline for a legal query.
+        Execute workflow in background (async fire-and-forget).
 
-        Args:
-            request: QueryRequest from API
-
-        Returns:
-            QueryResponse with answer, trace, and metadata
-
-        Raises:
-            asyncio.TimeoutError: If query exceeds timeout
-            Exception: If workflow execution fails
+        This method runs the complete workflow and handles all result persistence,
+        but does not return anything to the caller.
         """
-        # Generate trace ID
-        trace_id = self._generate_trace_id()
-        logger.info(f"[{trace_id}] Starting query execution: {request.query[:50]}...")
-
         start_time = time.time()
-        start_timestamp = datetime.utcnow()
-
-        # Save query to database with pending status
-        try:
-            await persistence_service.save_query(
-                trace_id=trace_id,
-                query_text=request.query,
-                session_id=request.session_id,
-                user_id=None,  # TODO: Extract from auth context
-                query_context=request.context.model_dump() if request.context else None,
-                options=request.options.model_dump() if request.options else None,
-            )
-            logger.info(f"[{trace_id}] Query saved to database with status=pending")
-        except Exception as e:
-            logger.warning(f"[{trace_id}] Failed to save query to database: {e}")
-            # Continue execution even if database save fails
 
         try:
             # Get compiled workflow app
             app = await self._get_workflow_app()
-
-            # Build initial state
-            initial_state = self._build_initial_state(request, trace_id)
 
             # Update query status to processing
             try:
@@ -511,8 +486,6 @@ class QueryExecutor:
             except Exception as e:
                 logger.warning(f"[{trace_id}] Failed to cache query status: {e}")
 
-            return response
-
         except asyncio.TimeoutError:
             elapsed_ms = (time.time() - start_time) * 1000
             logger.error(f"[{trace_id}] Query execution timeout after {elapsed_ms:.0f}ms")
@@ -524,10 +497,23 @@ class QueryExecutor:
                     status="timeout",
                     completed_at=datetime.utcnow(),
                 )
+                logger.info(f"[{trace_id}] Query status updated to timeout")
             except Exception as db_error:
                 logger.warning(f"[{trace_id}] Failed to update status to timeout: {db_error}")
 
-            raise
+            # Cache error in Redis
+            try:
+                await cache_service.set_query_status(
+                    trace_id=trace_id,
+                    status_data={
+                        "trace_id": trace_id,
+                        "status": "failed",
+                        "error": f"Query execution timeout after {elapsed_ms:.0f}ms",
+                    },
+                    ttl_hours=24,
+                )
+            except Exception as cache_error:
+                logger.warning(f"[{trace_id}] Failed to cache timeout status: {cache_error}")
 
         except Exception as e:
             elapsed_ms = (time.time() - start_time) * 1000
@@ -543,7 +529,87 @@ class QueryExecutor:
                     status="failed",
                     completed_at=datetime.utcnow(),
                 )
+                logger.info(f"[{trace_id}] Query status updated to failed")
             except Exception as db_error:
                 logger.warning(f"[{trace_id}] Failed to update status to failed: {db_error}")
 
-            raise
+            # Cache error in Redis
+            try:
+                await cache_service.set_query_status(
+                    trace_id=trace_id,
+                    status_data={
+                        "trace_id": trace_id,
+                        "status": "failed",
+                        "error": str(e),
+                    },
+                    ttl_hours=24,
+                )
+            except Exception as cache_error:
+                logger.warning(f"[{trace_id}] Failed to cache error status: {cache_error}")
+
+    async def execute_query(self, request: QueryRequest) -> QueryResponse:
+        """
+        Execute complete MERL-T pipeline for a legal query (ASYNC mode).
+
+        Returns immediately with trace_id, executes workflow in background.
+
+        Args:
+            request: QueryRequest from API
+
+        Returns:
+            QueryResponse with trace_id only (answer will be available via /query/status/)
+        """
+        # Generate trace ID
+        trace_id = self._generate_trace_id()
+        logger.info(f"[{trace_id}] Starting async query execution: {request.query[:50]}...")
+
+        # Save query to database with pending status
+        try:
+            await persistence_service.save_query(
+                trace_id=trace_id,
+                query_text=request.query,
+                session_id=request.session_id,
+                user_id=None,  # TODO: Extract from auth context
+                query_context=request.context.model_dump() if request.context else None,
+                options=request.options.model_dump() if request.options else None,
+            )
+            logger.info(f"[{trace_id}] Query saved to database with status=pending")
+        except Exception as e:
+            logger.warning(f"[{trace_id}] Failed to save query to database: {e}")
+
+        # Initialize Redis cache with pending status
+        try:
+            await cache_service.set_query_status(
+                trace_id=trace_id,
+                status_data={
+                    "trace_id": trace_id,
+                    "status": "pending",
+                    "current_stage": None,
+                    "progress_percent": 0.0,
+                    "stage_logs": [],
+                },
+                ttl_hours=24,
+            )
+            logger.info(f"[{trace_id}] Initial status cached in Redis")
+        except Exception as e:
+            logger.warning(f"[{trace_id}] Failed to cache initial status: {e}")
+
+        # Build initial state
+        initial_state = self._build_initial_state(request, trace_id)
+
+        # Start background task (fire-and-forget)
+        asyncio.create_task(
+            self._execute_workflow_background(request, trace_id, initial_state)
+        )
+
+        logger.info(f"[{trace_id}] Background execution started, returning trace_id to client")
+
+        # Return minimal response immediately
+        return QueryResponse(
+            trace_id=trace_id,
+            session_id=request.session_id,
+            answer=None,  # Will be populated by background task
+            execution_trace=None,
+            metadata=None,
+            timestamp=datetime.utcnow(),
+        )

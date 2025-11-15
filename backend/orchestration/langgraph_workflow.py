@@ -45,7 +45,21 @@ from backend.orchestration.iteration.models import IterationContext
 from backend.preprocessing import query_understanding
 from backend.preprocessing.kg_enrichment_service import KGEnrichmentService
 
+# Lazy import cache_service to avoid circular dependency
+# Import happens inside functions that need it
+
 logger = logging.getLogger(__name__)
+
+# Lazy import function to avoid circular dependency
+_cache_service_instance = None
+
+def get_cache_service():
+    """Lazy import of cache_service to avoid circular dependency."""
+    global _cache_service_instance
+    if _cache_service_instance is None:
+        from backend.orchestration.api.services.cache_service import cache_service
+        _cache_service_instance = cache_service
+    return _cache_service_instance
 
 
 # ============================================================================
@@ -123,6 +137,17 @@ async def preprocessing_node(state: MEGLTState) -> MEGLTState:
     - errors (if preprocessing fails)
     """
     logger.info(f"[{state['trace_id']}] Preprocessing node: analyzing query")
+
+    # Update real-time status
+    await get_cache_service().set_query_status(
+        state['trace_id'],
+        {
+            "status": "processing",
+            "current_stage": "preprocessing",
+            "progress_percent": 14.3,  # 1/7 stages
+            "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] Preprocessing: analyzing query..."]
+        }
+    )
 
     start_time = time.time()
 
@@ -256,6 +281,26 @@ async def preprocessing_node(state: MEGLTState) -> MEGLTState:
             f"[{state['trace_id']}] Preprocessing completed in {elapsed_ms:.0f}ms"
         )
 
+        # Update status: preprocessing complete with results
+        await get_cache_service().set_query_status(
+            state['trace_id'],
+            {
+                "current_stage": "preprocessing_complete",
+                "progress_percent": 14.3,
+                "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] ✓ Preprocessing completed ({elapsed_ms:.0f}ms)"],
+                "stage_results": {
+                    "preprocessing": {
+                        "intent": query_context.get("intent"),
+                        "confidence": query_context.get("intent_confidence"),
+                        "entities_count": len(query_context.get("entities", [])),
+                        "norm_references": query_context.get("norm_references", []),
+                        "legal_concepts": query_context.get("legal_concepts", []),
+                        "enrichment_sources": len(enriched_context.get("norms", [])) + len(enriched_context.get("sentenze", [])) + len(enriched_context.get("dottrina", [])),
+                    }
+                }
+            }
+        )
+
         return {
             **state,
             "query_context": query_context,
@@ -302,6 +347,16 @@ async def router_node(state: MEGLTState) -> MEGLTState:
         f"[{state['trace_id']}] Router node: iteration {state['current_iteration']}"
     )
 
+    # Update real-time status
+    await get_cache_service().set_query_status(
+        state['trace_id'],
+        {
+            "current_stage": "router",
+            "progress_percent": 28.6,  # 2/7 stages
+            "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] Router: generating execution plan..."]
+        }
+    )
+
     start_time = time.time()
 
     try:
@@ -328,6 +383,29 @@ async def router_node(state: MEGLTState) -> MEGLTState:
             f"[{state['trace_id']}] Router completed in {elapsed_ms:.0f}ms: "
             f"agents={sum([execution_plan.retrieval_plan.kg_agent.enabled, execution_plan.retrieval_plan.api_agent.enabled, execution_plan.retrieval_plan.vectordb_agent.enabled])}, "
             f"experts={len(execution_plan.reasoning_plan.experts)}"
+        )
+
+        # Update status: router complete with execution plan
+        agents_count = sum([execution_plan.retrieval_plan.kg_agent.enabled, execution_plan.retrieval_plan.api_agent.enabled, execution_plan.retrieval_plan.vectordb_agent.enabled])
+        await get_cache_service().set_query_status(
+            state['trace_id'],
+            {
+                "current_stage": "router_complete",
+                "progress_percent": 28.6,
+                "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] ✓ Router completed: {agents_count} agents, {len(execution_plan.reasoning_plan.experts)} experts ({elapsed_ms:.0f}ms)"],
+                "stage_results": {
+                    "router": {
+                        "agents_selected": {
+                            "kg_agent": execution_plan.retrieval_plan.kg_agent.enabled,
+                            "api_agent": execution_plan.retrieval_plan.api_agent.enabled,
+                            "vectordb_agent": execution_plan.retrieval_plan.vectordb_agent.enabled,
+                        },
+                        "experts_selected": execution_plan.reasoning_plan.experts,
+                        "synthesis_mode": execution_plan.reasoning_plan.synthesis_mode,
+                        "confidence_threshold": execution_plan.iteration_plan.stop_criteria.get("confidence_threshold"),
+                    }
+                }
+            }
         )
 
         return {
@@ -370,6 +448,16 @@ async def retrieval_node(state: MEGLTState) -> MEGLTState:
     """
     logger.info(
         f"[{state['trace_id']}] Retrieval node: executing agents"
+    )
+
+    # Update real-time status
+    await get_cache_service().set_query_status(
+        state['trace_id'],
+        {
+            "current_stage": "retrieval",
+            "progress_percent": 42.9,  # 3/7 stages
+            "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] Retrieval: querying agents..."]
+        }
     )
 
     start_time = time.time()
@@ -477,6 +565,26 @@ async def retrieval_node(state: MEGLTState) -> MEGLTState:
             f"agents={len(agent_results)}, errors={len(errors)}"
         )
 
+        # Update status: retrieval complete with sources
+        sources_summary = {}
+        for agent_name, result_dict in agent_results.items():
+            sources_summary[agent_name] = {
+                "count": len(result_dict.get("data", [])),
+                "success": result_dict.get("success", False),
+            }
+
+        await get_cache_service().set_query_status(
+            state['trace_id'],
+            {
+                "current_stage": "retrieval_complete",
+                "progress_percent": 42.9,
+                "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] ✓ Retrieval completed: {len(agent_results)} agents ({elapsed_ms:.0f}ms)"],
+                "stage_results": {
+                    "retrieval": sources_summary
+                }
+            }
+        )
+
         return {
             **state,
             "agent_results": agent_results,
@@ -523,6 +631,16 @@ async def experts_node(state: MEGLTState) -> MEGLTState:
     """
     logger.info(
         f"[{state['trace_id']}] Experts node: executing experts"
+    )
+
+    # Update real-time status
+    await get_cache_service().set_query_status(
+        state['trace_id'],
+        {
+            "current_stage": "experts",
+            "progress_percent": 57.1,  # 4/7 stages
+            "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] Experts: consulting legal experts..."]
+        }
     )
 
     start_time = time.time()
@@ -623,6 +741,27 @@ async def experts_node(state: MEGLTState) -> MEGLTState:
             f"experts={len(opinion_dicts)}/{len(selected_experts)}, errors={len(errors)}"
         )
 
+        # Update status: experts complete with opinions summary
+        expert_summaries = []
+        for opinion in opinion_dicts:
+            expert_summaries.append({
+                "expert_type": opinion.get("expert_type"),
+                "confidence": opinion.get("confidence"),
+                "interpretation_preview": opinion.get("interpretation", "")[:200] + "..." if len(opinion.get("interpretation", "")) > 200 else opinion.get("interpretation", ""),
+            })
+
+        await get_cache_service().set_query_status(
+            state['trace_id'],
+            {
+                "current_stage": "experts_complete",
+                "progress_percent": 57.1,
+                "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] ✓ Experts completed: {len(opinion_dicts)} opinions ({elapsed_ms:.0f}ms)"],
+                "stage_results": {
+                    "experts": expert_summaries
+                }
+            }
+        )
+
         return {
             **state,
             "expert_opinions": opinion_dicts,
@@ -667,6 +806,16 @@ async def synthesis_node(state: MEGLTState) -> MEGLTState:
     """
     logger.info(
         f"[{state['trace_id']}] Synthesis node: synthesizing {len(state['expert_opinions'])} opinions"
+    )
+
+    # Update real-time status
+    await get_cache_service().set_query_status(
+        state['trace_id'],
+        {
+            "current_stage": "synthesis",
+            "progress_percent": 71.4,  # 5/7 stages
+            "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] Synthesis: combining expert opinions..."]
+        }
     )
 
     start_time = time.time()
@@ -720,6 +869,24 @@ async def synthesis_node(state: MEGLTState) -> MEGLTState:
             f"consensus={provisional_answer.consensus_level:.2f}"
         )
 
+        # Update status: synthesis complete with answer preview
+        await get_cache_service().set_query_status(
+            state['trace_id'],
+            {
+                "current_stage": "synthesis_complete",
+                "progress_percent": 71.4,
+                "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] ✓ Synthesis completed: confidence={provisional_answer.confidence:.2f} ({elapsed_ms:.0f}ms)"],
+                "stage_results": {
+                    "synthesis": {
+                        "confidence": provisional_answer.confidence,
+                        "consensus_level": provisional_answer.consensus_level,
+                        "answer_preview": provisional_answer.primary_answer[:300] + "..." if len(provisional_answer.primary_answer) > 300 else provisional_answer.primary_answer,
+                        "uncertainty_preserved": provisional_answer.uncertainty_preserved,
+                    }
+                }
+            }
+        )
+
         return {
             **state,
             "provisional_answer": provisional_answer.model_dump(),
@@ -766,6 +933,16 @@ async def iteration_node(state: MEGLTState) -> MEGLTState:
     """
     logger.info(
         f"[{state['trace_id']}] Iteration node: evaluating stopping criteria"
+    )
+
+    # Update real-time status
+    await get_cache_service().set_query_status(
+        state['trace_id'],
+        {
+            "current_stage": "iteration",
+            "progress_percent": 85.7,  # 6/7 stages
+            "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] Iteration: evaluating answer quality..."]
+        }
     )
 
     start_time = time.time()
@@ -854,6 +1031,16 @@ async def refinement_node(state: MEGLTState) -> MEGLTState:
     """
     logger.info(
         f"[{state['trace_id']}] Refinement node: generating refinement instructions"
+    )
+
+    # Update real-time status
+    await get_cache_service().set_query_status(
+        state['trace_id'],
+        {
+            "current_stage": "refinement",
+            "progress_percent": 100.0,  # 7/7 stages
+            "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] Refinement: preparing next iteration..."]
+        }
     )
 
     start_time = time.time()

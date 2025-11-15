@@ -262,12 +262,12 @@ class QueryResponse(BaseModel):
 
     trace_id: str = Field(..., description="Unique trace identifier for this query")
     session_id: Optional[str] = Field(None, description="Session ID (if provided)")
-    answer: Answer = Field(..., description="Complete legal answer")
+    answer: Optional[Answer] = Field(None, description="Complete legal answer (None if async execution)")
     execution_trace: Optional[ExecutionTrace] = Field(
         None,
         description="Full execution trace (if return_trace=True)"
     )
-    metadata: AnswerMetadata = Field(..., description="Query processing metadata")
+    metadata: Optional[AnswerMetadata] = Field(None, description="Query processing metadata (None if async execution)")
     timestamp: datetime = Field(
         default_factory=datetime.utcnow,
         description="Response timestamp (UTC)"
@@ -319,19 +319,23 @@ class QueryStatus(BaseModel):
     """
 
     trace_id: str = Field(..., description="Query trace identifier")
-    status: Literal["pending", "in_progress", "completed", "failed"] = Field(
+    status: Literal["pending", "processing", "completed", "failed"] = Field(
         ...,
         description="Current execution status"
     )
     current_stage: Optional[str] = Field(
         None,
-        description="Currently executing stage (if in_progress)"
+        description="Currently executing stage (if processing)"
     )
     progress_percent: Optional[float] = Field(
         None,
         ge=0.0,
         le=100.0,
         description="Completion percentage (0-100)"
+    )
+    stage_logs: Optional[List[str]] = Field(
+        None,
+        description="Log messages from each stage execution"
     )
     started_at: datetime = Field(..., description="Execution start time (UTC)")
     completed_at: Optional[datetime] = Field(
@@ -355,7 +359,7 @@ class QueryStatus(BaseModel):
         json_schema_extra = {
             "example": {
                 "trace_id": "QRY-20250105-abc123",
-                "status": "in_progress",
+                "status": "processing",
                 "current_stage": "experts",
                 "progress_percent": 60.0,
                 "started_at": "2025-01-05T14:30:22Z",

@@ -232,6 +232,8 @@ export interface QueryStatusResponse {
   progress_percent: number;
   /** Current stage being executed */
   current_stage?: string | null;
+  /** Log messages from each stage execution */
+  stage_logs?: string[] | null;
   /** Estimated time remaining (seconds) */
   eta_seconds?: number | null;
   /** Error message (if status=failed) */
