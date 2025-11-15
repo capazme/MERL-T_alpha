@@ -16,6 +16,7 @@ import { AnswerDisplay } from './components/AnswerDisplay';
 import { LegalBasisPanel } from './components/LegalBasisPanel';
 import { JurisprudencePanel } from './components/JurisprudencePanel';
 import { AlternativeInterpretationsPanel } from './components/AlternativeInterpretationsPanel';
+import { FeedbackPanel } from './components/FeedbackPanel';
 import {
   FileText,
   ArrowLeft,
@@ -251,20 +252,9 @@ export function QueryResults() {
             )}
           </TabsContent>
 
-          {/* Tab 3: Feedback (Placeholder for Phase 4) */}
+          {/* Tab 3: Feedback */}
           <TabsContent value="feedback">
-            <Card>
-              <CardContent className="py-12 text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-500/20 mb-4">
-                  <MessageSquare className="w-8 h-8 text-purple-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">Feedback Interface</h3>
-                <p className="text-gray-400 max-w-md mx-auto">
-                  L'interfaccia di feedback (User Feedback, RLCF Expert Feedback, NER Corrections)
-                  sarà implementata nella Fase 4.
-                </p>
-              </CardContent>
-            </Card>
+            <FeedbackPanel traceId={traceId || ''} queryText={queryData.query} />
           </TabsContent>
         </Tabs>
       </div>

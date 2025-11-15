@@ -83,7 +83,7 @@ export function useSubmitUserFeedback() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (feedback: { trace_id: string; rating: number; feedback_text?: string; categories?: any }) =>
+    mutationFn: (feedback: { trace_id: string; rating: number; feedback_text?: string | null; categories?: any }) =>
       apiClient.orchestration.submitUserFeedback(feedback),
     onSuccess: (_, variables) => {
       // Invalidate query details to refresh feedback list
@@ -100,7 +100,7 @@ export function useSubmitRlcfFeedback() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (feedback: { trace_id: string; expert_id: number; authority_score: number; corrections: any }) =>
+    mutationFn: (feedback: { trace_id: string; expert_id: string; authority_score?: number; corrections: any }) =>
       apiClient.orchestration.submitRlcfFeedback(feedback),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: orchestrationKeys.query(variables.trace_id) });
@@ -116,7 +116,7 @@ export function useSubmitNerCorrection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (correction: { trace_id: string; expert_id: number; correction_type: string; original_entity: any; corrected_entity: any }) =>
+    mutationFn: (correction: { trace_id: string; correction_type: string; correction_data: any }) =>
       apiClient.orchestration.submitNerCorrection(correction),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: orchestrationKeys.query(variables.trace_id) });
