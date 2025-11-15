@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@components/ui/Card';
 import { Button } from '@components/ui/Button';
 import { Badge } from '@components/ui/Badge';
@@ -6,7 +7,7 @@ import { useTasks, useUsers, useCreateTask, useBatchCreateTasksFromYaml, useCrea
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import type { LegalTask, User, TaskType } from '@/types/index';
-import { RefreshCw, Download, Upload, Users, CheckCircle, Clock, BarChart } from 'lucide-react';
+import { RefreshCw, Download, Upload, Users, CheckCircle, Clock, BarChart, Database } from 'lucide-react';
 import { toast } from 'sonner';
 import { TaskManager } from './TaskManager';
 import { CsvUpload } from './CsvUpload';
@@ -37,6 +38,7 @@ const taskInputPlaceholders: Record<string, string> = {
 type AdminView = 'dashboard' | 'tasks' | 'upload' | 'ai-config';
 
 export function AdminDashboard() {
+  const navigate = useNavigate();
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
   const { data: tasks, refetch: refetchTasks } = useTasks();
   const { data: users, refetch: refetchUsers } = useUsers();
@@ -271,15 +273,22 @@ export function AdminDashboard() {
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Button 
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <Button
+              onClick={() => navigate('/admin/ingestion')}
+              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            >
+              <Database className="h-4 w-4" />
+              KG Ingestion
+            </Button>
+            <Button
               onClick={() => setCurrentView('upload')}
               className="flex items-center gap-2"
             >
               <Upload className="h-4 w-4" />
               Upload CSV Dataset
             </Button>
-            <Button 
+            <Button
               variant="outline"
               onClick={() => setCurrentView('tasks')}
               className="flex items-center gap-2"
@@ -287,14 +296,14 @@ export function AdminDashboard() {
               <RefreshCw className="h-4 w-4" />
               Manage Tasks
             </Button>
-            <Button 
+            <Button
               variant="outline"
               onClick={() => setCurrentView('ai-config')}
               className="flex items-center gap-2"
             >
               🤖 AI Configuration
             </Button>
-            <Button 
+            <Button
               variant="outline"
               onClick={handleExport}
               className="flex items-center gap-2"

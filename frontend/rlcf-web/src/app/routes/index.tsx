@@ -7,6 +7,7 @@ import { TaskEvaluation } from '../../features/evaluation/TaskEvaluation';
 import { Analytics } from '../../features/analytics/Analytics';
 import { ConfigurationManager } from '../../features/admin/ConfigurationManager';
 import { AdminDashboard } from '../../features/admin/AdminDashboard';
+import { IngestionManager } from '../../features/admin/IngestionManager';
 import { Login } from '../../features/auth/Login';
 import { Leaderboard } from '../../features/analytics/Leaderboard';
 import { AuthorityDashboard } from '../../features/dashboard/AuthorityDashboard';
@@ -128,6 +129,14 @@ export const router = createBrowserRouter([
             element: (
               <AuthGuard requiredRole={UserRole.ADMIN}>
                 <QueryMonitorDashboard />
+              </AuthGuard>
+            ),
+          },
+          {
+            path: 'ingestion',
+            element: (
+              <AuthGuard requiredRole={UserRole.ADMIN}>
+                <IngestionManager />
               </AuthGuard>
             ),
           },
