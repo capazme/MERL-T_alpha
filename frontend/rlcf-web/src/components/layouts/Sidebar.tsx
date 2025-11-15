@@ -1,15 +1,16 @@
 import { motion } from 'framer-motion';
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  ClipboardCheck, 
-  BarChart3, 
-  Settings, 
-  User, 
-  ChevronLeft, 
+import {
+  LayoutDashboard,
+  ClipboardCheck,
+  BarChart3,
+  Settings,
+  User,
+  ChevronLeft,
   Trophy,
   Shield,
-  Zap
+  Zap,
+  Activity
 } from 'lucide-react';
 import { useUIStore } from '../../app/store/ui';
 import { useAuthStore } from '../../app/store/auth';
@@ -45,6 +46,12 @@ const navigationItems = [
     label: 'Settings',
     icon: Settings,
     href: '/admin/settings',
+    roles: [UserRole.ADMIN]
+  },
+  {
+    label: 'Query Monitor',
+    icon: Activity,
+    href: '/admin/orchestration',
     roles: [UserRole.ADMIN]
   },
   {

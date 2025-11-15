@@ -157,8 +157,37 @@ export const apiClient = {
 
   admin: {
     getAssignmentStatistics: () => axiosInstance.get<any>('/admin/assignments/statistics').then(res => res.data),
-    assignTasks: (assignment: { taskIds: number[], strategy: string, criteria?: any }) => 
+    assignTasks: (assignment: { taskIds: number[], strategy: string, criteria?: any }) =>
       axiosInstance.post<any>('/admin/assignments/assign', assignment).then(res => res.data),
+  },
+
+  orchestration: {
+    // Query execution and monitoring
+    executeQuery: (request: { query: string; context?: any; options?: any }) =>
+      axiosInstance.post<any>('/query/execute', request).then(res => res.data),
+
+    getQueryStatus: (traceId: string) =>
+      axiosInstance.get<any>(`/query/status/${traceId}`).then(res => res.data),
+
+    getQueryHistory: (userId: string, params?: { limit?: number; offset?: number; since?: string }) =>
+      axiosInstance.get<any>(`/query/history/${userId}`, { params }).then(res => res.data),
+
+    retrieveQuery: (traceId: string) =>
+      axiosInstance.get<any>(`/query/retrieve/${traceId}`).then(res => res.data),
+
+    // Feedback submission
+    submitUserFeedback: (feedback: { trace_id: string; rating: number; feedback_text?: string; categories?: any }) =>
+      axiosInstance.post<any>('/feedback/user', feedback).then(res => res.data),
+
+    submitRlcfFeedback: (feedback: { trace_id: string; expert_id: number; authority_score: number; corrections: any }) =>
+      axiosInstance.post<any>('/feedback/rlcf', feedback).then(res => res.data),
+
+    submitNerCorrection: (correction: { trace_id: string; expert_id: number; correction_type: string; original_entity: any; corrected_entity: any }) =>
+      axiosInstance.post<any>('/feedback/ner', correction).then(res => res.data),
+
+    // Statistics
+    getFeedbackStats: () =>
+      axiosInstance.get<any>('/feedback/stats').then(res => res.data),
   },
 };
 

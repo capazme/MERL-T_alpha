@@ -14,6 +14,7 @@ import { AggregationViewer } from '../../features/analytics/AggregationViewer';
 import { BiasAnalysisDashboard } from '../../features/analytics/BiasAnalysisDashboard';
 import { ExportHub } from '../../features/export/ExportHub';
 import { TaskAssignmentSystem } from '../../features/admin/TaskAssignmentSystem';
+import { QueryMonitorDashboard } from '../../features/orchestration';
 import { UserRole } from '@/types';
 
 export const router = createBrowserRouter([
@@ -102,6 +103,14 @@ export const router = createBrowserRouter([
             element: (
               <AuthGuard requiredRole={UserRole.ADMIN}>
                 <TaskAssignmentSystem />
+              </AuthGuard>
+            ),
+          },
+          {
+            path: 'orchestration',
+            element: (
+              <AuthGuard requiredRole={UserRole.ADMIN}>
+                <QueryMonitorDashboard />
               </AuthGuard>
             ),
           },
