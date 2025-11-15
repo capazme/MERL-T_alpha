@@ -81,26 +81,53 @@ check_port() {
 
 print_step "1. Verifica Prerequisiti"
 
-# Verifica comandi essenziali
-check_command python3
+# Verifica Node.js
 check_command node
 check_command npm
 
-# Verifica versioni
-PYTHON_VERSION=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2)
 NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-
-if (( $(echo "$PYTHON_VERSION < 3.11" | bc -l) )); then
-    print_error "Python 3.11+ richiesto. Versione attuale: $PYTHON_VERSION"
-    exit 1
-fi
-print_success "Python $PYTHON_VERSION OK"
-
 if (( NODE_VERSION < 18 )); then
     print_error "Node.js 18+ richiesto. Versione attuale: v$NODE_VERSION"
     exit 1
 fi
 print_success "Node.js v$NODE_VERSION OK"
+
+# Trova la versione corretta di Python (3.11-3.13)
+PYTHON_CMD=""
+PYTHON_VERSION=""
+
+# Prova in ordine: 3.13, 3.12, 3.11
+for version in 3.13 3.12 3.11; do
+    if command -v python$version &> /dev/null; then
+        PYTHON_CMD="python$version"
+        PYTHON_VERSION=$version
+        break
+    fi
+done
+
+# Fallback a python3 generico se nessuna versione specifica è trovata
+if [ -z "$PYTHON_CMD" ] && command -v python3 &> /dev/null; then
+    PYTHON_CMD="python3"
+    PYTHON_VERSION=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2)
+
+    # Verifica che sia 3.11-3.13
+    PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d'.' -f1)
+    PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d'.' -f2)
+
+    if [ "$PYTHON_MAJOR" != "3" ] || [ "$PYTHON_MINOR" -lt 11 ] || [ "$PYTHON_MINOR" -gt 13 ]; then
+        print_error "Python 3.11-3.13 richiesto. Versione trovata: $PYTHON_VERSION"
+        print_warning "Installa Python 3.13: brew install python@3.13"
+        exit 1
+    fi
+fi
+
+if [ -z "$PYTHON_CMD" ]; then
+    print_error "Python 3.11-3.13 non trovato"
+    print_warning "Installa Python 3.13: brew install python@3.13"
+    exit 1
+fi
+
+print_success "Python $PYTHON_VERSION OK (comando: $PYTHON_CMD)"
 
 # ============================================================================
 # 2. Modalità di Avvio
@@ -151,17 +178,27 @@ print_success "OPENROUTER_API_KEY configurata"
 print_step "4. Setup Python Virtual Environment"
 
 if [ ! -d "venv" ]; then
-    print_warning "Virtual environment non trovato. Creazione in corso..."
-    python3 -m venv venv
+    print_warning "Virtual environment non trovato. Creazione in corso con $PYTHON_CMD..."
+    $PYTHON_CMD -m venv venv
     print_success "Virtual environment creato"
+elif [ -f "venv/bin/python" ]; then
+    # Verifica che il venv usi una versione compatibile
+    VENV_VERSION=$(venv/bin/python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
+    VENV_MINOR=$(echo $VENV_VERSION | cut -d'.' -f2)
+    if [ "$VENV_MINOR" -gt 13 ]; then
+        print_warning "Virtual environment usa Python $VENV_VERSION (non supportato). Ricreazione..."
+        rm -rf venv
+        $PYTHON_CMD -m venv venv
+        print_success "Virtual environment ricreato con $PYTHON_CMD"
+    fi
 fi
 
 source venv/bin/activate
-print_success "Virtual environment attivato"
+print_success "Virtual environment attivato (Python $PYTHON_VERSION)"
 
 # Installa/Aggiorna dipendenze
 print_warning "Installazione dipendenze Python (può richiedere qualche minuto)..."
-pip install -q --upgrade pip
+pip install -q --upgrade pip setuptools wheel
 pip install -q -e .
 print_success "Dipendenze Python installate"
 
