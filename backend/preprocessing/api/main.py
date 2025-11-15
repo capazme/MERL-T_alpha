@@ -541,6 +541,7 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
+    import os
 
     structlog.configure(
         processors=[
@@ -550,9 +551,14 @@ if __name__ == "__main__":
         ]
     )
 
+    # Get configuration from environment variables
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8002"))  # Default port 8002 for KG Ingestion API
+    log_level = os.getenv("LOG_LEVEL", "info").lower()
+
     uvicorn.run(
         app,
-        host="0.0.0.0",
-        port=8001,  # Different port from orchestration API
-        log_level="info"
+        host=host,
+        port=port,
+        log_level=log_level
     )
