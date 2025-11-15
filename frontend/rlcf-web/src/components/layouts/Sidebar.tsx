@@ -10,7 +10,8 @@ import {
   Trophy,
   Shield,
   Zap,
-  Activity
+  Activity,
+  Search
 } from 'lucide-react';
 import { useUIStore } from '../../app/store/ui';
 import { useAuthStore } from '../../app/store/auth';
@@ -22,6 +23,12 @@ const navigationItems = [
     label: 'Dashboard',
     icon: LayoutDashboard,
     href: '/dashboard',
+    roles: [UserRole.ADMIN, UserRole.EVALUATOR, UserRole.VIEWER]
+  },
+  {
+    label: 'Legal Query',
+    icon: Search,
+    href: '/query',
     roles: [UserRole.ADMIN, UserRole.EVALUATOR, UserRole.VIEWER]
   },
   {

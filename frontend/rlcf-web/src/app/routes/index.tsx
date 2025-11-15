@@ -17,6 +17,10 @@ import { TaskAssignmentSystem } from '../../features/admin/TaskAssignmentSystem'
 import { QueryMonitorDashboard } from '../../features/orchestration';
 import { UserRole } from '@/types';
 
+// Query feature (placeholder imports - will be created in Phase 2-4)
+import { QuerySubmission } from '../../features/query/QuerySubmission';
+import { QueryResults } from '../../features/query/QueryResults';
+
 export const router = createBrowserRouter([
   {
     path: '/login',
@@ -39,6 +43,19 @@ export const router = createBrowserRouter([
       {
         path: 'dashboard',
         element: <Dashboard />,
+      },
+      {
+        path: 'query',
+        children: [
+          {
+            index: true,
+            element: <QuerySubmission />,
+          },
+          {
+            path: 'results/:traceId',
+            element: <QueryResults />,
+          },
+        ],
       },
       {
         path: 'evaluation',
