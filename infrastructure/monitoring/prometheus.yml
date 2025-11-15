@@ -1,0 +1,188 @@
+# =============================================================================
+# Prometheus Configuration - Neo4j Metrics Scraping
+# =============================================================================
+#
+# This configuration defines:
+#   - Scrape targets for Neo4j metrics
+#   - Alert rules for Neo4j monitoring
+#   - Recording rules for aggregated metrics
+#
+# Scraping Endpoints:
+#   1. Neo4j Prometheus Metrics (port 2004):
+#      - JVM metrics (heap, GC, threads)
+#      - Database metrics (nodes, relationships, store sizes)
+#      - Query metrics (execution time, cache hits)
+#      - Transaction metrics (commit rate, rollback rate)
+#
+# Alert Rules:
+#   - Loaded from alerts/neo4j_alerts.yml
+#   - 4 critical alerts: memory, disk, latency, connections
+#
+# =============================================================================
+
+global:
+  scrape_interval: 15s      # Scrape metrics every 15 seconds
+  evaluation_interval: 30s  # Evaluate alert rules every 30 seconds
+  scrape_timeout: 10s       # Timeout for individual scrapes
+
+  external_labels:
+    cluster: 'merl-t-production'
+    environment: 'production'
+    region: 'eu-west-1'
+
+# =============================================================================
+# Alert Manager Configuration
+# =============================================================================
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# =============================================================================
+# Alert Rules
+# =============================================================================
+rule_files:
+  - '/etc/prometheus/alerts/neo4j_alerts.yml'
+
+# =============================================================================
+# Scrape Configurations
+# =============================================================================
+scrape_configs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Prometheus Self-Monitoring
+  # ---------------------------------------------------------------------------
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Neo4j Prometheus Metrics Endpoint
+  # ---------------------------------------------------------------------------
+  - job_name: 'neo4j-metrics'
+    static_configs:
+      - targets:
+          - 'merl-t-neo4j-production:2004'  # Neo4j container name + Prometheus port
+
+    # Metric relabeling (optional, for cleaner metric names)
+    metric_relabel_configs:
+      # Add instance label for multi-instance deployments
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'neo4j-production'
+
+      # Rename neo4j_* metrics to neo4j_db_* for clarity
+      - source_labels: [__name__]
+        regex: 'neo4j_database_(.*)'
+        target_label: __name__
+        replacement: 'neo4j_db_${1}'
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Neo4j JVM Metrics
+  # ---------------------------------------------------------------------------
+  - job_name: 'neo4j-jvm'
+    static_configs:
+      - targets:
+          - 'merl-t-neo4j-production:2004'
+
+    # Only scrape JVM metrics
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'jvm_(.*)'
+        action: keep  # Keep only JVM metrics
+
+  # ---------------------------------------------------------------------------
+  # Job 4: Docker Container Metrics (via cAdvisor - optional)
+  # ---------------------------------------------------------------------------
+  # Uncomment to enable Docker container monitoring
+  # - job_name: 'cadvisor'
+  #   static_configs:
+  #     - targets:
+  #         - 'cadvisor:8080'  # Deploy cAdvisor separately
+
+# =============================================================================
+# Recording Rules (Optional - for pre-computed aggregations)
+# =============================================================================
+# Recording rules compute expensive queries once and store the result
+# Useful for dashboard queries that run frequently
+
+# Example recording rules (uncomment to enable):
+# - name: neo4j_recording_rules
+#   interval: 30s
+#   rules:
+#     # Total nodes across all databases
+#     - record: neo4j_total_nodes
+#       expr: sum(neo4j_database_node_count)
+#
+#     # Total relationships across all databases
+#     - record: neo4j_total_relationships
+#       expr: sum(neo4j_database_relationship_count)
+#
+#     # Average query duration (5m window)
+#     - record: neo4j_avg_query_duration_5m
+#       expr: rate(neo4j_cypher_query_execution_time_sum[5m]) / rate(neo4j_cypher_query_execution_time_count[5m])
+#
+#     # Transaction throughput (1m rate)
+#     - record: neo4j_transaction_throughput_1m
+#       expr: rate(neo4j_database_transaction_committed_total[1m])
+
+# =============================================================================
+# Remote Write (Optional - for long-term storage)
+# =============================================================================
+# Send metrics to remote storage (e.g., Grafana Cloud, Thanos, Cortex)
+
+# Example remote write config (uncomment to enable):
+# remote_write:
+#   - url: https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push
+#     basic_auth:
+#       username: <grafana_cloud_instance_id>
+#       password: <grafana_cloud_api_key>
+
+# =============================================================================
+# Notes
+# =============================================================================
+#
+# **Key Metrics to Monitor**:
+#
+# 1. **Database Size**:
+#    - neo4j_database_node_count
+#    - neo4j_database_relationship_count
+#    - neo4j_database_store_size_total
+#
+# 2. **Query Performance**:
+#    - neo4j_cypher_query_execution_time_bucket
+#    - neo4j_cypher_query_execution_time_sum
+#    - neo4j_cypher_query_execution_time_count
+#
+# 3. **Transaction Metrics**:
+#    - neo4j_database_transaction_committed_total
+#    - neo4j_database_transaction_rollback_total
+#    - neo4j_database_transaction_active_read
+#    - neo4j_database_transaction_active_write
+#
+# 4. **JVM Memory**:
+#    - jvm_memory_used_bytes{area="heap"}
+#    - jvm_memory_max_bytes{area="heap"}
+#    - jvm_gc_pause_seconds_sum
+#
+# 5. **Connection Pool**:
+#    - neo4j_bolt_connections_opened_total
+#    - neo4j_bolt_connections_closed_total
+#    - neo4j_bolt_connections_running
+#
+# **Troubleshooting**:
+#
+# 1. **Metrics not appearing in Prometheus**:
+#    - Check targets: http://localhost:9090/targets
+#    - Verify Neo4j metrics endpoint: curl http://localhost:2004/metrics
+#    - Ensure Neo4j container is on same network: docker network inspect merl-t-neo4j
+#
+# 2. **High cardinality warnings**:
+#    - Limit metric labels (avoid high-cardinality labels like user_id)
+#    - Use metric_relabel_configs to drop unnecessary labels
+#
+# 3. **Slow query performance**:
+#    - Use recording rules for expensive queries
+#    - Increase evaluation_interval (trade-off: less frequent alerts)
+#
+# =============================================================================

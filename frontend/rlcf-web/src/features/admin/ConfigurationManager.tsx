@@ -5,12 +5,8 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { apiClient } from '../../lib/api';
 import { toast } from 'sonner';
-import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
-import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json';
-import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-
-// Register JSON language for syntax highlighting
-SyntaxHighlighter.registerLanguage('json', json);
+import JsonView from '@uiw/react-json-view';
+import { darkTheme } from '@uiw/react-json-view/dark';
 
 interface ModelConfig {
   authority_weights: {
@@ -329,21 +325,13 @@ export function ConfigurationManager() {
               </CardHeader>
               <CardContent>
                 {showSyntaxPreview ? (
-                  <div className="border border-slate-600 rounded-lg overflow-hidden">
-                    <SyntaxHighlighter
-                      language="json"
-                      style={atomOneDark}
-                      customStyle={{
-                        margin: 0,
-                        padding: '1rem',
-                        fontSize: '0.875rem',
-                        height: '24rem',
-                        overflow: 'auto'
-                      }}
-                      showLineNumbers
-                    >
-                      {modelConfigText}
-                    </SyntaxHighlighter>
+                  <div className="border border-slate-600 rounded-lg overflow-hidden bg-slate-900">
+                    <JsonView
+                      value={JSON.parse(modelConfigText || '{}')}
+                      style={darkTheme}
+                      displayDataTypes={false}
+                      enableClipboard={false}
+                    />
                   </div>
                 ) : (
                   <textarea
@@ -443,21 +431,13 @@ export function ConfigurationManager() {
               </CardHeader>
               <CardContent>
                 {showSyntaxPreview ? (
-                  <div className="border border-slate-600 rounded-lg overflow-hidden">
-                    <SyntaxHighlighter
-                      language="json"
-                      style={atomOneDark}
-                      customStyle={{
-                        margin: 0,
-                        padding: '1rem',
-                        fontSize: '0.875rem',
-                        height: '24rem',
-                        overflow: 'auto'
-                      }}
-                      showLineNumbers
-                    >
-                      {taskConfigText}
-                    </SyntaxHighlighter>
+                  <div className="border border-slate-600 rounded-lg overflow-hidden bg-slate-900">
+                    <JsonView
+                      value={JSON.parse(taskConfigText || '{}')}
+                      style={darkTheme}
+                      displayDataTypes={false}
+                      enableClipboard={false}
+                    />
                   </div>
                 ) : (
                   <textarea

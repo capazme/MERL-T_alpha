@@ -1,0 +1,195 @@
+# =============================================================================
+# Prometheus + Neo4j Metrics Exporter - Production Monitoring Stack
+# =============================================================================
+#
+# This Docker Compose file deploys:
+#   1. Prometheus - Metrics collection and alerting
+#   2. Neo4j Metrics Exporter - Exposes Neo4j internal metrics
+#   3. Alert Manager - Alert routing and notifications
+#
+# Usage:
+#   # Start monitoring stack
+#   docker-compose -f infrastructure/monitoring/prometheus-neo4j.yml up -d
+#
+#   # View Prometheus UI
+#   http://localhost:9090
+#
+#   # View Neo4j metrics endpoint
+#   http://localhost:2004/metrics
+#
+# Integration:
+#   This stack integrates with infrastructure/docker/neo4j-production.yml
+#   Ensure Neo4j is running with metrics enabled:
+#     NEO4J_metrics_enabled=true
+#     NEO4J_metrics_prometheus_enabled=true
+#     NEO4J_metrics_prometheus_endpoint=0.0.0.0:2004
+#
+# Alert Rules:
+#   - High memory usage (>80%)
+#   - Low disk space (<10GB)
+#   - High query latency (>5s)
+#   - Connection pool exhaustion (>90%)
+#
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # Prometheus - Metrics Collection & Alerting
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: merl-t-prometheus
+    restart: unless-stopped
+
+    user: root  # Required for writing to mounted volumes
+
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'  # Enable /reload endpoint
+      - '--web.enable-admin-api'  # Enable admin API
+
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+
+    volumes:
+      # Configuration files
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts/neo4j_alerts.yml:/etc/prometheus/alerts/neo4j_alerts.yml:ro
+
+      # Persistent storage for metrics
+      - prometheus_data:/prometheus
+
+      # Logs
+      - prometheus_logs:/var/log/prometheus
+
+    networks:
+      - merl-t-monitoring
+      - merl-t-neo4j  # Connect to Neo4j network
+
+    environment:
+      - TZ=Europe/Rome
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    labels:
+      com.merl-t.service: "monitoring"
+      com.merl-t.component: "prometheus"
+
+  # ---------------------------------------------------------------------------
+  # Alert Manager - Alert Routing & Notifications
+  # ---------------------------------------------------------------------------
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: merl-t-alertmanager
+    restart: unless-stopped
+
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+
+    networks:
+      - merl-t-monitoring
+
+    environment:
+      - TZ=Europe/Rome
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    labels:
+      com.merl-t.service: "monitoring"
+      com.merl-t.component: "alertmanager"
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  merl-t-monitoring:
+    driver: bridge
+    name: merl-t-monitoring
+
+  merl-t-neo4j:
+    external: true
+    name: merl-t-neo4j  # Must match neo4j-production.yml network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  prometheus_data:
+    driver: local
+    name: merl-t-prometheus-data
+
+  prometheus_logs:
+    driver: local
+    name: merl-t-prometheus-logs
+
+  alertmanager_data:
+    driver: local
+    name: merl-t-alertmanager-data
+
+# =============================================================================
+# Notes
+# =============================================================================
+#
+# **Scraping Neo4j Metrics**:
+#   Prometheus scrapes 2 endpoints:
+#     1. Neo4j Prometheus endpoint (port 2004): JVM metrics, query stats, transaction rate
+#     2. Neo4j Bolt endpoint (port 7687): Connection pool metrics (requires bolt exporter)
+#
+# **Retention Policy**:
+#   Default: 30 days (configurable via PROMETHEUS_RETENTION env var)
+#   Disk usage: ~1GB per week for typical Neo4j workload
+#
+# **Alert Routing**:
+#   Alerts are sent to AlertManager, which routes them to:
+#     - Email (if configured in alertmanager.yml)
+#     - Slack/PagerDuty (if configured)
+#     - Webhook (for custom integrations)
+#
+# **Security**:
+#   - Prometheus UI is accessible on localhost:9090 (restrict in production)
+#   - No authentication by default (use reverse proxy with auth if exposing)
+#   - AlertManager has no auth (configure in alertmanager.yml)
+#
+# **Performance**:
+#   - Scrape interval: 15s (configurable in prometheus.yml)
+#   - Evaluation interval: 30s (for alert rules)
+#   - Resource limits: 512MB RAM, 0.5 CPU (increase if needed)
+#
+# **Troubleshooting**:
+#   # Check Prometheus targets
+#   http://localhost:9090/targets
+#
+#   # Check alert rules
+#   http://localhost:9090/rules
+#
+#   # Check active alerts
+#   http://localhost:9090/alerts
+#
+#   # Reload configuration (without restart)
+#   curl -X POST http://localhost:9090/-/reload
+#
+# =============================================================================

@@ -1,0 +1,371 @@
+# =============================================================================
+# AlertManager Configuration - Neo4j Alert Routing
+# =============================================================================
+#
+# This file defines alert routing and notification channels.
+#
+# Alert Routing Strategy:
+#   - Critical alerts → PagerDuty + Email
+#   - Warning alerts → Email + Slack
+#   - Info alerts → Slack only
+#
+# Notification Channels:
+#   1. Email (SMTP)
+#   2. Slack (webhook)
+#   3. PagerDuty (optional, for on-call)
+#   4. Webhook (for custom integrations)
+#
+# =============================================================================
+
+global:
+  # SMTP server for email notifications
+  smtp_from: 'alerts@merl-t.alis.org'
+  smtp_smarthost: '${SMTP_HOST:-smtp.gmail.com:587}'
+  smtp_auth_username: '${SMTP_USERNAME}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+  # Default notification templates
+  resolve_timeout: 5m  # Auto-resolve alerts after 5 minutes if metric returns to normal
+
+# =============================================================================
+# Templates for Alert Notifications
+# =============================================================================
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# =============================================================================
+# Alert Routing Tree
+# =============================================================================
+route:
+  # Default receiver (catch-all)
+  receiver: 'default'
+
+  # Group alerts by these labels (reduces notification spam)
+  group_by: ['alertname', 'cluster', 'service']
+
+  # Wait 10s before sending first notification (allows for flapping alerts)
+  group_wait: 10s
+
+  # Send updates every 5 minutes if alert is still firing
+  group_interval: 5m
+
+  # Re-send notification every 4 hours if alert is still firing
+  repeat_interval: 4h
+
+  # Child routes (override defaults for specific alerts)
+  routes:
+    # ---------------------------------------------------------------------------
+    # Route 1: Critical Neo4j Alerts (PagerDuty + Email)
+    # ---------------------------------------------------------------------------
+    - match:
+        severity: critical
+        component: neo4j
+      receiver: 'neo4j-critical'
+      continue: false  # Don't propagate to other routes
+      group_wait: 5s   # Send critical alerts immediately
+      repeat_interval: 15m  # Re-send every 15 minutes
+
+    # ---------------------------------------------------------------------------
+    # Route 2: Warning Neo4j Alerts (Email + Slack)
+    # ---------------------------------------------------------------------------
+    - match:
+        severity: warning
+        component: neo4j
+      receiver: 'neo4j-warning'
+      continue: false
+      group_wait: 30s
+      repeat_interval: 2h
+
+    # ---------------------------------------------------------------------------
+    # Route 3: Info Alerts (Slack only)
+    # ---------------------------------------------------------------------------
+    - match:
+        severity: info
+      receiver: 'slack-notifications'
+      continue: false
+      group_wait: 1m
+      repeat_interval: 12h
+
+# =============================================================================
+# Receivers (Notification Channels)
+# =============================================================================
+receivers:
+  # ---------------------------------------------------------------------------
+  # Default Receiver (fallback for unmatched alerts)
+  # ---------------------------------------------------------------------------
+  - name: 'default'
+    email_configs:
+      - to: '${ALERT_EMAIL_DEFAULT:-admin@merl-t.alis.org}'
+        headers:
+          Subject: '[MERL-T Alert] {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>{{ .GroupLabels.alertname }}</h2>
+          <p><strong>Severity:</strong> {{ .CommonLabels.severity }}</p>
+          <p><strong>Summary:</strong> {{ .CommonAnnotations.summary }}</p>
+          <p><strong>Description:</strong></p>
+          <pre>{{ .CommonAnnotations.description }}</pre>
+          <p><strong>Firing Alerts:</strong> {{ len .Alerts.Firing }}</p>
+          <ul>
+          {{ range .Alerts.Firing }}
+            <li>{{ .Labels.alertname }} ({{ .Labels.instance }})</li>
+          {{ end }}
+          </ul>
+
+  # ---------------------------------------------------------------------------
+  # Neo4j Critical Alerts (PagerDuty + Email)
+  # ---------------------------------------------------------------------------
+  - name: 'neo4j-critical'
+    # Email notification
+    email_configs:
+      - to: '${ALERT_EMAIL_CRITICAL:-oncall@merl-t.alis.org}'
+        send_resolved: true
+        headers:
+          Subject: '🚨 [CRITICAL] Neo4j Alert: {{ .GroupLabels.alertname }}'
+          Priority: 'urgent'
+        html: |
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; }
+              .critical { color: #dc3545; font-weight: bold; }
+              .header { background: #dc3545; color: white; padding: 10px; }
+              .content { padding: 15px; }
+              .action { background: #fff3cd; padding: 10px; margin: 10px 0; }
+              pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>🚨 CRITICAL Neo4j Alert</h1>
+            </div>
+            <div class="content">
+              <h2 class="critical">{{ .GroupLabels.alertname }}</h2>
+
+              <p><strong>Cluster:</strong> {{ .CommonLabels.cluster }}</p>
+              <p><strong>Instance:</strong> {{ .CommonLabels.instance }}</p>
+              <p><strong>Severity:</strong> <span class="critical">CRITICAL</span></p>
+              <p><strong>Started At:</strong> {{ range .Alerts.Firing }}{{ .StartsAt }}{{ end }}</p>
+
+              <h3>Summary</h3>
+              <p>{{ .CommonAnnotations.summary }}</p>
+
+              <h3>Description</h3>
+              <pre>{{ .CommonAnnotations.description }}</pre>
+
+              <div class="action">
+                <h3>⚡ Action Required</h3>
+                <p>This is a <strong>CRITICAL</strong> alert requiring immediate attention.</p>
+                <p>Please investigate and resolve within 15 minutes.</p>
+              </div>
+
+              <h3>Firing Alerts ({{ len .Alerts.Firing }})</h3>
+              <ul>
+              {{ range .Alerts.Firing }}
+                <li>
+                  <strong>{{ .Labels.alertname }}</strong> ({{ .Labels.instance }})<br>
+                  Started: {{ .StartsAt }}<br>
+                  Labels: {{ .Labels }}<br>
+                  <a href="{{ .GeneratorURL }}">View in Prometheus</a>
+                </li>
+              {{ end }}
+              </ul>
+
+              {{ if .Alerts.Resolved }}
+              <h3>Resolved Alerts ({{ len .Alerts.Resolved }})</h3>
+              <ul>
+              {{ range .Alerts.Resolved }}
+                <li>
+                  <strong>{{ .Labels.alertname }}</strong> ({{ .Labels.instance }})<br>
+                  Resolved: {{ .EndsAt }}
+                </li>
+              {{ end }}
+              </ul>
+              {{ end }}
+            </div>
+          </body>
+          </html>
+
+    # PagerDuty notification (optional - requires PagerDuty integration)
+    # Uncomment and configure if you have PagerDuty
+    # pagerduty_configs:
+    #   - service_key: '${PAGERDUTY_SERVICE_KEY}'
+    #     description: '🚨 [CRITICAL] {{ .GroupLabels.alertname }}'
+    #     details:
+    #       summary: '{{ .CommonAnnotations.summary }}'
+    #       description: '{{ .CommonAnnotations.description }}'
+    #       severity: 'critical'
+    #       cluster: '{{ .CommonLabels.cluster }}'
+
+    # Slack notification (critical channel)
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL_CRITICAL}'
+        channel: '#neo4j-alerts-critical'
+        username: 'MERL-T AlertManager'
+        icon_emoji: ':rotating_light:'
+        title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+
+          *Cluster:* {{ .CommonLabels.cluster }}
+          *Instance:* {{ .CommonLabels.instance }}
+          *Severity:* CRITICAL
+
+          *Description:*
+          ```
+          {{ .CommonAnnotations.description }}
+          ```
+
+          *Firing Alerts:* {{ len .Alerts.Firing }}
+        send_resolved: true
+        color: 'danger'
+
+  # ---------------------------------------------------------------------------
+  # Neo4j Warning Alerts (Email + Slack)
+  # ---------------------------------------------------------------------------
+  - name: 'neo4j-warning'
+    # Email notification
+    email_configs:
+      - to: '${ALERT_EMAIL_WARNING:-ops@merl-t.alis.org}'
+        send_resolved: true
+        headers:
+          Subject: '⚠️ [WARNING] Neo4j Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>⚠️ WARNING: {{ .GroupLabels.alertname }}</h2>
+          <p><strong>Summary:</strong> {{ .CommonAnnotations.summary }}</p>
+          <p><strong>Description:</strong></p>
+          <pre>{{ .CommonAnnotations.description }}</pre>
+          <p><strong>Cluster:</strong> {{ .CommonLabels.cluster }}</p>
+          <p><strong>Instance:</strong> {{ .CommonLabels.instance }}</p>
+          <p><strong>Firing Alerts:</strong> {{ len .Alerts.Firing }}</p>
+
+    # Slack notification (general channel)
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#neo4j-alerts'
+        username: 'MERL-T AlertManager'
+        icon_emoji: ':warning:'
+        title: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Instance:* {{ .CommonLabels.instance }}
+
+          {{ range .Alerts.Firing }}
+          - {{ .Labels.alertname }} (started {{ .StartsAt }})
+          {{ end }}
+        send_resolved: true
+        color: 'warning'
+
+  # ---------------------------------------------------------------------------
+  # Slack-only Receiver (Info alerts)
+  # ---------------------------------------------------------------------------
+  - name: 'slack-notifications'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#neo4j-info'
+        username: 'MERL-T AlertManager'
+        icon_emoji: ':information_source:'
+        title: 'ℹ️ {{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.summary }}'
+        send_resolved: true
+        color: 'good'
+
+  # ---------------------------------------------------------------------------
+  # Webhook Receiver (for custom integrations)
+  # ---------------------------------------------------------------------------
+  # - name: 'webhook'
+  #   webhook_configs:
+  #     - url: 'http://your-webhook-endpoint/alerts'
+  #       send_resolved: true
+  #       http_config:
+  #         bearer_token: '${WEBHOOK_BEARER_TOKEN}'
+
+# =============================================================================
+# Inhibition Rules (suppress redundant alerts)
+# =============================================================================
+inhibit_rules:
+  # Suppress warning alerts if critical alert is firing for same component
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'component', 'instance']
+
+  # Suppress page cache alerts if memory alert is firing (root cause)
+  - source_match:
+      alertname: 'Neo4jHighHeapMemoryUsage'
+    target_match:
+      alertname: 'Neo4jHighPageCacheEvictions'
+    equal: ['instance']
+
+  # Suppress connection pool alert if database is down (obvious)
+  - source_match:
+      alertname: 'Neo4jDatabaseDown'
+    target_match:
+      alertname: 'Neo4jConnectionPoolExhaustion'
+    equal: ['instance']
+
+# =============================================================================
+# Configuration Notes
+# =============================================================================
+#
+# **Environment Variables Required**:
+#   - SMTP_HOST: SMTP server (default: smtp.gmail.com:587)
+#   - SMTP_USERNAME: SMTP username
+#   - SMTP_PASSWORD: SMTP password
+#   - ALERT_EMAIL_DEFAULT: Default email for alerts
+#   - ALERT_EMAIL_CRITICAL: Email for critical alerts (on-call)
+#   - ALERT_EMAIL_WARNING: Email for warning alerts (ops team)
+#   - SLACK_WEBHOOK_URL: Slack webhook for general alerts
+#   - SLACK_WEBHOOK_URL_CRITICAL: Slack webhook for critical alerts
+#   - PAGERDUTY_SERVICE_KEY: PagerDuty integration key (optional)
+#
+# **Gmail SMTP Setup**:
+#   1. Enable 2FA on Gmail account
+#   2. Generate App Password: https://myaccount.google.com/apppasswords
+#   3. Use App Password as SMTP_PASSWORD
+#   4. SMTP_HOST=smtp.gmail.com:587
+#   5. SMTP_USERNAME=your-email@gmail.com
+#
+# **Slack Webhook Setup**:
+#   1. Create Incoming Webhook: https://api.slack.com/messaging/webhooks
+#   2. Select channel: #neo4j-alerts
+#   3. Copy webhook URL to SLACK_WEBHOOK_URL env var
+#
+# **Testing Alerts**:
+#   # Send test alert
+#   curl -X POST http://localhost:9093/api/v1/alerts \
+#     -H "Content-Type: application/json" \
+#     -d '[{
+#       "labels": {
+#         "alertname": "TestAlert",
+#         "severity": "warning",
+#         "component": "neo4j",
+#         "instance": "neo4j-production"
+#       },
+#       "annotations": {
+#         "summary": "This is a test alert",
+#         "description": "Testing AlertManager configuration"
+#       }
+#     }]'
+#
+# **Silencing Alerts**:
+#   # Silence all Neo4j alerts for 4 hours (maintenance window)
+#   curl -X POST http://localhost:9093/api/v1/silences \
+#     -H "Content-Type: application/json" \
+#     -d '{
+#       "matchers": [{"name": "component", "value": "neo4j"}],
+#       "startsAt": "2025-01-15T00:00:00Z",
+#       "endsAt": "2025-01-15T04:00:00Z",
+#       "createdBy": "admin@merl-t.alis.org",
+#       "comment": "Scheduled maintenance: Neo4j upgrade"
+#     }'
+#
+# **Monitoring AlertManager**:
+#   - UI: http://localhost:9093
+#   - API: http://localhost:9093/api/v1/status
+#   - Silences: http://localhost:9093/#/silences
+#   - Alerts: http://localhost:9093/#/alerts
+#
+# =============================================================================

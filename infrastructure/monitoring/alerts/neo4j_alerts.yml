@@ -1,0 +1,390 @@
+# =============================================================================
+# Neo4j Alert Rules - Prometheus
+# =============================================================================
+#
+# This file defines alert rules for Neo4j production monitoring.
+# Alerts are triggered when metrics exceed defined thresholds.
+#
+# Alert Severity Levels:
+#   - critical: Immediate action required (paging)
+#   - warning: Attention needed (email/Slack)
+#   - info: Informational (log only)
+#
+# Alert Categories:
+#   1. Memory alerts (heap usage, GC pressure)
+#   2. Disk alerts (storage space, I/O)
+#   3. Performance alerts (query latency, transaction rate)
+#   4. Availability alerts (connections, database health)
+#
+# =============================================================================
+
+groups:
+  # ---------------------------------------------------------------------------
+  # Group 1: Memory & JVM Alerts
+  # ---------------------------------------------------------------------------
+  - name: neo4j_memory_alerts
+    interval: 30s
+    rules:
+      # Alert 1: High Heap Memory Usage (>80%)
+      - alert: Neo4jHighHeapMemoryUsage
+        expr: |
+          (jvm_memory_used_bytes{area="heap", job="neo4j-metrics"} /
+           jvm_memory_max_bytes{area="heap", job="neo4j-metrics"}) > 0.80
+        for: 5m
+        labels:
+          severity: critical
+          component: neo4j
+          category: memory
+        annotations:
+          summary: "Neo4j heap memory usage is critically high"
+          description: |
+            Neo4j heap memory usage is {{ $value | humanizePercentage }} (threshold: 80%).
+
+            **Current State**:
+            - Used: {{ with query "jvm_memory_used_bytes{area='heap', job='neo4j-metrics'}" }}{{ . | first | value | humanize }}B{{ end }}
+            - Max: {{ with query "jvm_memory_max_bytes{area='heap', job='neo4j-metrics'}" }}{{ . | first | value | humanize }}B{{ end }}
+
+            **Impact**:
+            - Risk of OutOfMemoryError
+            - Garbage collection pressure
+            - Slow query execution
+
+            **Action Required**:
+            1. Check for memory leaks (long-running transactions, large result sets)
+            2. Review query patterns (LIMIT clauses, pagination)
+            3. Consider increasing heap size (NEO4J_server_memory_heap_max__size)
+            4. Monitor GC metrics: jvm_gc_pause_seconds_sum
+
+            **Runbook**: https://neo4j.com/docs/operations-manual/current/performance/memory-configuration/
+
+      # Alert 2: High Page Cache Evictions (memory pressure)
+      - alert: Neo4jHighPageCacheEvictions
+        expr: |
+          rate(neo4j_page_cache_evictions_total[5m]) > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: neo4j
+          category: memory
+        annotations:
+          summary: "Neo4j page cache is experiencing high eviction rate"
+          description: |
+            Page cache evictions: {{ $value | humanize }} pages/sec (threshold: 100/sec).
+
+            **Impact**:
+            - Increased disk I/O
+            - Slower query performance
+            - Cache thrashing
+
+            **Action Required**:
+            1. Increase page cache size (NEO4J_server_memory_pagecache_size)
+            2. Review query patterns (avoid full graph scans)
+            3. Check for large imports (pause during import)
+
+      # Alert 3: Excessive Garbage Collection
+      - alert: Neo4jHighGCTime
+        expr: |
+          rate(jvm_gc_pause_seconds_sum{job="neo4j-metrics"}[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: neo4j
+          category: memory
+        annotations:
+          summary: "Neo4j JVM is spending too much time in garbage collection"
+          description: |
+            GC time: {{ $value | humanize }}s over last 5 minutes (threshold: 1s).
+
+            **Impact**:
+            - Application pauses during GC
+            - Reduced throughput
+
+            **Action Required**:
+            1. Increase heap size
+            2. Tune GC settings (e.g., G1GC tuning)
+            3. Reduce object allocation rate (optimize queries)
+
+  # ---------------------------------------------------------------------------
+  # Group 2: Disk & Storage Alerts
+  # ---------------------------------------------------------------------------
+  - name: neo4j_disk_alerts
+    interval: 60s
+    rules:
+      # Alert 4: Low Disk Space (<10GB)
+      - alert: Neo4jLowDiskSpace
+        expr: |
+          neo4j_database_store_size_total{job="neo4j-metrics"} >
+          (neo4j_database_store_size_total{job="neo4j-metrics"} + 10737418240)
+        for: 5m
+        labels:
+          severity: critical
+          component: neo4j
+          category: disk
+        annotations:
+          summary: "Neo4j database has less than 10GB free disk space"
+          description: |
+            Current database size: {{ with query "neo4j_database_store_size_total" }}{{ . | first | value | humanize }}B{{ end }}
+            Free space: <10GB
+
+            **Impact**:
+            - Database writes may fail
+            - Transaction logs cannot grow
+            - Risk of database corruption
+
+            **Action Required**:
+            1. **URGENT**: Free up disk space immediately
+            2. Delete old transaction logs: `docker exec neo4j rm -rf /data/transactions/neo4j/*.0`
+            3. Run backup and delete old backups
+            4. Prune query logs: `/logs/query.log*`
+            5. Consider disk expansion
+
+            **Runbook**: https://neo4j.com/docs/operations-manual/current/configuration/file-locations/
+
+      # Alert 5: Disk I/O Saturation (>90% utilization)
+      # Note: Requires node_exporter or cadvisor for disk metrics
+      # - alert: Neo4jHighDiskIO
+      #   expr: |
+      #     rate(node_disk_io_time_seconds_total{device=~"sd.*"}[5m]) > 0.9
+      #   for: 10m
+      #   labels:
+      #     severity: warning
+      #     component: neo4j
+      #     category: disk
+      #   annotations:
+      #     summary: "Neo4j disk I/O is saturated"
+      #     description: "Disk I/O utilization: {{ $value | humanizePercentage }}"
+
+  # ---------------------------------------------------------------------------
+  # Group 3: Query Performance Alerts
+  # ---------------------------------------------------------------------------
+  - name: neo4j_performance_alerts
+    interval: 30s
+    rules:
+      # Alert 6: High Query Latency (95th percentile >5s)
+      - alert: Neo4jHighQueryLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(neo4j_cypher_query_execution_time_bucket[5m])
+          ) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: neo4j
+          category: performance
+        annotations:
+          summary: "Neo4j query latency is critically high"
+          description: |
+            95th percentile query latency: {{ $value | humanizeDuration }} (threshold: 5s).
+
+            **Impact**:
+            - Slow API responses
+            - User timeout errors
+            - Database overload
+
+            **Action Required**:
+            1. **Check slow query log**: `/logs/query.log` (queries >1s are logged)
+            2. **Profile slow queries**:
+               ```cypher
+               PROFILE MATCH (n) RETURN n LIMIT 1000
+               ```
+            3. **Add missing indexes**:
+               ```cypher
+               CREATE INDEX article_numero IF NOT EXISTS FOR (a:Article) ON (a.numero)
+               ```
+            4. **Optimize query patterns**:
+               - Use LIMIT clauses
+               - Avoid Cartesian products (missing relationship patterns)
+               - Use parameters instead of string concatenation
+
+            **Runbook**: https://neo4j.com/docs/cypher-manual/current/query-tuning/
+
+      # Alert 7: High Transaction Rollback Rate (>10%)
+      - alert: Neo4jHighTransactionRollbackRate
+        expr: |
+          (rate(neo4j_database_transaction_rollback_total[5m]) /
+           (rate(neo4j_database_transaction_committed_total[5m]) +
+            rate(neo4j_database_transaction_rollback_total[5m]))) > 0.10
+        for: 15m
+        labels:
+          severity: warning
+          component: neo4j
+          category: performance
+        annotations:
+          summary: "Neo4j transaction rollback rate is high"
+          description: |
+            Rollback rate: {{ $value | humanizePercentage }} (threshold: 10%).
+
+            **Possible Causes**:
+            - Application errors (constraint violations, deadlocks)
+            - Long-running transactions timing out
+            - Concurrent write conflicts
+
+            **Action Required**:
+            1. Check application logs for transaction errors
+            2. Review constraint violations: `SHOW CONSTRAINTS`
+            3. Reduce transaction scope (smaller batches)
+            4. Implement retry logic with exponential backoff
+
+      # Alert 8: Low Cache Hit Ratio (<80%)
+      - alert: Neo4jLowCacheHitRatio
+        expr: |
+          (rate(neo4j_page_cache_hits_total[5m]) /
+           (rate(neo4j_page_cache_hits_total[5m]) +
+            rate(neo4j_page_cache_faults_total[5m]))) < 0.80
+        for: 15m
+        labels:
+          severity: warning
+          component: neo4j
+          category: performance
+        annotations:
+          summary: "Neo4j page cache hit ratio is low"
+          description: |
+            Cache hit ratio: {{ $value | humanizePercentage }} (threshold: 80%).
+
+            **Impact**:
+            - Increased disk reads
+            - Slower query performance
+
+            **Action Required**:
+            1. Increase page cache size (NEO4J_server_memory_pagecache_size)
+            2. Current page cache: {{ with query "neo4j_page_cache_bytes_total" }}{{ . | first | value | humanize }}B{{ end }}
+            3. Recommended: 50% of RAM for page cache
+
+  # ---------------------------------------------------------------------------
+  # Group 4: Connection & Availability Alerts
+  # ---------------------------------------------------------------------------
+  - name: neo4j_availability_alerts
+    interval: 30s
+    rules:
+      # Alert 9: Connection Pool Exhaustion (>90%)
+      - alert: Neo4jConnectionPoolExhaustion
+        expr: |
+          (neo4j_bolt_connections_running /
+           neo4j_bolt_connections_opened_total) > 0.90
+        for: 5m
+        labels:
+          severity: critical
+          component: neo4j
+          category: availability
+        annotations:
+          summary: "Neo4j connection pool is nearly exhausted"
+          description: |
+            Active connections: {{ with query "neo4j_bolt_connections_running" }}{{ . | first | value }}{{ end }}
+            Connection pool usage: {{ $value | humanizePercentage }} (threshold: 90%).
+
+            **Impact**:
+            - New connection requests will be rejected
+            - Application errors: "Unable to acquire connection"
+            - Service unavailability
+
+            **Action Required**:
+            1. **URGENT**: Increase max connections (NEO4J_dbms_connector_bolt_thread__pool__max__size)
+            2. Check for connection leaks (connections not being closed)
+            3. Review application connection pooling settings
+            4. Identify long-running queries holding connections:
+               ```cypher
+               CALL dbms.listQueries() YIELD queryId, elapsedTimeMillis, query
+               WHERE elapsedTimeMillis > 30000
+               RETURN queryId, elapsedTimeMillis, query
+               ORDER BY elapsedTimeMillis DESC
+               ```
+            5. Terminate long-running queries:
+               ```cypher
+               CALL dbms.killQuery('<queryId>')
+               ```
+
+      # Alert 10: Neo4j Database Down
+      - alert: Neo4jDatabaseDown
+        expr: |
+          up{job="neo4j-metrics"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: neo4j
+          category: availability
+        annotations:
+          summary: "Neo4j database is unreachable"
+          description: |
+            Neo4j Prometheus metrics endpoint is not responding.
+
+            **Impact**:
+            - Database is unavailable
+            - All queries will fail
+            - Service outage
+
+            **Action Required**:
+            1. **URGENT**: Check Neo4j container status:
+               ```bash
+               docker ps -a | grep neo4j
+               docker logs merl-t-neo4j-production --tail 100
+               ```
+            2. Check Neo4j logs: `/logs/neo4j.log`
+            3. Restart Neo4j if necessary:
+               ```bash
+               docker restart merl-t-neo4j-production
+               ```
+            4. If corruption suspected, restore from backup:
+               ```bash
+               bash infrastructure/scripts/restore_neo4j.sh
+               ```
+
+      # Alert 11: High Active Transactions (potential deadlock)
+      - alert: Neo4jHighActiveTransactions
+        expr: |
+          (neo4j_database_transaction_active_read +
+           neo4j_database_transaction_active_write) > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: neo4j
+          category: availability
+        annotations:
+          summary: "Neo4j has unusually high number of active transactions"
+          description: |
+            Active transactions: {{ $value }} (threshold: 100).
+
+            **Possible Causes**:
+            - Deadlocks
+            - Long-running transactions
+            - High query concurrency
+
+            **Action Required**:
+            1. List active transactions:
+               ```cypher
+               CALL dbms.listTransactions()
+               ```
+            2. Identify long-running transactions (>1 minute)
+            3. Terminate if necessary:
+               ```cypher
+               CALL dbms.killTransaction('<txId>')
+               ```
+
+# =============================================================================
+# Alert Routing (configure in alertmanager.yml)
+# =============================================================================
+#
+# **Critical Alerts** (severity: critical):
+#   - Route to: PagerDuty, SMS, Phone call
+#   - Response time: <15 minutes
+#   - Alerts: Neo4jHighHeapMemoryUsage, Neo4jLowDiskSpace,
+#            Neo4jConnectionPoolExhaustion, Neo4jDatabaseDown
+#
+# **Warning Alerts** (severity: warning):
+#   - Route to: Email, Slack
+#   - Response time: <1 hour
+#   - Alerts: All other alerts
+#
+# **Silencing Alerts**:
+#   Silence alerts during maintenance windows:
+#   ```bash
+#   curl -X POST http://localhost:9093/api/v1/silences \
+#     -H "Content-Type: application/json" \
+#     -d '{
+#       "matchers": [{"name": "component", "value": "neo4j"}],
+#       "startsAt": "2025-01-15T00:00:00Z",
+#       "endsAt": "2025-01-15T04:00:00Z",
+#       "comment": "Scheduled maintenance"
+#     }'
+#   ```
+#
+# =============================================================================
