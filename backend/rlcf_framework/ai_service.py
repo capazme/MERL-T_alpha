@@ -327,14 +327,132 @@ Please provide a concise legal summary highlighting key points, obligations, and
         
         return classifications
     
+    async def generate_completion(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        model: str = "google/gemini-2.5-flash",
+        temperature: float = 0.1,
+        max_tokens: int = 4000,
+        api_key: Optional[str] = None
+    ) -> str:
+        """
+        Generate a generic completion using OpenRouter API.
+
+        This method provides a low-level interface for direct LLM calls,
+        useful for components that need custom prompting outside the
+        RLCF task framework (e.g., LLM Router, custom agents).
+
+        Args:
+            prompt: User prompt content
+            system_prompt: Optional system prompt
+            model: OpenRouter model ID
+            temperature: Sampling temperature (0.0-1.0)
+            max_tokens: Maximum tokens to generate
+            api_key: Optional API key (defaults to env OPENROUTER_API_KEY)
+
+        Returns:
+            str: Generated completion text
+
+        Raises:
+            Exception: If API request fails
+        """
+        import os
+
+        try:
+            session = await self._get_session()
+
+            api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+            if not api_key:
+                raise ValueError("OpenRouter API key not provided")
+
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://rlcf-framework.com",
+                "X-Title": "RLCF Framework"
+            }
+
+            logger.info(f"Generating completion with model: {model}")
+
+            async with session.post(
+                f"{self.OPENROUTER_BASE_URL}/chat/completions",
+                json=payload,
+                headers=headers
+            ) as response:
+
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"OpenRouter API error {response.status}: {error_text}")
+                    raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
+
+                data = await response.json()
+
+                if "choices" not in data or not data["choices"]:
+                    logger.error(f"Invalid OpenRouter response: {data}")
+                    raise Exception("Invalid response from OpenRouter API")
+
+                completion = data["choices"][0]["message"]["content"]
+                logger.info(f"Successfully generated completion ({len(completion)} chars)")
+
+                return completion
+
+        except Exception as e:
+            logger.error(f"Error generating completion: {str(e)}")
+            raise
+
+    async def generate_response_async(
+        self,
+        prompt: str,
+        model: str = "google/gemini-2.5-flash",
+        temperature: float = 0.7,
+        max_tokens: int = 1000,
+        system_prompt: Optional[str] = None
+    ) -> str:
+        """
+        Async method for generating responses (alias for generate_completion).
+
+        This method exists for backwards compatibility with experts that call it.
+
+        Args:
+            prompt: User prompt content
+            model: OpenRouter model ID
+            temperature: Sampling temperature (0.0-1.0)
+            max_tokens: Maximum tokens to generate
+            system_prompt: Optional system prompt
+
+        Returns:
+            str: Generated response text
+        """
+        # Delegate to generate_completion
+        return await self.generate_completion(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+
     def _get_fallback_response(self, task_type: str, error_msg: str) -> Dict[str, Any]:
         """
         Generate fallback response when AI generation fails.
-        
+
         Args:
             task_type: Type of legal task
             error_msg: Error message from failed generation
-            
+
         Returns:
             Dict[str, Any]: Fallback response structure
         """

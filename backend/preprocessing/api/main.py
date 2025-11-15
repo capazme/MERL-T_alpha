@@ -59,8 +59,8 @@ class IngestionBatchConfig(BaseModel):
 
     # LLM configuration
     llm_model: str = Field(
-        "anthropic/claude-3.5-sonnet",
-        description="LLM model to use (e.g., anthropic/claude-3.5-sonnet, google/gemini-pro)"
+        "google/gemini-2.5-flash",
+        description="LLM model to use (e.g., google/gemini-2.5-flash, google/gemini-pro)"
     )
     llm_temperature: float = Field(0.1, ge=0.0, le=2.0, description="LLM temperature")
 
@@ -478,7 +478,7 @@ async def list_available_models():
     """
     return [
         AvailableModel(
-            model_id="anthropic/claude-3.5-sonnet",
+            model_id="google/gemini-2.5-flash",
             provider="Anthropic",
             name="Claude 3.5 Sonnet",
             description="Best for complex legal reasoning and extraction",

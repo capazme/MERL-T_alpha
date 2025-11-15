@@ -453,7 +453,7 @@ export function RLCFExpertFeedbackForm({ traceId, onSuccess }: RLCFExpertFeedbac
                 <Button
                   type="submit"
                   disabled={!canProceedToNextStep() || isPending}
-                  isLoading={isPending}
+                  loading={isPending}
                   className="min-w-[160px]"
                 >
                   {isPending ? (

@@ -162,7 +162,7 @@ class LLMExtractor:
     def __init__(
         self,
         api_key: str,
-        model: str = "anthropic/claude-3.5-sonnet",
+        model: str = "google/gemini-2.5-flash",
         temperature: float = 0.1,
         max_tokens: int = 4000,
         timeout_seconds: int = 60,
@@ -172,7 +172,7 @@ class LLMExtractor:
 
         Args:
             api_key: OpenRouter API key
-            model: Model to use (e.g., "anthropic/claude-3.5-sonnet")
+            model: Model to use (e.g., "google/gemini-2.5-flash")
             temperature: Temperature for generation (lower = more consistent)
             max_tokens: Maximum tokens in response
             timeout_seconds: Request timeout
@@ -187,7 +187,7 @@ class LLMExtractor:
 
         # Pricing (approximate, per 1M tokens)
         self.pricing = {
-            "anthropic/claude-3.5-sonnet": {
+            "google/gemini-2.5-flash": {
                 "input": 3.0,   # $3 per 1M input tokens
                 "output": 15.0,  # $15 per 1M output tokens
             },

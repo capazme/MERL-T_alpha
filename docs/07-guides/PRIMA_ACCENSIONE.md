@@ -91,8 +91,8 @@ nano .env  # oppure vim, code, etc.
 ```bash
 # === LLM & AI ===
 OPENROUTER_API_KEY=sk-or-v1-YOUR-KEY-HERE
-ROUTER_MODEL=anthropic/claude-3.5-sonnet
-EXPERT_MODEL=anthropic/claude-3.5-sonnet
+ROUTER_MODEL=google/gemini-2.5-flash
+EXPERT_MODEL=google/gemini-2.5-flash
 
 # === Database (dev mode - usa SQLite) ===
 DATABASE_URL=sqlite+aiosqlite:///./merl_t.db

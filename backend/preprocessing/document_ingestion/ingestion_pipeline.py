@@ -62,7 +62,7 @@ class IngestionPipeline:
         llm_config = self.config.get("llm", {})
         self.extractor = LLMExtractor(
             api_key=openrouter_api_key,
-            model=llm_config.get("model", "anthropic/claude-3.5-sonnet"),
+            model=llm_config.get("model", "google/gemini-2.5-flash"),
             temperature=llm_config.get("temperature", 0.1),
             max_tokens=llm_config.get("max_tokens", 4000),
             timeout_seconds=llm_config.get("timeout_seconds", 60),

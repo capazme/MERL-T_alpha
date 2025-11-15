@@ -351,7 +351,7 @@ export function NERCorrectionForm({ traceId, queryText, onSuccess }: NERCorrecti
             <Button
               type="submit"
               disabled={!selectedCorrectionType || isPending}
-              isLoading={isPending}
+              loading={isPending}
               className="min-w-[160px]"
             >
               {isPending ? (

@@ -259,7 +259,7 @@ class RouterService:
 
         # Call OpenRouter
         try:
-            response = await self.ai_service.generate_response(
+            response_text = await self.ai_service.generate_completion(
                 prompt=prompt,
                 system_prompt="You are an expert legal AI router. Respond ONLY with valid JSON following the schema provided.",
                 model=self.config.llm_router.model,
@@ -269,7 +269,7 @@ class RouterService:
 
             # Parse JSON response
             execution_plan = self._parse_llm_response(
-                response,
+                response_text,
                 trace_id,
                 query_context,
                 enriched_context

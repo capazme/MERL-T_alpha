@@ -149,7 +149,7 @@ class IntentConfigLoader:
             },
             "llm_config": {
                 "provider": "openrouter",
-                "model": "anthropic/claude-3.5-sonnet",
+                "model": "google/gemini-2.5-flash",
                 "temperature": 0.1,
                 "max_tokens": 500,
                 "top_p": 0.9,
@@ -243,7 +243,7 @@ Se la query non corrisponde a nessun intent, rispondi con intent="unknown" e con
 
             # Call OpenRouter via existing service
             model_config = AIModelConfig(
-                name=self.llm_config.get("model", "anthropic/claude-3.5-sonnet"),
+                name=self.llm_config.get("model", "google/gemini-2.5-flash"),
                 api_key=os.getenv("OPENROUTER_API_KEY", ""),
                 temperature=self.llm_config.get("temperature", 0.1),
                 max_tokens=self.llm_config.get("max_tokens", 500),

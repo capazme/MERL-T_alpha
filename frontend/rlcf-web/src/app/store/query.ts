@@ -100,7 +100,7 @@ const DEFAULT_OPTIONS: QueryOptions = {
   max_iterations: 3,
   return_trace: true,
   stream_response: false,
-  timeout_ms: 30000,
+  timeout_ms: 60000,
 };
 
 const INITIAL_STATE: QueryState = {

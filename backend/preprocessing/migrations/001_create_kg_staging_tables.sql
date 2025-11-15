@@ -501,7 +501,7 @@ INSERT INTO kg_staging_relationships (
     'documents',
     0.92,
     'pending',
-    '{"llm_model": "anthropic/claude-3.5-sonnet", "extraction_method": "llm", "source_article": "2043"}'::JSONB,
+    '{"llm_model": "google/gemini-2.5-flash", "extraction_method": "llm", "source_article": "2043"}'::JSONB,
     CURRENT_TIMESTAMP
 );
 

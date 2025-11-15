@@ -272,7 +272,7 @@ class LLMGraphExtractor:
     def __init__(
         self,
         openrouter_api_key: str,
-        model: str = "anthropic/claude-3.5-sonnet",
+        model: str = "google/gemini-2.5-flash",
         temperature: float = 0.1,  # Low temperature for consistent extraction
         max_tokens: int = 8000
     ):

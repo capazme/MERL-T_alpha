@@ -112,7 +112,7 @@ python backend/preprocessing/cli_ingest_document.py \
 ```
 
 **Available models:**
-- `anthropic/claude-3.5-sonnet` (default, $3/$15 per 1M tokens)
+- `google/gemini-2.5-flash` (default, $3/$15 per 1M tokens)
 - `openai/gpt-4-turbo` ($10/$30 per 1M tokens)
 - `openai/gpt-4o` ($2.5/$10 per 1M tokens)
 
@@ -125,7 +125,7 @@ Configuration is in `backend/preprocessing/kg_config.yaml`:
 ```yaml
 document_ingestion:
   llm:
-    model: "anthropic/claude-3.5-sonnet"
+    model: "google/gemini-2.5-flash"
     temperature: 0.1  # Low for consistency
     max_tokens: 4000
 

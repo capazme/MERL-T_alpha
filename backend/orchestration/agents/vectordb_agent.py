@@ -97,13 +97,13 @@ class VectorDBAgent(RetrievalAgent):
 
         Args:
             qdrant_client: Qdrant client (deprecated, use qdrant_service)
-            qdrant_service: QdrantService instance
+            qdrant_service: QdrantService instance (if None, will be created lazily)
             embedding_service: EmbeddingService instance
             config: Agent configuration from orchestration_config.yaml
         """
         super().__init__(agent_name="vectordb_agent", config=config)
 
-        # Qdrant setup
+        # Qdrant setup (lazy initialization)
         if qdrant_service:
             self.qdrant_service = qdrant_service
             self.qdrant_client = qdrant_service.client
@@ -114,7 +114,10 @@ class VectorDBAgent(RetrievalAgent):
             self.qdrant_service = None
             self.collection_name = config.get("collection_name", "legal_corpus") if config else "legal_corpus"
         else:
-            raise ValueError("Either qdrant_service or qdrant_client must be provided")
+            # Will be initialized lazily in execute() if needed
+            self.qdrant_service = None
+            self.qdrant_client = None
+            self.collection_name = config.get("collection_name", "legal_corpus") if config else "legal_corpus"
 
         # Embedding service
         self.embedding_service = embedding_service or EmbeddingService.get_instance()
@@ -149,6 +152,25 @@ class VectorDBAgent(RetrievalAgent):
         start_time = time.time()
         all_results = []
         errors = []
+
+        # Lazy initialization of Qdrant service
+        if self.qdrant_service is None and self.qdrant_client is None:
+            try:
+                logger.info("Initializing QdrantService with defaults from env vars")
+                self.qdrant_service = QdrantService()
+                self.qdrant_client = self.qdrant_service.client
+                self.collection_name = self.qdrant_service.collection_name
+            except Exception as e:
+                error_msg = f"Failed to initialize QdrantService: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                return AgentResult(
+                    agent_name=self.agent_name,
+                    success=False,
+                    data=[],
+                    errors=[error_msg],
+                    execution_time_ms=(time.time() - start_time) * 1000,
+                    tasks_executed=0
+                )
 
         # Validate tasks
         for task in tasks:

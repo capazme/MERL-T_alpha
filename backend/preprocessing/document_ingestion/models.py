@@ -283,7 +283,7 @@ class ExtractionResult:
     """Relationships extracted from this segment"""
 
     llm_model: str = ""
-    """LLM model used (e.g., "anthropic/claude-3.5-sonnet")"""
+    """LLM model used (e.g., "google/gemini-2.5-flash")"""
 
     cost_usd: float = 0.0
     """Cost in USD for this extraction"""

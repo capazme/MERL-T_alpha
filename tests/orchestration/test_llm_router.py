@@ -231,7 +231,7 @@ def test_router_service_initialization():
         with patch('backend.orchestration.llm_router.get_orchestration_config') as mock_config:
             mock_config.return_value = Mock(
                 llm_router=Mock(
-                    model="anthropic/claude-3.5-sonnet",
+                    model="google/gemini-2.5-flash",
                     temperature=0.1,
                     prompt_template="router_v1"
                 )

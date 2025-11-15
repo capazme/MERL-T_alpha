@@ -191,7 +191,7 @@ class ReasoningExpert(ABC):
 
     def __init__(self, expert_type: str, config: Optional[Dict[str, Any]] = None):
         self.expert_type = expert_type
-        self.model = config.get("model", "anthropic/claude-3.5-sonnet")
+        self.model = config.get("model", "google/gemini-2.5-flash")
         self.temperature = config.get("temperature", 0.3)
         self.max_tokens = config.get("max_tokens", 3000)
         self.ai_service = AIService()  # From Phase 1

@@ -13,7 +13,7 @@
 llm_router:
   # OpenRouter configuration
   provider: openrouter
-  model: ${ROUTER_MODEL:-anthropic/claude-3.5-sonnet}
+  model: ${ROUTER_MODEL:-google/gemini-2.5-flash}
   temperature: ${ROUTER_TEMPERATURE:-0.1}
   max_tokens: 2000
   timeout_seconds: 10
@@ -126,7 +126,7 @@ reasoning_experts:
   literal_interpreter:
     enabled: true
     provider: openrouter
-    model: ${EXPERT_MODEL:-anthropic/claude-3.5-sonnet}
+    model: ${EXPERT_MODEL:-google/gemini-2.5-flash}
     temperature: 0.3
     max_tokens: 2000
     prompt_template: "literal_interpreter"
@@ -140,7 +140,7 @@ reasoning_experts:
   systemic_teleological:
     enabled: true
     provider: openrouter
-    model: ${EXPERT_MODEL:-anthropic/claude-3.5-sonnet}
+    model: ${EXPERT_MODEL:-google/gemini-2.5-flash}
     temperature: 0.4
     max_tokens: 2000
     prompt_template: "systemic_teleological"
@@ -154,7 +154,7 @@ reasoning_experts:
   principles_balancer:
     enabled: true
     provider: openrouter
-    model: ${EXPERT_MODEL:-anthropic/claude-3.5-sonnet}
+    model: ${EXPERT_MODEL:-google/gemini-2.5-flash}
     temperature: 0.4
     max_tokens: 2000
     prompt_template: "principles_balancer"
@@ -169,7 +169,7 @@ reasoning_experts:
   precedent_analyst:
     enabled: true
     provider: openrouter
-    model: ${EXPERT_MODEL:-anthropic/claude-3.5-sonnet}
+    model: ${EXPERT_MODEL:-google/gemini-2.5-flash}
     temperature: 0.35
     max_tokens: 2000
     prompt_template: "precedent_analyst"
@@ -185,7 +185,7 @@ reasoning_experts:
 # ==============================================
 synthesizer:
   provider: openrouter
-  model: ${SYNTHESIZER_MODEL:-anthropic/claude-3.5-sonnet}
+  model: ${SYNTHESIZER_MODEL:-google/gemini-2.5-flash}
   temperature: 0.2
   max_tokens: 3000
   timeout_seconds: 8

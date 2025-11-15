@@ -16,7 +16,7 @@ Usage:
     config = load_orchestration_config()
 
     # Access router config
-    print(config.llm_router.model)  # anthropic/claude-3.5-sonnet
+    print(config.llm_router.model)  # google/gemini-2.5-flash
 
     # Check if expert enabled
     if config.reasoning_experts.literal_interpreter.enabled:
@@ -39,7 +39,7 @@ from pydantic import BaseModel, Field, field_validator
 class LLMRouterConfig(BaseModel):
     """LLM Router configuration"""
     provider: str = Field(default="openrouter")
-    model: str = Field(default="anthropic/claude-3.5-sonnet")
+    model: str = Field(default="google/gemini-2.5-flash")
     temperature: float = Field(default=0.1, ge=0.0, le=2.0)
     max_tokens: int = Field(default=2000, gt=0)
     timeout_seconds: int = Field(default=10, gt=0)
@@ -124,7 +124,7 @@ class ReasoningExpertConfig(BaseModel):
     """Configuration for a single reasoning expert"""
     enabled: bool = Field(default=True)
     provider: str = Field(default="openrouter")
-    model: str = Field(default="anthropic/claude-3.5-sonnet")
+    model: str = Field(default="google/gemini-2.5-flash")
     temperature: float = Field(default=0.3, ge=0.0, le=2.0)
     max_tokens: int = Field(default=2000, gt=0)
     prompt_template: str
@@ -166,7 +166,7 @@ class DivergentSynthesisConfig(BaseModel):
 class SynthesizerConfig(BaseModel):
     """Synthesizer configuration"""
     provider: str = Field(default="openrouter")
-    model: str = Field(default="anthropic/claude-3.5-sonnet")
+    model: str = Field(default="google/gemini-2.5-flash")
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     max_tokens: int = Field(default=3000, gt=0)
     timeout_seconds: int = Field(default=8, gt=0)
@@ -314,8 +314,8 @@ def _expand_env_vars(config_dict: Dict[str, Any]) -> Dict[str, Any]:
     - ${VAR:-default} - Environment variable with default value
 
     Example:
-        model: ${ROUTER_MODEL:-anthropic/claude-3.5-sonnet}
-        → If ROUTER_MODEL not set, uses anthropic/claude-3.5-sonnet
+        model: ${ROUTER_MODEL:-google/gemini-2.5-flash}
+        → If ROUTER_MODEL not set, uses google/gemini-2.5-flash
     """
     env_var_pattern = re.compile(r'\$\{([^}^{]+)\}')
 

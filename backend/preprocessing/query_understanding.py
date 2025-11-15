@@ -440,9 +440,9 @@ Sii conciso nella spiegazione (max 20 parole).
 """
 
         try:
-            response = await openrouter_service.generate_async(
+            response = await openrouter_service.generate_response_async(
                 prompt=prompt,
-                model="meta-llama/llama-2-13b-chat",
+                model="google/gemini-2.5-flash",
                 max_tokens=200,
                 temperature=0.1
             )

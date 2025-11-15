@@ -290,7 +290,7 @@ class MonitoringConfig(BaseModel):
 class LLMConfig(BaseModel):
     """LLM configuration for document ingestion"""
     provider: str = Field(default="openrouter")
-    model: str = Field(default="anthropic/claude-3.5-sonnet")
+    model: str = Field(default="google/gemini-2.5-flash")
     api_key: str
     temperature: float = Field(default=0.1)
     max_tokens: int = Field(default=4000)

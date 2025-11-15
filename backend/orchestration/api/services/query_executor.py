@@ -236,9 +236,12 @@ class QueryExecutor:
         if final_state.get("refinement_instructions"):
             stages_executed.append("refinement")
 
-        # Extract experts consulted
-        execution_plan = final_state.get("execution_plan", {})
-        experts_consulted = execution_plan.get("experts", [])
+        # Extract experts consulted from Pydantic ExecutionPlan
+        execution_plan = final_state.get("execution_plan")
+        if execution_plan and hasattr(execution_plan, "reasoning_plan"):
+            experts_consulted = [expert.expert_type for expert in execution_plan.reasoning_plan.experts]
+        else:
+            experts_consulted = []
 
         # Extract agents used
         agent_results = final_state.get("agent_results", {})
@@ -424,8 +427,8 @@ class QueryExecutor:
             except Exception as e:
                 logger.warning(f"[{trace_id}] Failed to update query status: {e}")
 
-            # Execute workflow with timeout
-            timeout_ms = request.options.timeout_ms if request.options else 30000
+            # Execute workflow with timeout (increased for LLM calls)
+            timeout_ms = request.options.timeout_ms if request.options else 60000
             timeout_seconds = timeout_ms / 1000.0
 
             logger.info(f"[{trace_id}] Invoking LangGraph workflow (timeout: {timeout_seconds}s)...")

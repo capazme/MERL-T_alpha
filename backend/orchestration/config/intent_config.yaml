@@ -144,7 +144,7 @@ intent_types:
 llm_config:
   # Provider and model selection
   provider: "openrouter"
-  model: "anthropic/claude-3.5-sonnet"  # Best for Italian legal reasoning
+  model: "google/gemini-2.5-flash"  # Best for Italian legal reasoning
 
   # Model parameters
   temperature: 0.1              # Low: consistent intent detection

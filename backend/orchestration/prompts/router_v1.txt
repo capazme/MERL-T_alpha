@@ -34,69 +34,69 @@ You will receive:
 You **MUST** respond with a **valid JSON object** following this schema:
 
 ```json
-{
+{{
   "trace_id": "router-<timestamp>",
   "rationale": "<Your reasoning for this execution plan (2-3 sentences in Italian)>",
 
-  "retrieval_plan": {
-    "kg_agent": {
+  "retrieval_plan": {{
+    "kg_agent": {{
       "enabled": true/false,
       "tasks": [
-        {
+        {{
           "task_type": "expand_related_concepts" | "hierarchical_traversal" | "jurisprudence_lookup" | "temporal_evolution",
-          "params": {...},
+          "params": {{...}},
           "priority": "high" | "medium" | "low"
-        }
+        }}
       ],
       "rationale": "<Why activate KG agent (Italian)>"
-    },
+    }},
 
-    "api_agent": {
+    "api_agent": {{
       "enabled": true/false,
       "tasks": [
-        {
+        {{
           "task_type": "fetch_full_text" | "fetch_versions" | "fetch_metadata",
           "norm_references": ["Art. 1321 c.c."],
           "priority": "high" | "medium" | "low"
-        }
+        }}
       ],
       "rationale": "<Why activate API agent (Italian)>"
-    },
+    }},
 
-    "vectordb_agent": {
+    "vectordb_agent": {{
       "enabled": true/false,
       "tasks": [
-        {
+        {{
           "task_type": "semantic_search" | "hybrid_search" | "filtered_search",
           "query_text": "<Search query for semantic search>",
-          "filters": {...},
+          "filters": {{...}},
           "priority": "high" | "medium" | "low"
-        }
+        }}
       ],
       "rationale": "<Why activate VectorDB agent (Italian)>"
-    }
-  },
+    }}
+  }},
 
-  "reasoning_plan": {
+  "reasoning_plan": {{
     "experts": [
-      {
+      {{
         "expert_type": "literal_interpreter" | "systemic_teleological" | "principles_balancer" | "precedent_analyst",
         "activation_rationale": "<Why this expert is needed (Italian)>",
         "priority": "high" | "medium" | "low"
-      }
+      }}
     ],
     "synthesis_mode": "convergent" | "divergent",
     "synthesis_rationale": "<Why this synthesis mode (Italian)>"
-  },
+  }},
 
-  "iteration_strategy": {
+  "iteration_strategy": {{
     "estimated_iterations": 1 | 2 | 3,
     "refine_on_low_confidence": true/false,
     "refine_on_disagreement": true/false,
     "refine_on_missing_info": true/false,
     "rationale": "<Why this iteration strategy (Italian)>"
-  }
-}
+  }}
+}}
 ```
 
 ---
@@ -182,49 +182,49 @@ You **MUST** respond with a **valid JSON object** following this schema:
 
 **Input**:
 ```json
-{
+{{
   "original_query": "Cosa dice l'art. 1321 c.c. sul contratto?",
   "intent": "norm_explanation",
   "intent_confidence": 0.92,
   "norm_references": ["Art. 1321 c.c."],
   "legal_concepts": ["contratto"],
   "complexity": "low",
-  "enriched_context": {
-    "norms": {"count": 1, "sources": ["normattiva"]},
-    "sentenze": {"count": 3},
+  "enriched_context": {{
+    "norms": {{"count": 1, "sources": ["normattiva"]}},
+    "sentenze": {{"count": 3}},
     "cache_hit": true
-  }
-}
+  }}
+}}
 ```
 
 **Output**:
 ```json
-{
+{{
   "trace_id": "router-2025110512345",
   "rationale": "Query chiede testo letterale di norma specifica. Bassa complessità, alta confidenza. Serve solo interpretazione positivista.",
 
-  "retrieval_plan": {
-    "kg_agent": {"enabled": false, "rationale": "Norma già in enriched_context"},
-    "api_agent": {"enabled": true, "tasks": [{"task_type": "fetch_full_text", "norm_references": ["Art. 1321 c.c."], "priority": "high"}], "rationale": "Serve testo ufficiale completo"},
-    "vectordb_agent": {"enabled": false, "rationale": "Query specifica, non serve ricerca semantica"}
-  },
+  "retrieval_plan": {{
+    "kg_agent": {{"enabled": false, "rationale": "Norma già in enriched_context"}},
+    "api_agent": {{"enabled": true, "tasks": [{{"task_type": "fetch_full_text", "norm_references": ["Art. 1321 c.c."], "priority": "high"}}], "rationale": "Serve testo ufficiale completo"}},
+    "vectordb_agent": {{"enabled": false, "rationale": "Query specifica, non serve ricerca semantica"}}
+  }},
 
-  "reasoning_plan": {
+  "reasoning_plan": {{
     "experts": [
-      {"expert_type": "literal_interpreter", "activation_rationale": "Query chiede significato letterale norma", "priority": "high"}
+      {{"expert_type": "literal_interpreter", "activation_rationale": "Query chiede significato letterale norma", "priority": "high"}}
     ],
     "synthesis_mode": "convergent",
     "synthesis_rationale": "Solo un esperto, nessuna sintesi necessaria"
-  },
+  }},
 
-  "iteration_strategy": {
+  "iteration_strategy": {{
     "estimated_iterations": 1,
     "refine_on_low_confidence": false,
     "refine_on_disagreement": false,
     "refine_on_missing_info": false,
     "rationale": "Query semplice, alta confidenza, risposta diretta possibile"
-  }
-}
+  }}
+}}
 ```
 
 ---
@@ -233,50 +233,50 @@ You **MUST** respond with a **valid JSON object** following this schema:
 
 **Input**:
 ```json
-{
+{{
   "original_query": "Come si interpreta l'art. 2043 c.c. in caso di danno da GDPR? Quali sono i precedenti della Cassazione?",
   "intent": "contract_interpretation",
   "intent_confidence": 0.78,
   "norm_references": ["Art. 2043 c.c.", "GDPR"],
   "legal_concepts": ["responsabilità extracontrattuale", "danno", "privacy"],
   "complexity": "high",
-  "enriched_context": {
-    "norms": {"count": 2, "sources": ["normattiva", "eur-lex"]},
-    "sentenze": {"count": 15, "sources": ["cassazione"]},
-    "dottrina": {"count": 5}
-  }
-}
+  "enriched_context": {{
+    "norms": {{"count": 2, "sources": ["normattiva", "eur-lex"]}},
+    "sentenze": {{"count": 15, "sources": ["cassazione"]}},
+    "dottrina": {{"count": 5}}
+  }}
+}}
 ```
 
 **Output**:
 ```json
-{
+{{
   "trace_id": "router-2025110512346",
   "rationale": "Query complessa richiede interpretazione multi-livello: coordinamento norme nazionali/europee + analisi giurisprudenziale. Serve approfondimento sistematico e precedenti.",
 
-  "retrieval_plan": {
-    "kg_agent": {"enabled": true, "tasks": [{"task_type": "jurisprudence_lookup", "params": {"norm": "Art. 2043 c.c."}, "priority": "high"}], "rationale": "Cercare sentenze Cassazione su Art. 2043 + GDPR nel grafo"},
-    "api_agent": {"enabled": false, "rationale": "Testi norme già in enriched_context"},
-    "vectordb_agent": {"enabled": true, "tasks": [{"task_type": "hybrid_search", "query_text": "responsabilità extracontrattuale danno GDPR privacy", "priority": "medium"}], "rationale": "Ricerca semantica per trovare dottrina e precedenti rilevanti"}
-  },
+  "retrieval_plan": {{
+    "kg_agent": {{"enabled": true, "tasks": [{{"task_type": "jurisprudence_lookup", "params": {{"norm": "Art. 2043 c.c."}}, "priority": "high"}}], "rationale": "Cercare sentenze Cassazione su Art. 2043 + GDPR nel grafo"}},
+    "api_agent": {{"enabled": false, "rationale": "Testi norme già in enriched_context"}},
+    "vectordb_agent": {{"enabled": true, "tasks": [{{"task_type": "hybrid_search", "query_text": "responsabilità extracontrattuale danno GDPR privacy", "priority": "medium"}}], "rationale": "Ricerca semantica per trovare dottrina e precedenti rilevanti"}}
+  }},
 
-  "reasoning_plan": {
+  "reasoning_plan": {{
     "experts": [
-      {"expert_type": "systemic_teleological", "activation_rationale": "Serve interpretazione coordinata art. 2043 + GDPR (ratio legis)", "priority": "high"},
-      {"expert_type": "precedent_analyst", "activation_rationale": "Query chiede esplicitamente precedenti Cassazione", "priority": "high"}
+      {{"expert_type": "systemic_teleological", "activation_rationale": "Serve interpretazione coordinata art. 2043 + GDPR (ratio legis)", "priority": "high"}},
+      {{"expert_type": "precedent_analyst", "activation_rationale": "Query chiede esplicitamente precedenti Cassazione", "priority": "high"}}
     ],
     "synthesis_mode": "divergent",
     "synthesis_rationale": "Due esperti con prospettive diverse: sistematico (norme) + giurisprudenziale (precedenti)"
-  },
+  }},
 
-  "iteration_strategy": {
+  "iteration_strategy": {{
     "estimated_iterations": 2,
     "refine_on_low_confidence": true,
     "refine_on_disagreement": true,
     "refine_on_missing_info": false,
     "rationale": "Complessità alta e confidenza sotto soglia. Probabile necessità di raffinamento dopo prima sintesi."
-  }
-}
+  }}
+}}
 ```
 
 ---

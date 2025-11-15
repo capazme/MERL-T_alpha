@@ -144,7 +144,7 @@ def _read_pdf_with_pdfplumber(self, file_path: Path) -> List[DocumentSegment]:
 ```yaml
 llm:
   provider: "openrouter"
-  model: "anthropic/claude-3.5-sonnet"
+  model: "google/gemini-2.5-flash"
   temperature: 0.1  # Low for consistency
   max_tokens: 4000
   timeout_seconds: 60
@@ -333,7 +333,7 @@ document_ingestion:
   # LLM Configuration
   llm:
     provider: "openrouter"
-    model: "anthropic/claude-3.5-sonnet"
+    model: "google/gemini-2.5-flash"
     api_key: "${OPENROUTER_API_KEY}"
     temperature: 0.1  # Low for consistency
     max_tokens: 4000

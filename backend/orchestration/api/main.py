@@ -9,6 +9,12 @@ import logging
 import time
 from datetime import datetime
 from typing import Dict, Any
+from pathlib import Path
+
+# Load environment variables
+from dotenv import load_dotenv
+env_path = Path(__file__).parent.parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware

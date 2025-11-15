@@ -310,7 +310,7 @@ async def test_literal_interpreter_initialization():
     """Test LiteralInterpreter initialization."""
     expert = LiteralInterpreter()
     assert expert.expert_type == "literal_interpreter"
-    assert expert.model == "anthropic/claude-3.5-sonnet"
+    assert expert.model == "google/gemini-2.5-flash"
     assert expert.temperature == 0.3
     assert expert.prompt_template is not None
 
@@ -359,7 +359,7 @@ async def test_systemic_teleological_initialization():
     """Test SystemicTeleological initialization."""
     expert = SystemicTeleological()
     assert expert.expert_type == "systemic_teleological"
-    assert expert.model == "anthropic/claude-3.5-sonnet"
+    assert expert.model == "google/gemini-2.5-flash"
     assert expert.prompt_template is not None
 
 
@@ -391,7 +391,7 @@ async def test_principles_balancer_initialization():
     """Test PrinciplesBalancer initialization."""
     expert = PrinciplesBalancer()
     assert expert.expert_type == "principles_balancer"
-    assert expert.model == "anthropic/claude-3.5-sonnet"
+    assert expert.model == "google/gemini-2.5-flash"
 
 
 @pytest.mark.asyncio
@@ -415,7 +415,7 @@ async def test_precedent_analyst_initialization():
     """Test PrecedentAnalyst initialization."""
     expert = PrecedentAnalyst()
     assert expert.expert_type == "precedent_analyst"
-    assert expert.model == "anthropic/claude-3.5-sonnet"
+    assert expert.model == "google/gemini-2.5-flash"
 
 
 # ============================================================================
@@ -426,7 +426,7 @@ async def test_precedent_analyst_initialization():
 async def test_synthesizer_initialization():
     """Test Synthesizer initialization."""
     synthesizer = Synthesizer()
-    assert synthesizer.model == "anthropic/claude-3.5-sonnet"
+    assert synthesizer.model == "google/gemini-2.5-flash"
     assert synthesizer.temperature == 0.2
     assert synthesizer.convergent_prompt is not None
     assert synthesizer.divergent_prompt is not None
@@ -451,7 +451,7 @@ async def test_synthesizer_convergent_mode(
         confidence_factors=ConfidenceFactors(**mock_literal_interpreter_response["confidence_factors"]),
         sources=[LegalBasis(**s) for s in mock_literal_interpreter_response["sources"]],
         limitations=mock_literal_interpreter_response["limitations"],
-        llm_model="anthropic/claude-3.5-sonnet",
+        llm_model="google/gemini-2.5-flash",
         temperature=0.3,
         tokens_used=500,
         execution_time_ms=1200.0
@@ -467,7 +467,7 @@ async def test_synthesizer_convergent_mode(
         confidence_factors=ConfidenceFactors(**mock_systemic_response["confidence_factors"]),
         sources=[LegalBasis(**s) for s in mock_systemic_response["sources"]],
         limitations=mock_systemic_response["limitations"],
-        llm_model="anthropic/claude-3.5-sonnet",
+        llm_model="google/gemini-2.5-flash",
         temperature=0.3,
         tokens_used=450,
         execution_time_ms=1100.0
@@ -520,7 +520,7 @@ async def test_synthesizer_divergent_mode():
         ),
         sources=[],
         limitations="",
-        llm_model="anthropic/claude-3.5-sonnet",
+        llm_model="google/gemini-2.5-flash",
         temperature=0.3,
         tokens_used=400,
         execution_time_ms=1000.0
@@ -541,7 +541,7 @@ async def test_synthesizer_divergent_mode():
         ),
         sources=[],
         limitations="",
-        llm_model="anthropic/claude-3.5-sonnet",
+        llm_model="google/gemini-2.5-flash",
         temperature=0.3,
         tokens_used=420,
         execution_time_ms=1050.0
@@ -744,7 +744,7 @@ def test_provisional_answer_creation():
                 expert_support=[]
             )
         ],
-        llm_model="anthropic/claude-3.5-sonnet",
+        llm_model="google/gemini-2.5-flash",
         tokens_used=800,
         execution_time_ms=2500.0
     )
@@ -796,7 +796,7 @@ def test_expert_opinion_serialization(mock_literal_interpreter_response):
         ),
         sources=[],
         limitations="Test limitations",
-        llm_model="anthropic/claude-3.5-sonnet",
+        llm_model="google/gemini-2.5-flash",
         temperature=0.3,
         tokens_used=500,
         execution_time_ms=1200.0

@@ -58,7 +58,7 @@ class GraphConstructionConfig:
     neo4j_password: str = "password"
 
     # LLM
-    llm_model: str = "anthropic/claude-3.5-sonnet"
+    llm_model: str = "google/gemini-2.5-flash"
     llm_temperature: float = 0.1
 
     # Processing

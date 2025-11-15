@@ -316,7 +316,7 @@ async def router_node(state: MEGLTState) -> MEGLTState:
                 f"for iteration {state['current_iteration']}"
             )
 
-        # Generate execution plan
+        # Generate execution plan (keep as Pydantic object)
         execution_plan = await router.generate_execution_plan(
             query_context=context,
             enriched_context=state["enriched_context"]
@@ -326,8 +326,8 @@ async def router_node(state: MEGLTState) -> MEGLTState:
 
         logger.info(
             f"[{state['trace_id']}] Router completed in {elapsed_ms:.0f}ms: "
-            f"agents={len([a for a in [execution_plan.get('kg_agent', {}), execution_plan.get('api_agent', {}), execution_plan.get('vectordb_agent', {})] if a.get('enabled')])}, "
-            f"experts={len(execution_plan.get('experts', []))}"
+            f"agents={sum([execution_plan.retrieval_plan.kg_agent.enabled, execution_plan.retrieval_plan.api_agent.enabled, execution_plan.retrieval_plan.vectordb_agent.enabled])}, "
+            f"experts={len(execution_plan.reasoning_plan.experts)}"
         )
 
         return {
@@ -374,31 +374,60 @@ async def retrieval_node(state: MEGLTState) -> MEGLTState:
 
     start_time = time.time()
 
-    plan = state["execution_plan"]
+    from backend.orchestration.agents.base import AgentTask
+
+    plan = state.get("execution_plan")
+    if not plan:
+        logger.warning(f"[{state['trace_id']}] No execution plan in state")
+        return {
+            **state,
+            "agent_results": {},
+            "errors": ["No execution plan available"],
+            "execution_time_ms": state.get("execution_time_ms", 0.0)
+        }
+
+    retrieval_plan = plan.retrieval_plan
     tasks = []
     agent_names = []
 
     try:
         # KG Agent
-        if plan.get("kg_agent", {}).get("enabled", False):
+        if retrieval_plan.kg_agent.enabled:
             kg_agent = KGAgent()
-            kg_tasks = plan["kg_agent"].get("tasks", [])
+            # KG tasks are already AgentTask objects (generic)
+            kg_tasks = retrieval_plan.kg_agent.tasks
             logger.debug(f"[{state['trace_id']}] KG Agent: {len(kg_tasks)} tasks")
             tasks.append(kg_agent.execute(kg_tasks))
             agent_names.append("kg_agent")
 
         # API Agent
-        if plan.get("api_agent", {}).get("enabled", False):
+        if retrieval_plan.api_agent.enabled:
             api_agent = APIAgent()
-            api_tasks = plan["api_agent"].get("tasks", [])
+            # Convert APIAgentTask to standard AgentTask (put norm_references in params)
+            api_tasks = [
+                AgentTask(
+                    task_type=task.task_type,
+                    params={"norm_references": task.norm_references},
+                    priority=task.priority
+                )
+                for task in retrieval_plan.api_agent.tasks
+            ]
             logger.debug(f"[{state['trace_id']}] API Agent: {len(api_tasks)} tasks")
             tasks.append(api_agent.execute(api_tasks))
             agent_names.append("api_agent")
 
         # VectorDB Agent
-        if plan.get("vectordb_agent", {}).get("enabled", False):
+        if retrieval_plan.vectordb_agent.enabled:
             vectordb_agent = VectorDBAgent()
-            vectordb_tasks = plan["vectordb_agent"].get("tasks", [])
+            # Convert VectorDBAgentTask to standard AgentTask (put query_text and filters in params)
+            vectordb_tasks = [
+                AgentTask(
+                    task_type=task.task_type,
+                    params={"query_text": task.query_text, "filters": task.filters},
+                    priority=task.priority
+                )
+                for task in retrieval_plan.vectordb_agent.tasks
+            ]
             logger.debug(f"[{state['trace_id']}] VectorDB Agent: {len(vectordb_tasks)} tasks")
             tasks.append(vectordb_agent.execute(vectordb_tasks))
             agent_names.append("vectordb_agent")
@@ -433,11 +462,13 @@ async def retrieval_node(state: MEGLTState) -> MEGLTState:
                 }
                 errors.append(f"{agent_name} failed: {str(result)}")
             else:
+                # Convert AgentResult to dict
+                result_dict = result.to_dict() if hasattr(result, 'to_dict') else result
                 logger.debug(
                     f"[{state['trace_id']}] {agent_name} succeeded: "
-                    f"{len(result.get('data', []))} results"
+                    f"{len(result_dict.get('data', []))} results"
                 )
-                agent_results[agent_name] = result
+                agent_results[agent_name] = result_dict
 
         elapsed_ms = (time.time() - start_time) * 1000
 
@@ -498,13 +529,18 @@ async def experts_node(state: MEGLTState) -> MEGLTState:
 
     try:
         # Build ExpertContext from state
+        entities = state["query_context"].get("entities", {})
+        # Ensure entities is a dict (preprocessing might return list)
+        if not isinstance(entities, dict):
+            entities = {}
+
         expert_context = ExpertContext(
             query_text=state["original_query"],
             intent=state["query_context"].get("intent", "unknown"),
             complexity=state["query_context"].get("complexity", 0.5),
             norm_references=state["query_context"].get("norm_references", []),
             legal_concepts=state["query_context"].get("legal_concepts", []),
-            entities=state["query_context"].get("entities", {}),
+            entities=entities,
             kg_results=state["agent_results"].get("kg_agent", {}).get("data", []),
             api_results=state["agent_results"].get("api_agent", {}).get("data", []),
             vectordb_results=state["agent_results"].get("vectordb_agent", {}).get("data", []),
@@ -521,8 +557,21 @@ async def experts_node(state: MEGLTState) -> MEGLTState:
             "precedent_analyst": PrecedentAnalyst
         }
 
-        # Get selected experts from execution plan
-        selected_experts = state["execution_plan"].get("experts", [])
+        # Get selected experts from execution plan (Pydantic object)
+        plan = state.get("execution_plan")
+        if not plan:
+            logger.warning(f"[{state['trace_id']}] No execution plan in state")
+            return {
+                **state,
+                "expert_opinions": [],
+                "expert_context": expert_context.model_dump(),
+                "execution_time_ms": state.get("execution_time_ms", 0.0)
+            }
+
+        reasoning_plan = plan.reasoning_plan
+
+        # Extract expert types from Pydantic objects
+        selected_experts = [expert.expert_type for expert in reasoning_plan.experts]
 
         if not selected_experts:
             logger.warning(f"[{state['trace_id']}] No experts selected")
@@ -638,7 +687,7 @@ async def synthesis_node(state: MEGLTState) -> MEGLTState:
                 "provisional_answer": {
                     "trace_id": state["trace_id"],
                     "final_answer": "Nessuna opinione esperta disponibile.",
-                    "synthesis_mode": "fallback",
+                    "synthesis_mode": "convergent",  # Use valid mode even for fallback
                     "confidence": 0.0,
                     "consensus_level": 0.0,
                     "experts_consulted": [],
@@ -648,7 +697,9 @@ async def synthesis_node(state: MEGLTState) -> MEGLTState:
                 "execution_time_ms": state.get("execution_time_ms", 0.0)
             }
 
-        synthesis_mode = state["execution_plan"].get("synthesis_mode", "convergent")
+        # Get synthesis mode from Pydantic execution plan
+        plan = state.get("execution_plan")
+        synthesis_mode = plan.reasoning_plan.synthesis_mode if plan else "convergent"
 
         logger.debug(
             f"[{state['trace_id']}] Synthesis mode: {synthesis_mode}"

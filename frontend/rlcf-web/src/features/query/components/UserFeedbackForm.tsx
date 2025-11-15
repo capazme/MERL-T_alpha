@@ -256,7 +256,7 @@ export function UserFeedbackForm({ traceId, onSuccess }: UserFeedbackFormProps) 
             <Button
               type="submit"
               disabled={rating === 0 || isPending}
-              isLoading={isPending}
+              loading={isPending}
               className="min-w-[160px]"
             >
               {isPending ? (

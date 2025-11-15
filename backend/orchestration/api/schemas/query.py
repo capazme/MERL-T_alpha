@@ -31,7 +31,7 @@ class QueryOptions(BaseModel):
         description="Enable SSE streaming (future feature)"
     )
     timeout_ms: Optional[int] = Field(
-        default=30000,
+        default=60000,
         ge=1000,
         le=120000,
         description="Query timeout in milliseconds (1s-120s)"

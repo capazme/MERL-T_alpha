@@ -41,9 +41,9 @@ class CacheService:
             self._initialized = True
             self._enabled = os.getenv("REDIS_ENABLED", "true").lower() == "true"
 
-    async def _get_redis_client(self) -> Optional[Redis]:
+    async def get_redis_client(self) -> Optional[Redis]:
         """
-        Get or create Redis client.
+        Get or create Redis client (public method for middleware).
 
         Returns:
             Redis client or None if disabled
@@ -99,7 +99,7 @@ class CacheService:
             return False
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return False
 
@@ -128,7 +128,7 @@ class CacheService:
             return None
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return None
 
@@ -157,7 +157,7 @@ class CacheService:
             return False
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return False
 
@@ -194,7 +194,7 @@ class CacheService:
             return False
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return False
 
@@ -223,7 +223,7 @@ class CacheService:
             return None
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return None
 
@@ -261,7 +261,7 @@ class CacheService:
             return 0
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return 0
 
@@ -299,7 +299,7 @@ class CacheService:
             return True, 0
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return True, 0
 
@@ -329,7 +329,7 @@ class CacheService:
             return False
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return False
 
@@ -366,7 +366,7 @@ class CacheService:
             return False
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return False
 
@@ -397,7 +397,7 @@ class CacheService:
             return None
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return None
 
@@ -425,7 +425,7 @@ class CacheService:
             return False
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return False
 
@@ -450,7 +450,7 @@ class CacheService:
             return False
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return False
 
@@ -476,7 +476,7 @@ class CacheService:
             return False
 
         try:
-            redis = await self._get_redis_client()
+            redis = await self.get_redis_client()
             if redis is None:
                 return False
 

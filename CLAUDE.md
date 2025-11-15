@@ -423,8 +423,8 @@ docker-compose -f docker-compose.dev.yml up -d
 ```bash
 # LLM & AI
 OPENROUTER_API_KEY=sk-or-...
-ROUTER_MODEL=anthropic/claude-3.5-sonnet
-EXPERT_MODEL=anthropic/claude-3.5-sonnet
+ROUTER_MODEL=google/gemini-2.5-flash
+EXPERT_MODEL=google/gemini-2.5-flash
 
 # Databases
 DATABASE_URL=postgresql+asyncpg://user:pass@localhost/merl_t
@@ -792,7 +792,7 @@ from backend.rlcf_framework.models import User
 **2. Hardcoding Configuration**:
 ```python
 # BAD - hardcoded values
-llm_model = "anthropic/claude-3.5-sonnet"
+llm_model = "google/gemini-2.5-flash"
 
 # GOOD - use configuration
 llm_model = config.router_model

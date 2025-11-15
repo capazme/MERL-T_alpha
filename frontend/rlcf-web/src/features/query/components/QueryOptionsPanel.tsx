@@ -33,7 +33,7 @@ export function QueryOptionsPanel({ defaultOpen = false }: QueryOptionsPanelProp
     updateOptions({ return_trace: e.target.checked });
   };
 
-  const timeoutSeconds = (queryOptions.timeout_ms || 30000) / 1000;
+  const timeoutSeconds = (queryOptions.timeout_ms || 60000) / 1000;
 
   return (
     <Collapsible
@@ -159,7 +159,7 @@ export function QueryOptionsPanel({ defaultOpen = false }: QueryOptionsPanelProp
             <div className="flex items-center justify-between">
               <span className="text-gray-400">timeout_ms:</span>
               <span className="text-blue-400">
-                {queryOptions.timeout_ms || 30000}
+                {queryOptions.timeout_ms || 60000}
               </span>
             </div>
             <div className="flex items-center justify-between">

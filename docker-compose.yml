@@ -53,10 +53,10 @@ services:
       - LOG_FORMAT=text
 
       # Week 6 - Orchestration (Phase 2+)
-      - ROUTER_MODEL=${ROUTER_MODEL:-anthropic/claude-3.5-sonnet}
+      - ROUTER_MODEL=${ROUTER_MODEL:-google/gemini-2.5-flash}
       - ROUTER_TEMPERATURE=${ROUTER_TEMPERATURE:-0.1}
-      - EXPERT_MODEL=${EXPERT_MODEL:-anthropic/claude-3.5-sonnet}
-      - SYNTHESIZER_MODEL=${SYNTHESIZER_MODEL:-anthropic/claude-3.5-sonnet}
+      - EXPERT_MODEL=${EXPERT_MODEL:-google/gemini-2.5-flash}
+      - SYNTHESIZER_MODEL=${SYNTHESIZER_MODEL:-google/gemini-2.5-flash}
       - MAX_ITERATIONS=${MAX_ITERATIONS:-3}
 
       # Norma Controller API (Visualex microservice)
@@ -127,7 +127,7 @@ services:
     environment:
       # LLM & AI
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-your_openrouter_api_key_here}
-      - LLM_MODEL=${LLM_MODEL:-anthropic/claude-3.5-sonnet}
+      - LLM_MODEL=${LLM_MODEL:-google/gemini-2.5-flash}
       - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.1}
 
       # Databases

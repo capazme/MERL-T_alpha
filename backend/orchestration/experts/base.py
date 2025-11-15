@@ -170,7 +170,7 @@ class ReasoningExpert(ABC):
         self.logger = logging.getLogger(f"expert.{expert_type}")
 
         # LLM configuration
-        self.model = self.config.get("model", "anthropic/claude-3.5-sonnet")
+        self.model = self.config.get("model", "google/gemini-2.5-flash")
         self.temperature = self.config.get("temperature", 0.3)
         self.max_tokens = self.config.get("max_tokens", 2000)
 

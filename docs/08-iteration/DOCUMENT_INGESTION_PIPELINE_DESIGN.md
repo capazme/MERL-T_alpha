@@ -119,7 +119,7 @@ class Provenance:
 **Purpose**: Use LLM to extract entities and relationships according to KG schema.
 
 **LLM Provider**: OpenRouter (supports multiple models)
-**Recommended Model**: `anthropic/claude-3.5-sonnet` or `openai/gpt-4-turbo`
+**Recommended Model**: `google/gemini-2.5-flash` or `openai/gpt-4-turbo`
 
 **Prompt Engineering**:
 ```python
@@ -310,7 +310,7 @@ document_ingestion:
   # LLM Configuration
   llm:
     provider: "openrouter"
-    model: "anthropic/claude-3.5-sonnet"
+    model: "google/gemini-2.5-flash"
     api_key: "${OPENROUTER_API_KEY}"
     temperature: 0.1  # Low for consistency
     max_tokens: 4000

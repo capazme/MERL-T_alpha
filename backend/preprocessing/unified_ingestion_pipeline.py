@@ -98,7 +98,7 @@ class IngestionConfig:
 
     # LLM (for document ingestion)
     openrouter_api_key: Optional[str] = None
-    llm_model: str = "anthropic/claude-3.5-sonnet"
+    llm_model: str = "google/gemini-2.5-flash"
 
     # Quality control
     quality_control: QualityControlConfig = field(default_factory=QualityControlConfig)

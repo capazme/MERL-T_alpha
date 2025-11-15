@@ -135,7 +135,7 @@ export function QueryForm({ onSubmit, isSubmitting = false, error }: QueryFormPr
             <Button
               type="submit"
               disabled={!isValid || isSubmitting}
-              isLoading={isSubmitting}
+              loading={isSubmitting}
               className="min-w-[160px]"
             >
               {isSubmitting ? (

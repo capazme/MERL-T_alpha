@@ -15,7 +15,7 @@ import type {
 // Orchestration API (porta 8000) - per query e orchestrazione
 const axiosInstance = axios.create({
   baseURL: 'http://127.0.0.1:8000',
-  timeout: 30000,
+  timeout: 70000, // 70s to allow for 60s backend timeout + margin
   headers: {
     'X-API-KEY': 'supersecretkey'
   }
@@ -24,7 +24,7 @@ const axiosInstance = axios.create({
 // RLCF API (porta 8001) - per utenti, tasks, feedback
 const rlcfAxios = axios.create({
   baseURL: 'http://127.0.0.1:8001',
-  timeout: 30000,
+  timeout: 70000, // 70s to allow for 60s backend timeout + margin
   headers: {
     'X-API-KEY': 'supersecretkey'
   }

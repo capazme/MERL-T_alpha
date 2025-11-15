@@ -25,6 +25,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from hashlib import md5
+from enum import Enum
 import asyncio
 
 from neo4j import AsyncDriver, AsyncSession
@@ -581,10 +582,17 @@ class KGEnrichmentService:
 
         try:
             ttl = self.config.cache.ttl_seconds if self.config else 86400  # 24h default
+
+            # Custom serializer for Enum objects
+            def enum_serializer(obj):
+                if isinstance(obj, Enum):
+                    return obj.value  # Return enum value instead of str(enum)
+                return str(obj)
+
             await self.redis.setex(
                 key,
                 ttl,
-                json.dumps(data, default=str)
+                json.dumps(data, default=enum_serializer)
             )
             self.logger.debug(f"Cached {key} for {ttl}s")
             return True

@@ -103,7 +103,7 @@ class Synthesizer:
         self.logger = logging.getLogger("synthesizer")
 
         # LLM configuration
-        self.model = self.config.get("model", "anthropic/claude-3.5-sonnet")
+        self.model = self.config.get("model", "google/gemini-2.5-flash")
         self.temperature = self.config.get("temperature", 0.2)
         self.max_tokens = self.config.get("max_tokens", 3000)
 
@@ -270,7 +270,7 @@ If you cannot provide a complete synthesis, still return valid JSON with partial
                 for p in synthesis_data.get("provenance", [])
             ],
             llm_model=self.model,
-            tokens_used=tokens_used,
+            tokens_used=0,  # TODO: Extract from LLM response when available
             execution_time_ms=elapsed_ms
         )
 
