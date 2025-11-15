@@ -46,7 +46,7 @@ export function RecentQueriesPanel() {
   const { loadQuery } = useQueryStore();
 
   const { data: historyData, isLoading, error } = useQueryHistory(
-    user?.id || null,
+    user?.id ? String(user.id) : null,
     { limit: 10, offset: 0 }
   );
 
@@ -116,8 +116,8 @@ export function RecentQueriesPanel() {
         {/* Queries List */}
         {!isLoading && !error && historyData?.queries && historyData.queries.length > 0 && (
           <div className="flex-1 overflow-y-auto space-y-2 pr-2 -mr-2">
-            {historyData.queries.map((query) => {
-              const statusConfig = STATUS_CONFIG[query.status];
+            {historyData.queries.map((query: any) => {
+              const statusConfig = STATUS_CONFIG[query.status as QueryStatus];
 
               return (
                 <button

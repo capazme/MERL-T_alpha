@@ -41,7 +41,7 @@ export function QueryOptionsPanel({ defaultOpen = false }: QueryOptionsPanelProp
       defaultOpen={defaultOpen}
       icon={<Sliders className="w-4 h-4" />}
       badge={
-        <Badge variant="outline" size="sm">
+        <Badge variant="outline">
           Avanzate
         </Badge>
       }

@@ -74,8 +74,9 @@ export function QueryForm({ onSubmit, isSubmitting = false, error }: QueryFormPr
             showCharCount
             error={errors.query?.message}
             helperText={
-              !errors.query &&
-              'Fornisci tutti i dettagli rilevanti per ottenere una risposta accurata'
+              !errors.query
+                ? 'Fornisci tutti i dettagli rilevanti per ottenere una risposta accurata'
+                : undefined
             }
             required
             disabled={isSubmitting}

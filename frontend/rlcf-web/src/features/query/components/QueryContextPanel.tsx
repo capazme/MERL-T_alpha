@@ -57,7 +57,7 @@ export function QueryContextPanel({ defaultOpen = false }: QueryContextPanelProp
       defaultOpen={defaultOpen}
       icon={<Settings2 className="w-4 h-4" />}
       badge={
-        <Badge variant="outline" size="sm">
+        <Badge variant="outline">
           Opzionale
         </Badge>
       }
