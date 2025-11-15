@@ -1,0 +1,258 @@
+# Neo4j Production Docker Compose Configuration
+#
+# This configuration is optimized for production deployment with:
+# - Memory tuning for 100,000+ nodes and 500,000+ relationships
+# - Persistent volumes with backup support
+# - Security hardening (TLS, authentication)
+# - Health checks and resource limits
+# - APOC plugins for advanced operations
+#
+# Usage:
+#   docker-compose -f infrastructure/docker/neo4j-production.yml up -d
+#
+# Environment variables (set in .env.production):
+#   - NEO4J_AUTH: Authentication credentials (username/password)
+#   - NEO4J_ACCEPT_LICENSE_AGREEMENT: Accept Neo4j license
+#   - NEO4J_VERSION: Neo4j version (default: 5.13-community)
+#
+# Resources:
+#   - Memory: 6GB RAM (4GB heap + 4GB page cache)
+#   - CPU: 2 cores
+#   - Disk: 10GB minimum (data + backups)
+
+version: '3.8'
+
+services:
+  neo4j-production:
+    image: neo4j:${NEO4J_VERSION:-5.13-community}
+    container_name: merl-t-neo4j-production
+    restart: unless-stopped
+
+    # Ports
+    ports:
+      - "${NEO4J_BROWSER_PORT:-7474}:7474"  # HTTP Browser UI (restrict to localhost in production)
+      - "${NEO4J_BOLT_PORT:-7687}:7687"     # Bolt protocol
+
+    # Volumes - Persistent storage
+    volumes:
+      # Data directory (graph database files)
+      - neo4j_data:/data
+      # Logs directory (query logs, debug logs, security logs)
+      - neo4j_logs:/logs
+      # Plugins directory (APOC, GDS, etc.)
+      - neo4j_plugins:/plugins
+      # Import directory (for bulk imports)
+      - neo4j_import:/var/lib/neo4j/import
+      # Backup directory (for neo4j-admin dumps)
+      - ${NEO4J_BACKUP_DIR:-./backups/neo4j}:/backups
+      # SSL certificates (TLS/SSL for Bolt)
+      - ${NEO4J_SSL_DIR:-./security/neo4j/ssl}:/ssl
+
+    # Environment variables - Production configuration
+    environment:
+      # ============================================================
+      # AUTHENTICATION & SECURITY
+      # ============================================================
+      # Initial password (change immediately after first login)
+      # Format: username/password or neo4j/<password>
+      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/CHANGE_ME_IMMEDIATELY}
+
+      # Accept license agreement (required for Neo4j >= 5.0)
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: ${NEO4J_ACCEPT_LICENSE_AGREEMENT:-yes}
+
+      # Security configuration
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+
+      # Audit logging (track all queries for compliance)
+      NEO4J_dbms_logs_security_enabled: ${NEO4J_SECURITY_LOGS:-true}
+      NEO4J_dbms_logs_security_level: INFO
+
+      # ============================================================
+      # SSL/TLS CONFIGURATION (Bolt encryption)
+      # ============================================================
+      # Enable TLS for Bolt protocol (port 7687)
+      NEO4J_dbms_ssl_policy_bolt_enabled: ${NEO4J_SSL_ENABLED:-false}
+      NEO4J_dbms_ssl_policy_bolt_base__directory: /ssl
+      NEO4J_dbms_ssl_policy_bolt_private__key: bolt.key
+      NEO4J_dbms_ssl_policy_bolt_public__certificate: bolt.crt
+      NEO4J_dbms_ssl_policy_bolt_client__auth: NONE
+
+      # ============================================================
+      # MEMORY CONFIGURATION (Production tuning for 5,000+ articles)
+      # ============================================================
+      # Heap size: 4GB (stores transaction state, query execution)
+      # Rule of thumb: 50% of available RAM (for 8GB total)
+      NEO4J_server_memory_heap_initial__size: 4G
+      NEO4J_server_memory_heap_max__size: 4G
+
+      # Page cache: 4GB (caches graph data for fast access)
+      # Rule of thumb: 50% of available RAM (for 8GB total)
+      # For 100,000 nodes + 500,000 rels: ~2GB minimum, 4GB recommended
+      NEO4J_server_memory_pagecache_size: 4G
+
+      # Transaction state memory (max concurrent transactions)
+      NEO4J_db_memory_transaction_total_max: 1G
+
+      # Query cache size (compiled queries)
+      NEO4J_db_query__cache__size: 1000
+
+      # ============================================================
+      # CONNECTION POOLING & THREADS
+      # ============================================================
+      # Bolt connector thread pool (concurrent connections)
+      NEO4J_dbms_connector_bolt_thread__pool__min__size: 5
+      NEO4J_dbms_connector_bolt_thread__pool__max__size: 100
+
+      # Connection timeout (30 seconds)
+      NEO4J_dbms_connector_bolt_connection__timeout: 30s
+
+      # ============================================================
+      # TRANSACTION CONFIGURATION
+      # ============================================================
+      # Transaction timeout (5 minutes for long-running imports)
+      NEO4J_db_transaction_timeout: 5m
+
+      # Transaction bookmark timeout
+      NEO4J_db_transaction_bookmark_ready_timeout: 30s
+
+      # ============================================================
+      # QUERY LOGGING (Performance monitoring)
+      # ============================================================
+      # Enable query logging for slow queries
+      NEO4J_dbms_logs_query_enabled: ${NEO4J_QUERY_LOGS:-true}
+
+      # Log queries slower than 1 second
+      NEO4J_dbms_logs_query_threshold: ${NEO4J_QUERY_THRESHOLD:-1s}
+
+      # Query log format (JSON for structured logging)
+      NEO4J_dbms_logs_query_format: json
+
+      # Include query parameters in logs (useful for debugging)
+      NEO4J_dbms_logs_query_parameter__logging__enabled: true
+
+      # ============================================================
+      # DATABASE CONFIGURATION
+      # ============================================================
+      # Default database name
+      NEO4J_initial_dbms_default__database: ${NEO4J_DATABASE_NAME:-merl-t-kg}
+
+      # Allow file URLs for LOAD CSV (import operations)
+      NEO4J_dbms_security_allow__csv__import__from__file__urls: true
+
+      # ============================================================
+      # PLUGINS
+      # ============================================================
+      # Install APOC (Awesome Procedures on Cypher)
+      # Provides 450+ procedures for advanced operations
+      NEO4J_PLUGINS: '["apoc"]'
+
+      # APOC configuration
+      NEO4J_apoc_export_file_enabled: true
+      NEO4J_apoc_import_file_enabled: true
+      NEO4J_apoc_import_file_use__neo4j__config: true
+
+      # ============================================================
+      # LOGGING CONFIGURATION
+      # ============================================================
+      # Debug log level (INFO for production, DEBUG for troubleshooting)
+      NEO4J_dbms_logs_debug_level: ${NEO4J_LOG_LEVEL:-INFO}
+
+      # Structured logging format (JSON)
+      NEO4J_dbms_logs_debug_format: json
+
+      # Log rotation (keep 7 days of logs, max 1GB per file)
+      NEO4J_dbms_logs_debug_rotation_keep__number: 7
+      NEO4J_dbms_logs_debug_rotation_size: 1G
+
+      # HTTP log level
+      NEO4J_dbms_logs_http_level: ${NEO4J_HTTP_LOG_LEVEL:-WARN}
+
+      # ============================================================
+      # PERFORMANCE TUNING
+      # ============================================================
+      # Check point interval (write to disk every 15 minutes)
+      NEO4J_db_checkpoint_interval: 15m
+
+      # Store copy buffer size (for backups)
+      NEO4J_dbms_backup_buffer_size: 8m
+
+      # ============================================================
+      # METRICS & MONITORING
+      # ============================================================
+      # Enable metrics collection (for Prometheus)
+      NEO4J_metrics_enabled: ${NEO4J_METRICS_ENABLED:-true}
+      NEO4J_metrics_jmx_enabled: true
+      NEO4J_metrics_graphite_enabled: false
+      NEO4J_metrics_prometheus_enabled: true
+      NEO4J_metrics_prometheus_endpoint: 0.0.0.0:2004
+
+      # CSV metrics export (optional, for custom monitoring)
+      NEO4J_metrics_csv_enabled: false
+
+    # Health check - Verify Neo4j is responsive
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#*/}\" 'RETURN 1' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+    # Resource limits (prevent container from consuming all host resources)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'      # Max 2 CPU cores
+          memory: 6G       # Max 6GB RAM (4GB heap + 4GB page cache + 2GB buffer)
+        reservations:
+          cpus: '1.0'      # Min 1 CPU core
+          memory: 4G       # Min 4GB RAM
+
+    # Network
+    networks:
+      - merl-t-network
+
+    # Labels (for monitoring and service discovery)
+    labels:
+      - "com.merl-t.service=neo4j"
+      - "com.merl-t.environment=production"
+      - "com.merl-t.component=knowledge-graph"
+      - "com.merl-t.backup=daily"
+
+# Named volumes for persistent storage
+volumes:
+  neo4j_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${NEO4J_DATA_DIR:-./data/neo4j}
+
+  neo4j_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${NEO4J_LOGS_DIR:-./logs/neo4j}
+
+  neo4j_plugins:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${NEO4J_PLUGINS_DIR:-./plugins/neo4j}
+
+  neo4j_import:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${NEO4J_IMPORT_DIR:-./import/neo4j}
+
+# Network
+networks:
+  merl-t-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
