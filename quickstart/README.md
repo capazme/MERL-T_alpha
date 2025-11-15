@@ -24,13 +24,16 @@
 ### 1. start-dev.sh - Avvio Sistema
 
 **Cosa fa**:
-- ✅ Verifica prerequisiti (Python 3.11+, Node 18+)
+- ✅ Verifica prerequisiti (Python 3.11-3.13, Node 18+)
 - ✅ Setup virtual environment
 - ✅ Installazione dipendenze
-- ✅ Inizializzazione database
-- ✅ Avvio backend (porte 8000, 8001)
-- ✅ Avvio frontend (porta 3000)
-- ✅ Verifica health endpoints
+- ✅ Inizializzazione database (SQLite o PostgreSQL)
+- ✅ Avvio visualex API (porta 5000)
+- ✅ Avvio Orchestration API (porta 8000)
+- ✅ Avvio RLCF API (porta 8001)
+- ✅ Avvio Ingestion API (porta 8002)
+- ✅ Avvio Frontend (porta 3000)
+- ✅ Verifica health endpoints (tutti i 5 servizi)
 - ✅ Apertura browser
 
 **Uso**:
@@ -53,8 +56,10 @@
 ### 2. stop-dev.sh - Stop Sistema
 
 **Cosa fa**:
+- 🛑 Termina visualex API (porta 5000)
 - 🛑 Termina Backend Orchestration (porta 8000)
 - 🛑 Termina Backend RLCF (porta 8001)
+- 🛑 Termina Ingestion API (porta 8002)
 - 🛑 Termina Frontend (porta 3000)
 - 🛑 Cleanup porte (fallback)
 - 🛑 Stop Docker containers (opzionale)
@@ -93,13 +98,14 @@
 ### 4. test-system.sh - Test Sistema
 
 **Cosa fa**:
-- ✓ Test health endpoints
-- ✓ Test API endpoints
-- ✓ Test query end-to-end (15 secondi)
+- ✓ Test health endpoints (tutti i 5 servizi)
+- ✓ Test API endpoints specifici per servizio
+- ✓ Test query execution end-to-end
 - ✓ Test creazione task RLCF
-- ✓ Verifica database connectivity
-- ✓ Verifica configuration files
-- ✓ Controlla errori nei log
+- ✓ Verifica database connectivity (SQLite + PostgreSQL)
+- ✓ Verifica configuration files (.env, YAML configs)
+- ✓ Controlla errori critici nei log
+- ✓ Verifica Docker services (opzionale)
 
 **Uso**:
 ```bash
@@ -108,18 +114,29 @@
 
 **Output Esempio**:
 ```
-[TEST] Verifica Health Endpoints
-  ✓ PASS - Backend Orchestration health OK
-  ✓ PASS - Backend RLCF health OK
-  ✓ PASS - Frontend responding OK
+[TEST] Verifica Health Endpoints (5 servizi)
+  ✓ PASS - visualex API (5000) health OK
+  ✓ PASS - Backend Orchestration (8000) health OK
+  ✓ PASS - Backend RLCF (8001) health OK
+  ✓ PASS - Ingestion API (8002) health OK
+  ✓ PASS - Frontend (3000) responding OK
 
 [TEST] Verifica API Endpoints
-  ✓ PASS - GET /api/v1/queries OK
-  ✓ PASS - GET /api/v1/stats/queries OK
+  ✓ PASS - GET /search (visualex) OK
+  ✓ PASS - GET /query/history (orchestration) OK
+  ✓ PASS - GET /tasks/all (RLCF) OK
+  ✓ PASS - GET /batch/list (Ingestion) OK
 
 ...
 
 ✓ TUTTI I TEST PASSATI! 🎉
+
+Il sistema MERL-T è completamente funzionante:
+  ✓ visualex API (5000)
+  ✓ Orchestration API (8000)
+  ✓ RLCF API (8001)
+  ✓ Ingestion API (8002)
+  ✓ Frontend (3000)
 ```
 
 **Exit Code**:
@@ -395,11 +412,15 @@ Tutti i log sono salvati in `logs/`:
 
 ```
 logs/
-├── orchestration.log    # Backend Orchestration
-├── rlcf.log             # Backend RLCF
-├── frontend.log         # Frontend React
-├── orchestration.pid    # PID del processo
+├── visualex.log         # visualex API (Quart)
+├── orchestration.log    # Backend Orchestration (FastAPI)
+├── rlcf.log             # Backend RLCF (FastAPI)
+├── ingestion.log        # Ingestion API (FastAPI)
+├── frontend.log         # Frontend (React/Vite)
+├── visualex.pid         # PID dei processi
+├── orchestration.pid
 ├── rlcf.pid
+├── ingestion.pid
 ├── frontend.pid
 ├── runtime.info         # Info di runtime
 ├── test_query_result.json         # Risultato test query
@@ -436,19 +457,35 @@ grep -c "ERROR" logs/orchestration.log
 
 ## 🔗 Link Rapidi
 
-Quando il sistema è avviato:
+### Servizi Applicativi (5 Services)
 
 - 🌐 **Frontend**: http://localhost:3000
+- 🔍 **visualex API**: http://localhost:5000/docs
 - 📡 **Orchestration API**: http://localhost:8000/docs
 - 🤖 **RLCF API**: http://localhost:8001/docs
-- 💚 **Health Orchestration**: http://localhost:8000/health
-- 💚 **Health RLCF**: http://localhost:8001/health
+- 📊 **Ingestion API**: http://localhost:8002/docs
 
-Se usi Docker:
+### Health Endpoints
+
+- 💚 **visualex**: http://localhost:5000/health
+- 💚 **Orchestration**: http://localhost:8000/health
+- 💚 **RLCF**: http://localhost:8001/health
+- 💚 **Ingestion**: http://localhost:8002/health
+
+### Database Services (Docker - Opzionale)
+
 - 🐘 **PostgreSQL**: localhost:5432
 - 🔴 **Redis**: localhost:6379
 - 🔍 **Qdrant**: http://localhost:6333/dashboard
-- 🕸️ **Neo4j**: http://localhost:7474
+- 🕸️ **Neo4j**: http://localhost:7474 (user: neo4j, password: devpassword)
+
+### Development API Keys
+
+- **Frontend default**: `X-API-KEY: supersecretkey` (già configurato in api.ts)
+- **Admin key**: `merl-t-admin-key-dev-only-change-in-production`
+- **User key**: `merl-t-user-key-dev-only`
+
+⚠️ **WARNING**: Queste chiavi sono SOLO per sviluppo! Cambiale in produzione!
 
 ---
 
