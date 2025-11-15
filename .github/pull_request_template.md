@@ -10,14 +10,14 @@
 
 - [ ] = Bug fix (non-breaking change which fixes an issue)
 - [ ] ( New feature (non-breaking change which adds functionality)
-- [ ] =¥ Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] =Ý Documentation update
-- [ ] <¨ Code style update (formatting, renaming)
+- [ ] =ï¿½ Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] =ï¿½ Documentation update
+- [ ] <ï¿½ Code style update (formatting, renaming)
 - [ ] { Refactoring (no functional changes)
-- [ ] ¡ Performance improvement
+- [ ] ï¿½ Performance improvement
 - [ ]  Test update
 - [ ] =' Configuration change
-- [ ] =€ CI/CD update
+- [ ] =ï¿½ CI/CD update
 
 ## Related Issues
 
