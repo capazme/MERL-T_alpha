@@ -94,3 +94,8 @@ site/
 # Redis
 dump.rdb
 *.rdb
+
+#Other
+*shm
+*wal
+*.pid

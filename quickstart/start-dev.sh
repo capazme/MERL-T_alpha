@@ -323,7 +323,7 @@ echo $ORCHESTRATION_PID > logs/orchestration.pid
 print_success "Backend Orchestration avviato (PID: $ORCHESTRATION_PID)"
 
 # Aspetta che si avvii
-sleep 3
+sleep 10
 
 # Avvia Backend RLCF in background
 print_warning "Avvio Backend RLCF API (porta 8001)..."
@@ -371,7 +371,8 @@ else
     print_warning "visualex API: Non risponde (potrebbe essere normale)"
     echo "Controlla i log: logs/visualex.log"
 fi
-
+echo "Attendo altri 20 secondi per i servizi backend..."
+sleep 20
 # Controlla Backend Orchestration
 if curl -s http://localhost:8000/health > /dev/null 2>&1; then
     print_success "Backend Orchestration: OK"
