@@ -37,15 +37,28 @@ except ImportError:
 # ==========================================
 
 class EntityTypeEnum(PyEnum):
-    """Entity types in staging queue."""
+    """Entity types in staging queue (13 types from LLM extraction)."""
     NORMA = "norma"
-    SENTENZA = "sentenza"
+    CONCETTO_GIURIDICO = "concetto_giuridico"
+    SOGGETTO_GIURIDICO = "soggetto_giuridico"
+    ATTO_GIUDIZIARIO = "atto_giudiziario"
     DOTTRINA = "dottrina"
+    PROCEDURA = "procedura"
+    PRINCIPIO_GIURIDICO = "principio_giuridico"
+    RESPONSABILITA = "responsabilita"
+    DIRITTO_SOGGETTIVO = "diritto_soggettivo"
+    SANZIONE = "sanzione"
+    DEFINIZIONE_LEGALE = "definizione_legale"
+    FATTO_GIURIDICO = "fatto_giuridico"
+    MODALITA_GIURIDICA = "modalita_giuridica"
+    # Legacy types
+    SENTENZA = "sentenza"
     CONTRIBUTION = "contribution"
 
 
 class SourceTypeEnum(PyEnum):
     """Source types for entities."""
+    VISUALEX = "visualex"  # visualex API (Normattiva + BrocardiInfo)
     NORMATTIVA = "normattiva"
     CASSAZIONE = "cassazione"
     TAR = "tar"
@@ -53,6 +66,7 @@ class SourceTypeEnum(PyEnum):
     CURATED_DOCTRINE = "curated_doctrine"
     COMMUNITY_CONTRIBUTION = "community_contribution"
     RLCF_FEEDBACK = "rlcf_feedback"
+    DOCUMENTS = "documents"  # PDF/DOCX with LLM extraction
 
 
 class ReviewStatusEnum(PyEnum):
@@ -151,6 +165,61 @@ class StagingEntity(Base):
 
     def __repr__(self):
         return f"<StagingEntity id={self.id} status={self.status}>"
+
+
+class StagingRelationship(Base):
+    """
+    Review queue for extracted relationships (LLM extraction, community, etc).
+
+    Relationships wait here for expert approval before entering Neo4j graph.
+    """
+
+    __tablename__ = "kg_staging_relationships"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    relationship_type = Column(String(100), nullable=False, index=True)  # CITA, MODIFICA, etc.
+
+    # Source and target identification
+    source_entity_data = Column(PGJSON, nullable=False)  # {entity_type, identifier, properties}
+    target_entity_data = Column(PGJSON, nullable=False)  # {entity_type, identifier, properties}
+
+    # Relationship properties
+    properties = Column(PGJSON, default={})
+
+    # Source tracking
+    source_type = Column(Enum(SourceTypeEnum), nullable=False, index=True)
+    raw_data = Column(PGJSON, default={})  # Full extraction data
+
+    # Confidence from extraction
+    confidence_score = Column(Float, default=0.5, nullable=False)
+
+    # Review workflow
+    status = Column(Enum(ReviewStatusEnum), default=ReviewStatusEnum.PENDING, index=True)
+    reviewer_id = Column(String(100), nullable=True, index=True)
+    review_comments = Column(Text, nullable=True)
+
+    # Metadata
+    metadata = Column(PGJSON, default={})  # source_article, llm_model, etc.
+
+    # Tracking
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    reviewed_at = Column(DateTime, nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+
+    # Neo4j reference (if approved)
+    neo4j_edge_id = Column(String(100), nullable=True)
+
+    # Auditing
+    created_by = Column(String(100), nullable=True)
+    last_modified_at = Column(DateTime, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_staging_rel_status_created", "status", "created_at"),
+        Index("idx_staging_rel_type", "relationship_type", "status"),
+    )
+
+    def __repr__(self):
+        return f"<StagingRelationship id={self.id} type={self.relationship_type} status={self.status}>"
 
 
 # ==========================================
