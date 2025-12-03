@@ -10,8 +10,8 @@
 | Campo | Valore |
 |-------|--------|
 | **Data ultimo aggiornamento** | 3 Dicembre 2025 |
-| **Fase progetto** | Primo batch ingestion completato - Graph operativo con dati reali |
-| **Prossimo obiettivo** | Bridge Table + GraphAwareRetriever |
+| **Fase progetto** | Bridge Table implementata e testata ✅ |
+| **Prossimo obiettivo** | GraphAwareRetriever con hybrid scoring |
 | **Blocchi attivi** | Nessuno |
 
 ---
@@ -39,7 +39,7 @@
 
 ---
 
-## Cosa Abbiamo Fatto (Ultima Sessione - 3 Dic 2025)
+## Cosa Abbiamo Fatto (Ultima Sessione - 3 Dic 2025, Pomeriggio)
 
 - [x] **Archiviato codice v1** in `backend/archive_v1/`
 - [x] **Struttura modulare v2**:
@@ -75,6 +75,17 @@
   - Test suite completo (4/4 passed)
   - Script standalone: `scripts/ingest_art_1453_1456.py`
   - Performance: query in 0.3-0.8ms
+- [x] **Bridge Table implementata** ✅:
+  - PostgreSQL schema con 11 colonne, 6 indici
+  - SQLAlchemy ORM models (BridgeTableEntry)
+  - Service class async (BridgeTable) con CRUD operations
+  - Metodi: add_mapping(), add_mappings_batch(), get_nodes_for_chunk(), get_chunks_for_node()
+  - ✓ 5/5 test passano (health_check, single/batch insert, bidirectional queries)
+- [x] **Fix PostgreSQL port conflict**:
+  - Identificato conflitto con PostgreSQL 14 nativo (Homebrew) su porta 5432
+  - Container spostato su porta 5433
+  - Analisi approfondita: lsof, docker logs, pg_hba.conf
+  - Entrambe le istanze PostgreSQL coesistono senza problemi
 
 ---
 

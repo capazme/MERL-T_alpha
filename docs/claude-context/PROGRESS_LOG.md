@@ -5,6 +5,73 @@
 
 ---
 
+## 2025-12-03 (Pomeriggio) - Bridge Table Implementata ✅
+
+**Durata**: ~2 ore
+**Obiettivo**: Implementare e testare Bridge Table per mapping vector-graph
+**Risultato**: ✓ Bridge Table completa con 5/5 test passanti
+
+### Completato
+1. **Bridge Table Implementation**:
+   - Schema PostgreSQL: 11 colonne (chunk_id, graph_node_urn, node_type, relation_type, confidence, etc.)
+   - 6 indici per performance (chunk_id, graph_node_urn, node_type, relation_type, confidence, composite)
+   - Trigger auto-update per updated_at
+   - SQLAlchemy ORM models con BridgeTableEntry
+   - Service class async con connection pooling
+
+2. **CRUD Operations Complete**:
+   - `add_mapping()` - insert singolo
+   - `add_mappings_batch()` - batch insert per ingestion
+   - `get_nodes_for_chunk()` - query chunk → nodes
+   - `get_chunks_for_node()` - query node → chunks (bidirectional)
+   - `delete_mappings_for_chunk()` - cleanup
+   - `health_check()` - connection verification
+
+3. **Test Suite (5/5 passed)**:
+   - test_health_check
+   - test_add_single_mapping
+   - test_batch_insert
+   - test_get_chunks_for_node (bidirectional)
+   - test_filter_by_node_type
+   - Execution time: 0.36s
+
+### Problemi Incontrati
+1. **PostgreSQL port conflict (causa profonda)**:
+   - **Sintomo**: `role "dev" does not exist` su connessioni TCP/IP
+   - **Causa**: PostgreSQL 14 nativo (Homebrew, PID 979) su porta 5432 dal 23 novembre
+   - **Analisi**: lsof, docker logs, pg_hba.conf - container healthy ma connessioni andavano a istanza nativa
+   - **Soluzione**: Spostato container su porta 5433 (docker-compose.dev.yml)
+   - **Risultato**: Entrambe le istanze PostgreSQL coesistono senza problemi
+
+2. **Volume Docker corrotto**:
+   - Dati precedenti corrotti causavano skip dell'inizializzazione
+   - Rimosso volume, ricreato container da zero
+
+### Prossimi Passi
+1. **GraphAwareRetriever** (~3-4 ore):
+   - Hybrid scoring: `α * vector_similarity + (1-α) * graph_score`
+   - Usa Bridge Table per enrichment
+   - Learnable alpha parameter
+   - Test con dati reali (Art. 1453-1456)
+
+2. **Expand ingestion** (~2-3 ore):
+   - Target: ~50 articoli (Libro IV - Obbligazioni, Art. 1173-2059)
+   - Include Brocardi enrichment
+   - Batch ingestion via add_mappings_batch()
+
+3. **Expert with Tools** (~6-8 ore):
+   - LiteralExpert, SystemicExpert, PrinciplesExpert, PrecedentExpert
+   - Specialized retrieval tools per expert
+   - Integration con GraphAwareRetriever
+
+### Note per Future Sessioni
+- ⚠️ Porta PostgreSQL container: 5433 (non 5432)
+- ✅ Bridge Table pronta per integration con Qdrant
+- ✅ Test suite completa e veloce (0.36s)
+- 📝 Schema supporta metadata JSONB per estensioni future
+
+---
+
 ## Formato Entry
 
 ```markdown
