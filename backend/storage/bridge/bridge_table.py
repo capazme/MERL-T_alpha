@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 class BridgeTableConfig:
     """Configuration for Bridge Table connection."""
     host: str = "localhost"
-    port: int = 5432
+    port: int = 5433  # Dev container port (avoiding conflict with native PostgreSQL)
     database: str = "rlcf_dev"
     user: str = "dev"
     password: str = "devpassword"

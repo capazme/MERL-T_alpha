@@ -17,7 +17,7 @@ async def bridge_table():
     """Initialize BridgeTable for testing."""
     config = BridgeTableConfig(
         host="localhost",
-        port=5432,
+        port=5433,  # Dev container port
         database="rlcf_dev",
         user="dev",
         password="devpassword"

@@ -10,14 +10,14 @@
 services:
   # PostgreSQL: Bridge Table + RLCF authority/feedback
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: merl-t-postgres-dev
     environment:
       POSTGRES_DB: rlcf_dev
       POSTGRES_USER: dev
       POSTGRES_PASSWORD: devpassword
     ports:
-      - "5432:5432"
+      - "5433:5432"  # Host:5433 to avoid conflict with native PostgreSQL
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
