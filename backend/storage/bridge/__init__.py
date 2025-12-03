@@ -6,25 +6,29 @@ Maps vector chunks to graph nodes for hybrid retrieval.
 
 The Bridge Table enables Graph-Aware Similarity Search by linking:
 - chunk_id (Qdrant vectors)
-- graph_node_id (FalkorDB nodes)
-- relation_type (PRIMARY, CONCEPT, REFERENCE)
-- weight (learnable via RLCF)
+- graph_node_urn (FalkorDB nodes)
+- relation_type (contained_in, references, etc.)
+- confidence (0-1 score)
 
 See docs/03-architecture/04-storage-layer.md for design details.
 
 Schema:
     bridge_table (
         chunk_id UUID,
-        graph_node_id VARCHAR(200),
+        graph_node_urn VARCHAR(500),
+        node_type VARCHAR(50),
         relation_type VARCHAR(50),
-        weight FLOAT DEFAULT 1.0  -- Learnable!
+        confidence FLOAT,
+        metadata JSONB
     )
 """
 
-from .table import BridgeTable, BridgeTableBuilder, BridgeEntry
+from .models import BridgeTableEntry, Base
+from .bridge_table import BridgeTable, BridgeTableConfig
 
 __all__ = [
     "BridgeTable",
-    "BridgeTableBuilder",
-    "BridgeEntry",
+    "BridgeTableConfig",
+    "BridgeTableEntry",
+    "Base",
 ]

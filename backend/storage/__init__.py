@@ -32,8 +32,9 @@ v2 Architecture:
 """
 
 from .falkordb import FalkorDBClient, FalkorDBConfig
-from .bridge import BridgeTable, BridgeTableBuilder, BridgeEntry
-from .retriever import GraphAwareRetriever, RetrievalResult, RetrieverConfig
+from .bridge import BridgeTable, BridgeTableConfig, BridgeTableEntry
+# v2 TODO: GraphAwareRetriever placeholder
+# from .retriever import GraphAwareRetriever, RetrievalResult, RetrieverConfig
 
 __all__ = [
     # FalkorDB
@@ -41,10 +42,10 @@ __all__ = [
     "FalkorDBConfig",
     # Bridge Table
     "BridgeTable",
-    "BridgeTableBuilder",
-    "BridgeEntry",
-    # Retriever
-    "GraphAwareRetriever",
-    "RetrievalResult",
-    "RetrieverConfig",
+    "BridgeTableConfig",
+    "BridgeTableEntry",
+    # Retriever (v2 TODO)
+    # "GraphAwareRetriever",
+    # "RetrievalResult",
+    # "RetrieverConfig",
 ]
