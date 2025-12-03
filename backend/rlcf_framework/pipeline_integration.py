@@ -41,7 +41,8 @@ from backend.preprocessing.ner_feedback_loop import (
     create_ner_feedback_manager
 )
 from backend.rlcf_framework.database import SessionLocal
-from backend.preprocessing.neo4j_connection import Neo4jConnectionManager
+# v2: Neo4j archived - will be replaced by FalkorDB
+# from backend.preprocessing.neo4j_connection import Neo4jConnectionManager
 from backend.preprocessing.redis_connection import RedisConnectionManager
 from backend.preprocessing.config.kg_config import load_kg_config
 

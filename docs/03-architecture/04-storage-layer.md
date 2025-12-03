@@ -1,1333 +1,865 @@
-# Storage Layer Architecture
+# Storage Layer Architecture (v2)
 
-**Implementation Status**: 🚧 **PARZIALMENTE IMPLEMENTATO**
-**Current Version**: v0.6.0
-**Last Updated**: November 2025
+**Version**: 2.0
+**Status**: IN RIPROGETTAZIONE
+**Last Updated**: Dicembre 2025
 
-**Implemented Components**:
-- ✅ PostgreSQL: Orchestration tables, authentication, API keys, usage tracking
-- ✅ Qdrant (VectorDB): Collection management, semantic search, 3 search patterns
-- ✅ E5-large Embeddings: 1024-dim multilingual embeddings
-- ✅ Data Ingestion Script: Multi-source support (Neo4j, JSON, PostgreSQL)
-- ⏳ Neo4j/Memgraph: Schema defined, KG enrichment service ready, not yet deployed in production
-- ⏳ Redis: Used for rate limiting, not yet for general caching
-
-**Code Location**: `backend/orchestration/services/qdrant_service.py`, `backend/orchestration/services/embedding_service.py`, `scripts/ingest_legal_corpus.py`
-**Tests**: `tests/orchestration/test_vectordb_agent.py`, `test_embedding_service.py`
+> **Nota**: Questo documento descrive l'architettura v2 con FalkorDB e Bridge Table.
+> Per l'architettura v1 (Neo4j + storage separati), vedere `archive/v1-04-storage-layer.md`
 
 ---
 
-## 1. Introduction
+## 1. Cambio di Paradigma: v1 vs v2
 
-The **Storage Layer** is the foundation of MERL-T's knowledge infrastructure, consisting of three complementary storage systems plus a comprehensive data ingestion pipeline:
-
-1. **Vector Database** (semantic similarity search over legal corpus)
-2. **Knowledge Graph** (structured legal knowledge + relationships)
-3. **PostgreSQL** (metadata, RLCF feedback, system state)
-4. **Data Ingestion Pipeline** (parse, chunk, embed, enrich legal documents)
-
-**Design Principles**:
-- **Complementary Storage**: Each system optimized for different query patterns
-- **Unified Metadata**: Single metadata schema across VectorDB + KG + PostgreSQL
-- **Bootstrap Evolution**: Embeddings evolve from generic → fine-tuned → distilled (5 phases)
-- **Continuous Ingestion**: Pipeline supports incremental updates (new laws, judgments)
-- **RLCF-Driven**: Storage optimized based on community feedback
-
-**Performance Targets**:
-- Vector search: < 200ms (top-20, with filters)
-- KG traversal: < 50ms (depth-3)
-- Ingestion throughput: 1000 chunks/hour (single worker)
-
-**Reference**: See `docs/02-methodology/vector-database.md`, `docs/02-methodology/knowledge-graph.md`, `docs/02-methodology/data-ingestion.md` for theoretical foundations.
-
----
-
-## 2. Architecture Overview
+### Architettura v1 (Deprecata)
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    DATA INGESTION PIPELINE                   │
-│                                                              │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │  Parse   │→ │  Chunk   │→ │  Embed   │→ │ Enrich   │   │
-│  │ (Akoma   │  │(Semantic)│  │ (text-   │  │(Metadata)│   │
-│  │  Ntoso,  │  │          │  │embedding)│  │          │   │
-│  │   PDF)   │  │          │  │          │  │          │   │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
-│                                                              │
-└─────────────┬────────────────────────────────────────────────┘
-              ↓
-   ┌──────────┴──────────┐
-   │                     │
-   ↓                     ↓
-┌────────────────┐  ┌────────────────┐
-│ VECTOR DATABASE│  │ KNOWLEDGE GRAPH│
-│                │  │                │
-│ • Chunks       │  │ • Norms        │
-│ • Embeddings   │  │ • Concepts     │
-│ • Metadata     │  │ • Sentenze     │
-│ • HNSW Index   │  │ • Relationships│
-│                │  │ • 23 node types│
-│ • Weaviate     │  │ • Neo4j        │
-└────────────────┘  └────────────────┘
-         ↓                   ↓
-         └───────────┬───────┘
-                     ↓
-         ┌───────────────────┐
-         │   POSTGRESQL      │
-         │                   │
-         │ • Chunk metadata  │
-         │ • RLCF feedback   │
-         │ • User sessions   │
-         │ • System state    │
-         └───────────────────┘
+Storage Separati:
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│  VectorDB   │  │   Neo4j     │  │ PostgreSQL  │
+│  (Qdrant)   │  │   (Graph)   │  │  (RLCF)     │
+└─────────────┘  └─────────────┘  └─────────────┘
+      │                │                │
+      └────── NO DEEP INTEGRATION ──────┘
 ```
 
-**Data Flow**:
-1. **Ingestion**: Legal documents → Pipeline → Chunks + Embeddings + Metadata
-2. **Storage**: Chunks → VectorDB, Structured data → KG, Metadata → PostgreSQL
-3. **Retrieval**: VectorDB Agent → Vector search, KG Agent → Graph traversal
-4. **Feedback**: RLCF → PostgreSQL → Retrain embeddings → Update VectorDB
+**Problemi v1**:
+- Vector e Graph non comunicano
+- Retrieval "o semantico o strutturato", non entrambi
+- Neo4j troppo lento per traversal complessi (496x vs FalkorDB)
+- Nessun modo per "pesare" i risultati in base al grafo
 
----
-
-## 3. Vector Database Architecture
-
-**Reference**: `docs/02-methodology/vector-database.md`
-
-The Vector Database stores **semantic embeddings** of legal text chunks for fast similarity search.
-
-### 3.1 HNSW Index
-
-**HNSW** (Hierarchical Navigable Small World) is an approximate nearest neighbor algorithm optimized for high-dimensional vectors.
-
-**Architecture**:
+### Architettura v2 (Nuova)
 
 ```
-Vector Database Structure:
-
+Storage Integrato con Bridge Table:
 ┌─────────────────────────────────────────────────────┐
-│                 HNSW Index Layers                    │
-│                                                      │
-│  Layer 2 (coarse):   [Node A] ←→ [Node B]          │
-│                         ↕           ↕               │
-│  Layer 1 (medium):   [A1] [A2]  [B1] [B2]          │
-│                       ↕    ↕      ↕    ↕            │
-│  Layer 0 (fine):   [All 1M chunks, densely connected]│
-│                                                      │
+│                    BRIDGE TABLE                      │
+│      (Mappa chunk_id ↔ graph_node_id)               │
+├─────────────────────────────────────────────────────┤
+│                         │                            │
+│      ┌──────────────────┼──────────────────┐        │
+│      ▼                  │                  ▼        │
+│ ┌─────────────┐         │         ┌─────────────┐  │
+│ │  VectorDB   │◄────────┼────────►│  FalkorDB   │  │
+│ │  (Qdrant)   │    Graph-Aware    │   (Graph)   │  │
+│ │  Semantic   │    Similarity     │  Strutturato│  │
+│ └─────────────┘                   └─────────────┘  │
+│                         │                            │
+│                         ▼                            │
+│                  ┌─────────────┐                    │
+│                  │ PostgreSQL  │                    │
+│                  │ (RLCF, Auth)│                    │
+│                  └─────────────┘                    │
 └─────────────────────────────────────────────────────┘
-
-Search Strategy:
-1. Start at Layer 2 (coarse navigation)
-2. Find closest node at Layer 2
-3. Descend to Layer 1
-4. Find closest node at Layer 1
-5. Descend to Layer 0
-6. Exhaustive search in local neighborhood
-7. Return top-k nearest neighbors
-
-Complexity: O(log N) instead of O(N) for brute force
 ```
 
-**HNSW Parameters**:
-
-| Parameter | Value | Purpose |
-|-----------|-------|---------|
-| **M** | 16 | Max connections per node per layer (higher = better recall, more memory) |
-| **ef_construction** | 128 | Size of dynamic candidate list during construction (higher = better index quality) |
-| **ef_search** | 64 | Size of dynamic candidate list during search (higher = better recall, slower search) |
-| **max_layers** | Auto (log N) | Number of hierarchical layers |
-
-**Trade-offs**:
-- **Recall vs Speed**: Higher `ef_search` → Better recall, slower search
-- **Index Quality vs Build Time**: Higher `ef_construction` → Better index, slower build
-- **Memory vs Recall**: Higher `M` → Better recall, more memory (~16 bytes per connection)
-
-**Storage Requirements**:
-- Vector dimension: 3072 (text-embedding-3-large)
-- Vectors stored: 1,000,000 chunks
-- Vector size: 3072 × 4 bytes (float32) = 12 KB per vector
-- HNSW overhead: ~30% (connections)
-- **Total**: 1M × 12KB × 1.3 = **~15.6 GB**
+**Vantaggi v2**:
+- **FalkorDB**: 496x piu veloce di Neo4j per traversal
+- **Bridge Table**: Integrazione profonda vector ↔ graph
+- **Graph-Aware Similarity**: Ranking influenzato dalla struttura del grafo
+- **Hybrid Retrieval**: Combina semantica + struttura in ogni query
 
 ---
 
-### 3.2 Metadata Filter Engine
+## 2. FalkorDB: Knowledge Graph
 
-**Purpose**: Apply metadata constraints to narrow search space before vector similarity.
+### 2.1 Perche FalkorDB
 
-**Filter Architecture**:
+| Aspetto | Neo4j | FalkorDB |
+|---------|-------|----------|
+| **Performance** | Baseline | 496x piu veloce |
+| **Query Language** | Cypher | Cypher (compatibile) |
+| **Memory Model** | Disk-based | In-memory + disk |
+| **Licenza** | Enterprise (costosa) | Open Source |
+| **Concorrenza** | Limitata | Redis-based (eccellente) |
 
+**Benchmark** (da documentazione FalkorDB):
 ```
-┌────────────────────────────────────────────────────┐
-│ Query with Filters                                 │
-│ {                                                  │
-│   "query": "risoluzione contratto",                │
-│   "filters": {                                     │
-│     "temporal_metadata.is_current": true,          │
-│     "classification.legal_area": "civil",          │
-│     "authority_metadata.hierarchical_level":       │
-│       ["Costituzione", "Legge Ordinaria"]          │
-│   }                                                │
-│ }                                                  │
-└──────────────────┬─────────────────────────────────┘
-                   ↓
-┌────────────────────────────────────────────────────┐
-│ STEP 1: Metadata Filtering (Pre-filtering)        │
-│   Apply boolean filters to metadata               │
-│   Reduce search space from 1M → 200K chunks       │
-└──────────────────┬─────────────────────────────────┘
-                   ↓
-┌────────────────────────────────────────────────────┐
-│ STEP 2: Vector Search (HNSW on filtered set)      │
-│   Search only within filtered 200K chunks          │
-│   Retrieve top-20 by cosine similarity             │
-└──────────────────┬─────────────────────────────────┘
-                   ↓
-           Top-20 Results
+Query: 3-hop traversal su 1M nodi
+- Neo4j: 496ms
+- FalkorDB: 1ms
+
+Query: Pattern matching complesso
+- Neo4j: 2.3s
+- FalkorDB: 4.7ms
 ```
 
-**Filter Types**:
+### 2.2 Schema del Grafo (Hardcoded)
 
-| Filter Category | Metadata Fields | Example |
-|----------------|----------------|---------|
-| **Temporal** | `temporal_metadata.is_current`<br>`temporal_metadata.date_effective`<br>`temporal_metadata.date_end` | Current law only: `is_current = true`<br>Historical: `date_effective <= 2010-01-01` |
-| **Hierarchical** | `authority_metadata.hierarchical_level`<br>`authority_metadata.binding_force` | Constitutional level: `["Costituzione", "Legge Costituzionale"]` |
-| **Domain** | `classification.legal_area`<br>`classification.legal_domain_tags` | Civil law: `legal_area = "civil"` |
-| **Document Type** | `document_type` | Norms only: `document_type = "norm"` |
-| **Entity** | `entities_extracted.norm_references`<br>`entities_extracted.case_references` | References Art. 1453: `norm_references contains "art_1453_cc"` |
-
-**Performance**:
-- Filter evaluation: ~5ms (indexed metadata fields)
-- Reduction ratio: Typically 1M → 100K-500K (depends on filter selectivity)
-- Combined (filter + search): ~150ms (vs 200ms without filtering)
-
----
-
-### 3.3 Hybrid Search Combiner
-
-**Purpose**: Combine semantic similarity (vector) with keyword matching (BM25) for better recall.
-
-**Architecture**:
+Lo schema del grafo e definito a priori basandosi su discussione accademica, **non generato da LLM**.
 
 ```
-Query: "risoluzione per inadempimento"
-            ↓
-    ┌───────┴───────┐
-    │               │
-    ↓               ↓
-┌─────────────┐  ┌─────────────┐
-│ Vector      │  │ Keyword     │
-│ Search      │  │ Search      │
-│ (HNSW)      │  │ (BM25)      │
-└──────┬──────┘  └──────┬──────┘
-       │                │
-       ↓                ↓
-  vector_scores    keyword_scores
-  (cosine sim)     (BM25 score)
-       │                │
-       └────────┬───────┘
-                ↓
-      ┌──────────────────┐
-      │ Score Fusion     │
-      │ combined =       │
-      │ α·vector +       │
-      │ (1-α)·keyword    │
-      └────────┬─────────┘
-               ↓
-        Hybrid Rankings
+NODE TYPES (Principali)
+================================================================
+
+DOCUMENTI LEGALI:
+- Norma (Costituzione, Legge, DL, D.Lgs, Regolamento)
+- Versione (Temporal versions per multivigenza)
+- Articolo, Comma, Lettera, Numero
+- Sentenza (Cassazione, Corte Cost., TAR, etc.)
+- Dottrina (Commentari, articoli)
+
+ENTITA GIURIDICHE:
+- Concetto (contratto, proprieta, responsabilita)
+- Principio (buona fede, proporzionalita)
+- Definizione (definizioni legali da norme)
+
+RELAZIONI PROCESSUALI:
+- Caso (fact pattern)
+- Procedura (iter processuale)
+
+RELAZIONE TYPES (65 tipologie, 11 categorie)
+================================================================
+
+GERARCHICHE:
+- GERARCHIA_KELSENIANA (Costituzione → Legge → Regolamento)
+- ABROGA, MODIFICA, SOSTITUISCE
+- ATTUAZIONE, DELEGA
+
+CITAZIONALI:
+- CITA, RICHIAMA, RINVIA
+- INTERPRETA, APPLICA
+
+CONCETTUALI:
+- DISCIPLINATO_DA (Concept → Norma)
+- DEFINISCE, SPECIFICA
+- RELAZIONE_CONCETTUALE (prerequisito, conseguenza, eccezione)
+
+TEMPORALI:
+- VALIDO_DA, VALIDO_FINO_A
+- HA_VERSIONE
+
+GIURISPRUDENZIALI:
+- INTERPRETA (Sentenza → Norma)
+- OVERRULES, DISTINGUISHES
+- CONFERMA, RIBALTA
 ```
 
-**Score Fusion Algorithm**:
-
-```
-Input:
-- query: "risoluzione per inadempimento"
-- alpha: 0.7 (weighting parameter)
-
-Step 1: Vector Search
-- Embed query → query_vector [3072 dims]
-- HNSW search → top-100 candidates with cosine_scores
-
-Step 2: Keyword Search (BM25)
-- Tokenize query → ["risoluzione", "inadempimento"]
-- BM25 scoring → top-100 candidates with bm25_scores
-
-Step 3: Normalize Scores
-- vector_norm = (cosine - min) / (max - min)  → [0, 1]
-- keyword_norm = (bm25 - min) / (max - min)   → [0, 1]
-
-Step 4: Fuse Scores
-- For each chunk appearing in either result set:
-    combined_score = alpha * vector_norm + (1 - alpha) * keyword_norm
-
-Step 5: Rerank
-- Sort chunks by combined_score descending
-- Return top-k
-
-Output: Top-k chunks with hybrid ranking
-```
-
-**Alpha Parameter Tuning**:
-
-| Alpha | Vector Weight | Keyword Weight | Use Case |
-|-------|--------------|---------------|----------|
-| **1.0** | 100% | 0% | Pure semantic (conceptual similarity) |
-| **0.8** | 80% | 20% | Semantic-heavy (default for case law) |
-| **0.7** | 70% | 30% | Balanced (default for norms) |
-| **0.5** | 50% | 50% | Equal weight |
-| **0.3** | 30% | 70% | Keyword-heavy (exact term matching) |
-| **0.0** | 0% | 100% | Pure keyword (legacy search) |
-
-**Performance**:
-- Vector search: ~100ms
-- BM25 search: ~50ms
-- Parallel execution: max(100, 50) = ~100ms
-- Score fusion: ~10ms
-- **Total**: ~110ms (vs 100ms for vector-only)
-
----
-
-### 3.4 Cross-Encoder Reranker
-
-**Purpose**: Two-stage retrieval for higher precision (HNSW recall stage + BERT reranking stage).
-
-**Architecture**:
-
-```
-Stage 1: RECALL (Fast, Lower Precision)
-┌────────────────────────────────────┐
-│ Semantic Search (HNSW)             │
-│ Retrieve top-50 candidates         │
-│ Latency: ~100ms                    │
-└──────────────┬─────────────────────┘
-               ↓
-        Top-50 Candidates
-               ↓
-Stage 2: PRECISION (Slow, Higher Precision)
-┌────────────────────────────────────┐
-│ Cross-Encoder BERT Reranking       │
-│                                    │
-│ For each of 50 candidates:         │
-│   Input: [CLS] query [SEP] chunk  │
-│   BERT inference → relevance score │
-│                                    │
-│ Latency: ~40ms × 50 = 2000ms      │
-└──────────────┬─────────────────────┘
-               ↓
-         Reranked top-10
-```
-
-**Cross-Encoder Model**:
-
-```json
-{
-  "model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
-  "fine_tuned_on": "italian_legal_triplets",
-  "training_data": {
-    "size": 5000,
-    "format": "(query, chunk, relevance_label)",
-    "source": "RLCF feedback"
-  },
-  "input_format": "[CLS] query [SEP] chunk_text [SEP]",
-  "output": "relevance_score (0.0-1.0)",
-  "max_input_length": 512,
-  "latency": "~40ms per pair"
-}
-```
-
-**Processing Logic**:
-
-```
-Input: query = "È valido un contratto firmato da un minorenne?"
-       candidates = [chunk_1, chunk_2, ..., chunk_50]
-
-For each candidate_i in candidates:
-    # Construct input for BERT
-    bert_input = f"[CLS] {query} [SEP] {candidate_i.text[:500]} [SEP]"
-
-    # BERT inference
-    relevance_score_i = cross_encoder_model(bert_input)
-
-    # Store score
-    candidate_i.rerank_score = relevance_score_i
-
-# Sort by rerank_score
-ranked_candidates = sort(candidates, key=rerank_score, descending=True)
-
-# Return top-10
-return ranked_candidates[:10]
-```
-
-**Performance**:
-- **Candidate count**: 50 (recall stage)
-- **Final count**: 10 (precision stage)
-- **Latency**: ~2s (50 × 40ms)
-- **Accuracy improvement**: +15% precision@10 (vs vector-only)
-
-**When to Use**:
-- Query complexity > 0.6 (medium/high)
-- Intent = `validità_atto` (requires precision)
-- User requests "accurate" results
-
----
-
-### 3.5 Unified Metadata Schema
-
-**Reference**: `docs/02-methodology/vector-database.md` §3, `docs/02-methodology/data-ingestion.md` §4
-
-**Full Metadata Schema** (stored with each chunk):
-
-```json
-{
-  "chunk_metadata": {
-    "chunk_id": "uuid",
-    "document_id": "uuid (parent document)",
-    "document_type": "norm | jurisprudence | doctrine",
-
-    "temporal_metadata": {
-      "date_published": "2023-06-15",
-      "date_effective": "2023-07-01",
-      "date_end": null,
-      "is_current": true,
-      "version_id": "art_1453_cc_v3"
-    },
-
-    "classification": {
-      "legal_area": "civil | criminal | administrative | constitutional",
-      "legal_domain_tags": ["contract", "obligation", "termination"],
-      "complexity_level": 0.6,
-      "hierarchical_level": "Legge Ordinaria"
-    },
-
-    "authority_metadata": {
-      "hierarchical_level": "Costituzione | Legge Costituzionale | Legge Ordinaria | Regolamento",
-      "binding_force": 0.95,
-      "authority_score": 0.88,
-      "citation_count": 1542
-    },
-
-    "kg_links": {
-      "primary_article_id": "art_1453_cc",
-      "referenced_norm_ids": ["art_1454_cc", "art_1455_cc"],
-      "related_concept_ids": ["risoluzione_contratto", "inadempimento"],
-      "jurisprudence_cluster_id": "cluster_inadempimento_2023"
-    },
-
-    "entities_extracted": {
-      "norm_references": ["art_1453_cc", "art_1418_cc"],
-      "case_references": ["cass_2023_12567"],
-      "legal_concepts": ["risoluzione", "inadempimento", "contratto"],
-      "named_entities": {
-        "persons": [],
-        "organizations": [],
-        "courts": ["Cassazione"]
-      }
-    },
-
-    "ingestion_metadata": {
-      "source_url": "https://www.normattiva.it/...",
-      "ingestion_date": "2024-01-15T10:30:00Z",
-      "parser_version": "v2.1",
-      "embedding_model": "text-embedding-3-large",
-      "embedding_phase": 2
-    }
-  }
-}
-```
-
-**Metadata Inheritance**:
-- Document-level metadata → All chunks from same document
-- Version-aware: Each version of norm has separate chunks
-- Dynamic enrichment: Metadata updated when new relationships discovered in KG
-
----
-
-## 4. Knowledge Graph Architecture
-
-**Reference**: `docs/02-methodology/knowledge-graph.md`
-
-The Knowledge Graph stores **structured legal knowledge** with rich relationships.
-
-### 4.1 Neo4j Schema
-
-**Node Types** (23 total):
-
-```
-LEGAL DOCUMENTS (5 node types):
-┌───────────────────────────────────────────────────┐
-│ 1. Norma                                          │
-│    - Costituzione, Legge, DL, D.Lgs, Regolamento │
-│                                                   │
-│ 2. Versione                                       │
-│    - Temporal version of Norma (multivigenza)    │
-│                                                   │
-│ 3. Comma / Lettera / Numero                      │
-│    - Fine-grained article structure              │
-│                                                   │
-│ 4. AttoGiudiziario                               │
-│    - Sentenze, Ordinanze, Decreti                │
-│                                                   │
-│ 5. Dottrina                                       │
-│    - Legal scholarship, commentaries             │
-└───────────────────────────────────────────────────┘
-
-LEGAL ENTITIES (4 node types):
-┌───────────────────────────────────────────────────┐
-│ 6. SoggettoGiuridico                             │
-│    - Legal persons (natural, juridical)          │
-│                                                   │
-│ 7. OrganoGiurisdizionale                         │
-│    - Courts (Cassazione, TAR, Corte Cost.)       │
-│                                                   │
-│ 8. OrganoAmministrativo                          │
-│    - Administrative bodies (Ministero, Agenzia)  │
-│                                                   │
-│ 9. RuoloGiuridico                                │
-│    - Legal roles (creditore, debitore, erede)    │
-└───────────────────────────────────────────────────┘
-
-LEGAL CONCEPTS (3 node types):
-┌───────────────────────────────────────────────────┐
-│ 10. ConcettoGiuridico                            │
-│     - Abstract legal concepts (contratto, proprietà)│
-│                                                   │
-│ 11. DefinizioneLegale                            │
-│     - Legal definitions from norms               │
-│                                                   │
-│ 12. PrincipioGiuridico                           │
-│     - Legal principles (buona fede, certezza)    │
-└───────────────────────────────────────────────────┘
-
-LEGAL RELATIONS (4 node types):
-┌───────────────────────────────────────────────────┐
-│ 13. DirittoSoggettivo                            │
-│     - Subjective rights (ownership, credit)      │
-│                                                   │
-│ 14. InteresseLegittimo                           │
-│     - Legitimate interests (administrative law)  │
-│                                                   │
-│ 15. ModalitàGiuridica                            │
-│     - Legal modalities (conditions, terms)       │
-│                                                   │
-│ 16. Responsabilità                               │
-│     - Legal liability types                      │
-└───────────────────────────────────────────────────┘
-
-PROCEDURES & CONSEQUENCES (4 node types):
-┌───────────────────────────────────────────────────┐
-│ 17. Procedura                                     │
-│     - Legal procedures (trial, appeal)           │
-│                                                   │
-│ 18. FattoGiuridico                               │
-│     - Legal facts (birth, death, contract)       │
-│                                                   │
-│ 19. Caso                                          │
-│     - Legal cases (fact patterns)                │
-│                                                   │
-│ 20. Sanzione / Termine                           │
-│     - Sanctions and deadlines                    │
-└───────────────────────────────────────────────────┘
-
-EU INTEGRATION (2 node types):
-┌───────────────────────────────────────────────────┐
-│ 21. DirettivaUE                                   │
-│     - EU directives                              │
-│                                                   │
-│ 22. RegolamentoUE                                │
-│     - EU regulations                             │
-└───────────────────────────────────────────────────┘
-
-REASONING (1 node type):
-┌───────────────────────────────────────────────────┐
-│ 23. Regola / ProposizioneGiuridica               │
-│     - Inference rules (if-then patterns)         │
-└───────────────────────────────────────────────────┘
-```
-
----
-
-### 4.2 Relationship Types (65 total, 11 categories)
-
-**Relationship Categories**:
-
-```
-1. HIERARCHICAL RELATIONSHIPS (7 types)
-┌──────────────────────────────────────────────────┐
-│ - GERARCHIA_KELSENIANA                           │
-│   (Costituzione → Legge → Regolamento)           │
-│                                                  │
-│ - ABROGA / MODIFICA / SOSTITUISCE                │
-│   (Norm evolution)                               │
-│                                                  │
-│ - ATTUAZIONE / DELEGA                            │
-│   (Implementation relationships)                 │
-│                                                  │
-│ - HA_VERSIONE                                    │
-│   (Norm → Version, for multivigenza)             │
-└──────────────────────────────────────────────────┘
-
-2. CITATION RELATIONSHIPS (5 types)
-┌──────────────────────────────────────────────────┐
-│ - CITA / RICHIAMA / RINVIA                       │
-│   (Cross-references between norms)               │
-│                                                  │
-│ - INTERPRETA / APPLICA                           │
-│   (Jurisprudence → Norm)                         │
-└──────────────────────────────────────────────────┘
-
-3. CONCEPTUAL RELATIONSHIPS (8 types)
-┌──────────────────────────────────────────────────┐
-│ - DISCIPLINATO_DA                                │
-│   (Concept → Norm)                               │
-│                                                  │
-│ - RELAZIONE_CONCETTUALE                          │
-│   (Concept ← → Concept)                          │
-│   Subtypes: prerequisito, conseguenza,           │
-│             alternativa, eccezione               │
-│                                                  │
-│ - DEFINISCE / SPECIFICA                          │
-│   (Norm → Definition)                            │
-│                                                  │
-│ - ISTANZIA / GENERALIZZA                         │
-│   (Concept hierarchy)                            │
-└──────────────────────────────────────────────────┘
-
-4. PROCEDURAL RELATIONSHIPS (6 types)
-┌──────────────────────────────────────────────────┐
-│ - PRESUPPONE / RICHIEDE                          │
-│   (Procedural dependencies)                      │
-│                                                  │
-│ - PRECEDE / SEGUE                                │
-│   (Temporal sequence)                            │
-│                                                  │
-│ - ALTERNATIVA_A / ESCLUDE                        │
-│   (Mutual exclusivity)                           │
-└──────────────────────────────────────────────────┘
-
-5. SUBJECT-OBJECT RELATIONSHIPS (7 types)
-┌──────────────────────────────────────────────────┐
-│ - HA_DIRITTO / HA_OBBLIGO                        │
-│   (Subject → Right/Obligation)                   │
-│                                                  │
-│ - ESERCITA / TUTELA                              │
-│   (Subject → Action)                             │
-│                                                  │
-│ - LESO / PROTETTO                                │
-│   (Harm/Protection relationships)                │
-│                                                  │
-│ - PROPRIETARIO_DI / DETENTORE_DI                 │
-│   (Ownership relationships)                      │
-└──────────────────────────────────────────────────┘
-
-6. TEMPORAL RELATIONSHIPS (4 types)
-┌──────────────────────────────────────────────────┐
-│ - VALIDO_DA / VALIDO_FINO_A                      │
-│   (Temporal validity)                            │
-│                                                  │
-│ - CONTEMPORANEO_A / POSTERIORE_A                 │
-│   (Temporal ordering)                            │
-└──────────────────────────────────────────────────┘
-
-7. CAUSAL RELATIONSHIPS (6 types)
-┌──────────────────────────────────────────────────┐
-│ - CAUSA / EFFETTO                                │
-│   (Causa → Effetto)                              │
-│                                                  │
-│ - PRODUCE / ESTINGUE                             │
-│   (Legal consequence relationships)              │
-│                                                  │
-│ - INVALIDA / ANNULLA                             │
-│   (Invalidation relationships)                   │
-│                                                  │
-│ - CONDIZIONATO_DA / SUBORDINATO_A                │
-│   (Conditional relationships)                    │
-└──────────────────────────────────────────────────┘
-
-8. JURISPRUDENCE RELATIONSHIPS (5 types)
-┌──────────────────────────────────────────────────┐
-│ - INTERPRETA / CONFERMA / RIBALTA                │
-│   (Sentenza → Norm/Sentenza)                     │
-│                                                  │
-│ - PRECEDENTE_DI / SEGUITO_DA                     │
-│   (Case law evolution)                           │
-└──────────────────────────────────────────────────┘
-
-9. CONFLICT RELATIONSHIPS (4 types)
-┌──────────────────────────────────────────────────┐
-│ - CONTRASTA_CON / IN_CONFLITTO_CON               │
-│   (Norm ←conflict→ Norm)                         │
-│                                                  │
-│ - DEROGA / INTEGRA                               │
-│   (Exception/Integration)                        │
-└──────────────────────────────────────────────────┘
-
-10. EU INTEGRATION RELATIONSHIPS (6 types)
-┌──────────────────────────────────────────────────┐
-│ - RECEPISCE / ATTUA_DIRETTIVA                    │
-│   (Italian norm → EU directive)                  │
-│                                                  │
-│ - CONFORMITA_A / VIOLAZIONE_DI                   │
-│   (Norm ←→ EU law)                               │
-│                                                  │
-│ - RINVIO_PREGIUDIZIALE / DISAPPLICAZIONE         │
-│   (CGUE interaction)                             │
-└──────────────────────────────────────────────────┘
-
-11. META RELATIONSHIPS (7 types)
-┌──────────────────────────────────────────────────┐
-│ - COMMENTATO_DA / ANALIZZATO_DA                  │
-│   (Norm → Dottrina)                              │
-│                                                  │
-│ - FONTE / DERIVATO_DA                            │
-│   (Source tracking)                              │
-│                                                  │
-│ - CORRELATO_A / SIMILE_A / ESEMPIO_DI            │
-│   (Analogical relationships)                     │
-└──────────────────────────────────────────────────┘
-```
-
-**Relationship Properties**:
+### 2.3 Cypher Queries Ottimizzate
 
 ```cypher
-// Example relationship with properties
-(:Norma {id: "art_1453_cc"})-[
-  r:DISCIPLINATO_DA {
-    strength: 0.95,
-    relationship_type: "prerequisito",
-    established_by: "legislator",
-    date_established: "1942-03-16"
-  }
-]->(:ConcettoGiuridico {id: "risoluzione_contratto"})
-```
-
----
-
-### 4.3 Query Patterns
-
-**Common Query Patterns**:
-
-**Pattern 1: Concept-to-Norm Mapping**
-```cypher
-// Find norms that discipline a concept
-MATCH (c:ConcettoGiuridico {id: $concept_id})-[:DISCIPLINATO_DA]->(n:Norma)
-OPTIONAL MATCH (n)-[:HA_VERSIONE]->(v:Versione)
-WHERE v.is_current = true OR v IS NULL
+-- Pattern 1: Concept-to-Norm con versione corrente
+MATCH (c:Concetto {id: $concept_id})-[:DISCIPLINATO_DA]->(n:Norma)
+OPTIONAL MATCH (n)-[:HA_VERSIONE]->(v:Versione {is_current: true})
 RETURN n, v
 ORDER BY n.hierarchical_level DESC
 LIMIT 10
-```
 
-**Pattern 2: Hierarchical Traversal**
-```cypher
-// Find parent norms in Kelsenian hierarchy
+-- Pattern 2: Traversal gerarchico
 MATCH path = (parent:Norma)-[:GERARCHIA_KELSENIANA*1..3]->(child:Norma {id: $norm_id})
 RETURN parent, length(path) AS distance
 ORDER BY distance ASC
-```
 
-**Pattern 3: Related Concepts Discovery**
-```cypher
-// Find related concepts via multi-hop traversal
-MATCH path = (c1:ConcettoGiuridico {id: $concept_id})-[:RELAZIONE_CONCETTUALE*1..2]-(c2:ConcettoGiuridico)
-WHERE ALL(r IN relationships(path) WHERE r.relationship_type IN $allowed_types)
-WITH c2, path,
-     reduce(strength = 1.0, r IN relationships(path) | strength * r.strength) AS path_strength
-RETURN c2, path_strength
-ORDER BY path_strength DESC
-LIMIT 10
-```
-
-**Pattern 4: Jurisprudence Lookup**
-```cypher
-// Find case law interpreting a norm
-MATCH (n:Norma {id: $norm_id})<-[:INTERPRETA]-(s:AttoGiudiziario)
-WHERE s.document_type = 'sentenza'
-  AND s.court IN ['Cassazione', 'Corte Costituzionale']
+-- Pattern 3: Giurisprudenza interpretativa
+MATCH (n:Norma {id: $norm_id})<-[:INTERPRETA]-(s:Sentenza)
+WHERE s.court IN ['Cassazione', 'Corte Costituzionale']
 RETURN s
 ORDER BY s.date_published DESC
 LIMIT 5
+
+-- Pattern 4: Traversal pesato per expert (v2)
+MATCH path = (start:Norma {id: $norm_id})-[r*1..3]-(related)
+WHERE ALL(rel IN relationships(path) WHERE
+    CASE type(rel)
+        WHEN 'DEFINISCE' THEN $weight_definisce
+        WHEN 'RINVIA' THEN $weight_rinvia
+        WHEN 'INTERPRETA' THEN $weight_interpreta
+        ELSE 0.5
+    END > rand()  -- Probabilistic selection
+)
+RETURN related, reduce(s = 1.0, rel IN relationships(path) |
+    s * CASE type(rel)
+        WHEN 'DEFINISCE' THEN $weight_definisce
+        WHEN 'RINVIA' THEN $weight_rinvia
+        ELSE 0.5
+    END
+) AS path_score
+ORDER BY path_score DESC
+LIMIT 20
 ```
 
 ---
 
-## 5. PostgreSQL Architecture
+## 3. Bridge Table: Integrazione Vector-Graph
 
-### 5.1 Metadata Storage
+### 3.1 Concetto
 
-**Purpose**: Store chunk metadata for faster filtering (alternative to Neo4j for simple queries).
+La **Bridge Table** e il cuore dell'integrazione v2. Mappa ogni chunk vettoriale ai nodi del grafo corrispondenti.
 
-**Schema**:
-
-```sql
--- Chunks table (primary metadata)
-CREATE TABLE chunks (
-    chunk_id UUID PRIMARY KEY,
-    document_id UUID NOT NULL,
-    document_type VARCHAR(50) NOT NULL, -- 'norm', 'jurisprudence', 'doctrine'
-    text TEXT NOT NULL,
-
-    -- Temporal metadata
-    date_published DATE,
-    date_effective DATE,
-    date_end DATE,
-    is_current BOOLEAN DEFAULT true,
-    version_id VARCHAR(100),
-
-    -- Classification
-    legal_area VARCHAR(50),
-    legal_domain_tags TEXT[], -- Array of tags
-    complexity_level FLOAT,
-    hierarchical_level VARCHAR(100),
-
-    -- Authority
-    binding_force FLOAT,
-    authority_score FLOAT,
-    citation_count INTEGER,
-
-    -- KG links
-    primary_article_id VARCHAR(100),
-    referenced_norm_ids TEXT[],
-    related_concept_ids TEXT[],
-
-    -- Ingestion
-    ingestion_date TIMESTAMP DEFAULT NOW(),
-    embedding_model VARCHAR(100),
-    embedding_phase INTEGER,
-
-    -- Indexes
-    CONSTRAINT valid_document_type CHECK (document_type IN ('norm', 'jurisprudence', 'doctrine'))
-);
-
--- Indexes for fast filtering
-CREATE INDEX idx_chunks_is_current ON chunks(is_current);
-CREATE INDEX idx_chunks_legal_area ON chunks(legal_area);
-CREATE INDEX idx_chunks_document_type ON chunks(document_type);
-CREATE INDEX idx_chunks_hierarchical_level ON chunks(hierarchical_level);
-CREATE INDEX idx_chunks_date_effective ON chunks(date_effective);
-CREATE INDEX idx_chunks_primary_article ON chunks(primary_article_id);
-
--- GIN index for array fields (fast containment queries)
-CREATE INDEX idx_chunks_domain_tags ON chunks USING GIN(legal_domain_tags);
-CREATE INDEX idx_chunks_referenced_norms ON chunks USING GIN(referenced_norm_ids);
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      BRIDGE TABLE                            │
+├──────────────┬──────────────┬───────────────┬───────────────┤
+│   chunk_id   │ graph_node_id│  relation_type │    weight    │
+├──────────────┼──────────────┼───────────────┼───────────────┤
+│  chunk_001   │  art_1453_cc │   PRIMARY      │    1.0       │
+│  chunk_001   │  risoluzione │   CONCEPT      │    0.9       │
+│  chunk_001   │  art_1454_cc │   REFERENCE    │    0.7       │
+│  chunk_002   │  cass_2023_1 │   PRIMARY      │    1.0       │
+│  chunk_002   │  art_1453_cc │   INTERPRETS   │    0.85      │
+└──────────────┴──────────────┴───────────────┴───────────────┘
 ```
 
----
-
-### 5.2 RLCF Feedback Storage
-
-**Purpose**: Store community feedback for RLCF learning loops.
-
-**Schema**:
+### 3.2 Schema SQL
 
 ```sql
--- User feedback on answers
-CREATE TABLE answer_feedback (
-    feedback_id UUID PRIMARY KEY,
-    trace_id VARCHAR(100) NOT NULL, -- Links to query execution
-    user_id UUID NOT NULL,
-    user_authority_score FLOAT NOT NULL, -- Dynamic authority (0.0-1.0)
+CREATE TABLE bridge_table (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chunk_id UUID NOT NULL,
+    graph_node_id VARCHAR(200) NOT NULL,
 
-    -- Feedback content
-    rating INTEGER CHECK (rating BETWEEN 1 AND 5),
-    feedback_text TEXT,
-    corrections JSONB, -- Structured corrections
+    -- Tipo di relazione
+    relation_type VARCHAR(50) NOT NULL,  -- PRIMARY, CONCEPT, REFERENCE, INTERPRETS
 
-    -- Context
-    query_text TEXT NOT NULL,
-    final_answer TEXT NOT NULL,
-    execution_plan JSONB,
-    expert_outputs JSONB,
-
-    -- Timestamps
-    created_at TIMESTAMP DEFAULT NOW(),
-
-    -- Indexes
-    CONSTRAINT valid_rating CHECK (rating >= 1 AND rating <= 5)
-);
-
-CREATE INDEX idx_feedback_trace_id ON answer_feedback(trace_id);
-CREATE INDEX idx_feedback_user_id ON answer_feedback(user_id);
-CREATE INDEX idx_feedback_rating ON answer_feedback(rating);
-CREATE INDEX idx_feedback_created_at ON answer_feedback(created_at);
-
-
--- Training examples derived from feedback
-CREATE TABLE training_examples (
-    example_id UUID PRIMARY KEY,
-    feedback_id UUID REFERENCES answer_feedback(feedback_id),
-
-    example_type VARCHAR(50) NOT NULL, -- 'router_decision', 'embedding_triplet', 'entity_annotation', etc.
-
-    -- Training data
-    input_data JSONB NOT NULL,
-    expected_output JSONB NOT NULL,
+    -- Peso della relazione (apprendibile da RLCF)
+    weight FLOAT DEFAULT 1.0,
 
     -- Metadata
-    quality_score FLOAT, -- How good is this training example (0.0-1.0)
-    used_in_training BOOLEAN DEFAULT false,
-    training_run_id UUID,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
 
-    created_at TIMESTAMP DEFAULT NOW()
+    -- Indici
+    UNIQUE(chunk_id, graph_node_id, relation_type)
 );
 
-CREATE INDEX idx_training_examples_type ON training_examples(example_type);
-CREATE INDEX idx_training_examples_quality ON training_examples(quality_score);
+-- Indici per query veloci
+CREATE INDEX idx_bridge_chunk ON bridge_table(chunk_id);
+CREATE INDEX idx_bridge_node ON bridge_table(graph_node_id);
+CREATE INDEX idx_bridge_relation ON bridge_table(relation_type);
+CREATE INDEX idx_bridge_weight ON bridge_table(weight);
+
+-- Funzione per aggiornare i pesi da RLCF
+CREATE OR REPLACE FUNCTION update_bridge_weight(
+    p_chunk_id UUID,
+    p_node_id VARCHAR(200),
+    p_delta FLOAT,
+    p_authority FLOAT
+) RETURNS VOID AS $$
+BEGIN
+    UPDATE bridge_table
+    SET weight = GREATEST(0.0, LEAST(1.0, weight + p_delta * p_authority)),
+        updated_at = NOW()
+    WHERE chunk_id = p_chunk_id AND graph_node_id = p_node_id;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### 3.3 Costruzione della Bridge Table
+
+```python
+class BridgeTableBuilder:
+    """
+    Costruisce la Bridge Table durante l'ingestion.
+
+    Per ogni chunk:
+    1. Estrae entita (NER)
+    2. Risolve entita a nodi nel grafo
+    3. Calcola peso iniziale
+    4. Inserisce in bridge_table
+    """
+
+    async def build_for_chunk(
+        self,
+        chunk: TextChunk,
+        entities: List[Entity]
+    ) -> List[BridgeEntry]:
+
+        entries = []
+
+        # PRIMARY: collegamento diretto al nodo sorgente
+        if chunk.source_node_id:
+            entries.append(BridgeEntry(
+                chunk_id=chunk.id,
+                graph_node_id=chunk.source_node_id,
+                relation_type="PRIMARY",
+                weight=1.0
+            ))
+
+        # CONCEPT: concetti estratti dal testo
+        for entity in entities:
+            if entity.type == "CONCEPT":
+                node_id = await self.resolve_to_graph(entity)
+                if node_id:
+                    entries.append(BridgeEntry(
+                        chunk_id=chunk.id,
+                        graph_node_id=node_id,
+                        relation_type="CONCEPT",
+                        weight=entity.confidence
+                    ))
+
+        # REFERENCE: rinvii normativi
+        for ref in chunk.norm_references:
+            entries.append(BridgeEntry(
+                chunk_id=chunk.id,
+                graph_node_id=ref.target_urn,
+                relation_type="REFERENCE",
+                weight=0.7  # Default per riferimenti
+            ))
+
+        return entries
 ```
 
 ---
 
-## 6. Data Ingestion Pipeline
+## 4. Graph-Aware Similarity Search
 
-**Reference**: `docs/02-methodology/data-ingestion.md`
+### 4.1 Concetto
 
-The Data Ingestion Pipeline transforms raw legal documents into searchable chunks with embeddings and metadata.
-
-### 6.1 Pipeline Overview
+Il **Graph-Aware Similarity Search** combina:
+1. **Similarita Semantica**: cosine similarity tra embedding
+2. **Prossimita nel Grafo**: distanza/connessione nel KG
 
 ```
-┌────────────────────────────────────────────────────────┐
-│ Stage 1: PARSING                                       │
-│   Akoma Ntoso XML/JSON → Structured Norm              │
-│   PDF (Sentenze) → Extracted Text                     │
-│   Latency: ~500ms per document                        │
-└──────────────────┬─────────────────────────────────────┘
-                   ↓
-┌────────────────────────────────────────────────────────┐
-│ Stage 2: CHUNKING                                      │
-│   Semantic chunking with overlap                      │
-│   Norms: Article-level (1 article = 1 chunk)          │
-│   Sentenze: Section-based (fatto, diritto, dispositivo)│
-│   Dottrina: Similarity-based (threshold=0.72)         │
-│   Latency: ~200ms per document                        │
-└──────────────────┬─────────────────────────────────────┘
-                   ↓
-┌────────────────────────────────────────────────────────┐
-│ Stage 3: EMBEDDING GENERATION                          │
-│   text-embedding-3-large (Phase 1-2)                  │
-│   Fine-tuned legal embeddings (Phase 3+)              │
-│   Latency: ~50ms per chunk (batched)                  │
-└──────────────────┬─────────────────────────────────────┘
-                   ↓
-┌────────────────────────────────────────────────────────┐
-│ Stage 4: METADATA ENRICHMENT                           │
-│   - Temporal metadata extraction                      │
-│   - Entity extraction (NER)                            │
-│   - Classification (legal area, complexity)           │
-│   - Authority scoring                                  │
-│   - KG linking (norm IDs, concept IDs)                │
-│   Latency: ~300ms per chunk                           │
-└──────────────────┬─────────────────────────────────────┘
-                   ↓
-┌────────────────────────────────────────────────────────┐
-│ Stage 5: STORAGE                                       │
-│   - VectorDB: chunk + embedding + metadata            │
-│   - PostgreSQL: chunk metadata                        │
-│   - Neo4j: structured entities + relationships        │
-│   Latency: ~100ms per chunk                           │
-└────────────────────────────────────────────────────────┘
+Score_finale = α × Sim_semantica + (1-α) × Score_grafo
+```
 
-Total Pipeline Latency: ~1.15s per chunk
-Throughput: 1 worker = ~3,000 chunks/hour
-Parallelizable: N workers = N × 3,000 chunks/hour
+### 4.2 Implementazione
+
+```python
+class GraphAwareRetriever:
+    """
+    Retriever ibrido che combina vector similarity e graph structure.
+    """
+
+    def __init__(
+        self,
+        vector_db: Qdrant,
+        graph_db: FalkorDB,
+        bridge_table: BridgeTable,
+        alpha: float = 0.7  # Peso semantico vs grafo
+    ):
+        self.vector_db = vector_db
+        self.graph_db = graph_db
+        self.bridge = bridge_table
+        self.alpha = alpha
+
+    async def retrieve(
+        self,
+        query_embedding: np.ndarray,
+        context_nodes: List[str],  # Nodi di contesto (da NER query)
+        top_k: int = 20,
+        expert_type: str = None  # Per traversal weights
+    ) -> List[RetrievalResult]:
+
+        # STEP 1: Vector search (semantico)
+        vector_results = await self.vector_db.search(
+            query_embedding,
+            top_k=top_k * 3  # Over-retrieve per re-ranking
+        )
+
+        # STEP 2: Graph enrichment (strutturale)
+        enriched_results = []
+
+        for vr in vector_results:
+            # Trova nodi collegati al chunk
+            linked_nodes = await self.bridge.get_nodes_for_chunk(vr.chunk_id)
+
+            # Calcola graph score
+            graph_score = await self._compute_graph_score(
+                linked_nodes,
+                context_nodes,
+                expert_type
+            )
+
+            # Combina scores
+            final_score = (
+                self.alpha * vr.similarity_score +
+                (1 - self.alpha) * graph_score
+            )
+
+            enriched_results.append(RetrievalResult(
+                chunk_id=vr.chunk_id,
+                text=vr.text,
+                similarity_score=vr.similarity_score,
+                graph_score=graph_score,
+                final_score=final_score,
+                linked_nodes=linked_nodes
+            ))
+
+        # STEP 3: Re-rank per final_score
+        enriched_results.sort(key=lambda x: x.final_score, reverse=True)
+
+        return enriched_results[:top_k]
+
+    async def _compute_graph_score(
+        self,
+        chunk_nodes: List[str],
+        context_nodes: List[str],
+        expert_type: str = None
+    ) -> float:
+        """
+        Calcola quanto il chunk e "vicino" al contesto nel grafo.
+        """
+        if not context_nodes:
+            return 0.5  # Default se no context
+
+        total_score = 0.0
+
+        for chunk_node in chunk_nodes:
+            for context_node in context_nodes:
+                # Trova shortest path
+                path = await self.graph_db.shortest_path(
+                    chunk_node, context_node, max_hops=3
+                )
+
+                if path:
+                    # Score basato su distanza + pesi relazioni
+                    path_score = self._score_path(path, expert_type)
+                    total_score = max(total_score, path_score)
+
+        return total_score
+
+    def _score_path(
+        self,
+        path: GraphPath,
+        expert_type: str = None
+    ) -> float:
+        """
+        Score di un path nel grafo.
+
+        - Distanza: piu corto = meglio
+        - Relazioni: alcune valgono di piu per certi expert
+        """
+        # Base: inverse distance
+        distance_score = 1.0 / (len(path.edges) + 1)
+
+        # Bonus per relazioni rilevanti
+        relation_bonus = 1.0
+        if expert_type:
+            weights = EXPERT_TRAVERSAL_WEIGHTS.get(expert_type, {})
+            for edge in path.edges:
+                relation_bonus *= weights.get(edge.type, 0.5)
+
+        return distance_score * relation_bonus
+```
+
+### 4.3 Esempio di Query Ibrida
+
+```
+Query: "Quali sono i termini per la risoluzione del contratto?"
+
+STEP 1: Vector Search
+───────────────────────────────────────────────────────
+Top chunks per similarita semantica:
+1. chunk_art1453 (Art. 1453 c.c.) - sim: 0.92
+2. chunk_art1454 (Art. 1454 c.c.) - sim: 0.88
+3. chunk_cass_2023 (Sentenza risoluzione) - sim: 0.85
+4. chunk_art1455 (Art. 1455 c.c.) - sim: 0.83
+
+STEP 2: Context Nodes (da NER)
+───────────────────────────────────────────────────────
+Entita estratte dalla query:
+- "risoluzione" → Concetto: risoluzione_contratto
+- "contratto" → Concetto: contratto
+- "termini" → Concetto: termine_giuridico
+
+STEP 3: Graph Score
+───────────────────────────────────────────────────────
+chunk_art1453:
+  - Linked: art_1453_cc (PRIMARY)
+  - Path a risoluzione_contratto: art_1453_cc -[DISCIPLINA]-> risoluzione_contratto
+  - Path length: 1 → graph_score: 0.95
+
+chunk_art1454:
+  - Linked: art_1454_cc (PRIMARY)
+  - Path a risoluzione_contratto: art_1454_cc -[SPECIFICA]-> art_1453_cc -[DISCIPLINA]-> risoluzione
+  - Path length: 2 → graph_score: 0.80
+
+chunk_cass_2023:
+  - Linked: cass_2023_123 (PRIMARY)
+  - Path a risoluzione_contratto: cass_2023_123 -[INTERPRETA]-> art_1453_cc -[DISCIPLINA]-> risoluzione
+  - Path length: 2 → graph_score: 0.75
+
+STEP 4: Final Score (α=0.7)
+───────────────────────────────────────────────────────
+1. chunk_art1453: 0.7×0.92 + 0.3×0.95 = 0.929
+2. chunk_art1454: 0.7×0.88 + 0.3×0.80 = 0.856
+3. chunk_cass_2023: 0.7×0.85 + 0.3×0.75 = 0.820
+4. chunk_art1455: 0.7×0.83 + 0.3×0.65 = 0.776
 ```
 
 ---
 
-### 6.2 Norm Parser (Akoma Ntoso)
+## 5. Qdrant: Vector Database
 
-**Input**: Akoma Ntoso XML/JSON from Italian Government API
+### 5.1 Configurazione
 
-**Processing**:
-
-```
-Akoma Ntoso Document (XML)
-         ↓
-┌──────────────────────────────┐
-│ 1. Parse XML Structure       │
-│    Extract: meta, body, annex│
-└──────────┬───────────────────┘
-           ↓
-┌──────────────────────────────┐
-│ 2. Extract Metadata          │
-│    - Title, date, source     │
-│    - Hierarchical level      │
-│    - Effective dates         │
-└──────────┬───────────────────┘
-           ↓
-┌──────────────────────────────┐
-│ 3. Parse Article Structure   │
-│    - Articles (Art. 1, 2...) │
-│    - Commas (comma 1, 2...)  │
-│    - Letters (lett. a, b...) │
-└──────────┬───────────────────┘
-           ↓
-┌──────────────────────────────┐
-│ 4. Extract Full Text         │
-│    Concatenate article text  │
-└──────────┬───────────────────┘
-           ↓
-   Structured Norm Object
-```
-
-**Output Example**:
-
-```json
-{
-  "norm": {
-    "norm_id": "art_1453_cc",
-    "source": "Codice Civile",
-    "article": "1453",
-    "title": "Risoluzione per inadempimento",
-    "hierarchical_level": "Legge Ordinaria",
-    "date_published": "1942-03-16",
-    "date_effective": "1942-03-16",
-    "is_current": true,
-    "structure": {
-      "commas": [
-        {
-          "comma_num": 1,
-          "text": "Nei contratti con prestazioni corrispettive, quando uno dei contraenti non adempie le sue obbligazioni, l'altro può a sua scelta chiedere l'adempimento o la risoluzione del contratto, salvo, in ogni caso, il risarcimento del danno."
-        }
-      ]
+```python
+# Collection per legal chunks
+LEGAL_CHUNKS_COLLECTION = {
+    "name": "legal_chunks",
+    "vectors_config": {
+        "size": 1024,  # E5-large
+        "distance": "Cosine"
     },
-    "full_text": "Nei contratti con prestazioni corrispettive, quando uno dei contraenti non adempie le sue obbligazioni, l'altro può a sua scelta chiedere l'adempimento o la risoluzione del contratto, salvo, in ogni caso, il risarcimento del danno."
-  }
-}
-```
-
----
-
-### 6.3 PDF Processor (Sentenze)
-
-**Input**: PDF files of court decisions (sentenze)
-
-**Processing**:
-
-```
-PDF File
-    ↓
-┌──────────────────────────────┐
-│ 1. OCR (if scanned)          │
-│    Tesseract OCR             │
-└──────────┬───────────────────┘
-           ↓
-┌──────────────────────────────┐
-│ 2. Layout Analysis           │
-│    Detect sections:          │
-│    - Intestazione (header)   │
-│    - Fatto (facts)           │
-│    - Diritto (law)           │
-│    - Dispositivo (ruling)    │
-└──────────┬───────────────────┘
-           ↓
-┌──────────────────────────────┐
-│ 3. Text Extraction           │
-│    Extract text per section  │
-└──────────┬───────────────────┘
-           ↓
-┌──────────────────────────────┐
-│ 4. Metadata Extraction       │
-│    - Court, date, case number│
-│    - Parties, judges         │
-│    - Norms cited             │
-└──────────┬───────────────────┘
-           ↓
-  Structured Sentenza Object
-```
-
-**Output Example**:
-
-```json
-{
-  "sentenza": {
-    "sentenza_id": "cass_2023_12567",
-    "court": "Cassazione",
-    "section": "Civile, Sezione III",
-    "date_published": "2023-06-15",
-    "case_number": "12567/2023",
-    "sections": {
-      "fatto": "Il ricorrente ha stipulato un contratto di compravendita...",
-      "diritto": "La Corte rileva che l'Art. 1453 c.c. prevede...",
-      "dispositivo": "La Corte rigetta il ricorso."
+    "optimizers_config": {
+        "memmap_threshold": 20000,  # Store on disk if > 20k vectors
+        "indexing_threshold": 10000,  # Start indexing after 10k vectors
     },
-    "norms_cited": ["art_1453_cc", "art_1454_cc"],
-    "binding_force": 0.85
-  }
+    "hnsw_config": {
+        "m": 16,  # Connections per layer
+        "ef_construct": 128,  # Build quality
+        "on_disk": False  # Keep index in RAM
+    }
 }
 ```
 
----
+### 5.2 Metadata Schema
 
-### 6.4 Semantic Chunking Engine
+Ogni chunk in Qdrant ha metadata ricchi per filtering:
 
-**Purpose**: Split documents into semantically coherent chunks.
+```python
+class ChunkMetadata:
+    """Metadata stored with each vector in Qdrant."""
 
-**Chunking Strategies** (by document type):
+    # Identificativi
+    chunk_id: str
+    document_id: str
+    document_type: str  # norm, sentenza, dottrina
 
-| Document Type | Strategy | Chunk Size | Overlap | Rationale |
-|--------------|----------|-----------|---------|-----------|
-| **Norms** | Article-level | 1 article | 0 tokens | Legal articles are atomic units |
-| **Jurisprudence** | Section-based | 1 section (fatto/diritto/dispositivo) | 50 tokens | Sections are semantically distinct |
-| **Doctrine** | Similarity-based | Dynamic (max 1024 tokens) | 100 tokens | Paragraphs may span multiple semantic units |
+    # Temporali
+    date_published: datetime
+    date_effective: datetime
+    is_current: bool
 
-**Similarity-Based Chunking** (for Doctrine):
+    # Classificazione
+    legal_area: str  # civile, penale, amministrativo
+    hierarchical_level: str  # Costituzione, Legge, Regolamento
 
-```
-Input: Document text = [sent_1, sent_2, ..., sent_N]
+    # Authority
+    binding_force: float  # 0.0-1.0
+    citation_count: int
 
-Step 1: Sentence Embeddings
-For each sentence sent_i:
-    embed_i = embedding_model(sent_i)
-
-Step 2: Compute Sentence Similarities
-For i = 1 to N-1:
-    similarity_i = cosine_similarity(embed_i, embed_{i+1})
-
-Step 3: Identify Chunk Boundaries
-boundaries = []
-For i = 1 to N-1:
-    if similarity_i < threshold (0.72):
-        boundaries.append(i)  # Break here
-
-Step 4: Create Chunks with Overlap
-chunks = []
-For each boundary pair (start, end):
-    chunk_text = sent_start...sent_end
-    if len(chunk_text) > max_tokens (1024):
-        split further
-    chunks.append(chunk_text)
-
-Output: Array of chunks
+    # Bridge links (per join veloce)
+    primary_graph_node: str  # Nodo principale nel grafo
 ```
 
-**Performance**:
-- Embedding sentences: ~20ms per sentence (batched)
-- Similarity computation: ~5ms per pair
-- Total: ~200ms per document (avg 20 sentences)
+### 5.3 Query Patterns
 
----
+```python
+# Pattern 1: Search con filtri temporali
+results = await qdrant.search(
+    collection_name="legal_chunks",
+    query_vector=query_embedding,
+    query_filter=Filter(
+        must=[
+            FieldCondition(key="is_current", match=MatchValue(value=True)),
+            FieldCondition(key="legal_area", match=MatchValue(value="civile"))
+        ]
+    ),
+    limit=20
+)
 
-### 6.5 Embedding Generation Service
+# Pattern 2: Search con range di date
+results = await qdrant.search(
+    collection_name="legal_chunks",
+    query_vector=query_embedding,
+    query_filter=Filter(
+        must=[
+            FieldCondition(
+                key="date_effective",
+                range=Range(gte="2020-01-01", lte="2024-12-31")
+            )
+        ]
+    ),
+    limit=20
+)
 
-**Reference**: `docs/02-methodology/vector-database.md` §4
-
-**5-Phase Bootstrap Evolution**:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ PHASE 1: Generic Embeddings (Bootstrap)                 │
-│   Model: text-embedding-3-large (OpenAI)                │
-│   No fine-tuning, zero-shot                             │
-│   Quality: Baseline                                     │
-│   Timeline: Week 1-4                                    │
-└─────────────────────────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────────────────────────┐
-│ PHASE 2: Italian Legal Corpus Pre-training              │
-│   Model: multilingual-e5-large                          │
-│   Pre-training on Italian legal corpus (unsupervised)   │
-│   Quality: +10% vs Phase 1                              │
-│   Timeline: Week 5-8                                    │
-└─────────────────────────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────────────────────────┐
-│ PHASE 3: Contrastive Fine-Tuning (RLCF data)            │
-│   Model: Fine-tuned from Phase 2                        │
-│   Training data: Anchor-Positive-Negative triplets      │
-│     from RLCF feedback (query, relevant_chunk, irrelevant_chunk)│
-│   Loss: Contrastive loss (triplet margin loss)          │
-│   Quality: +20% vs Phase 1                              │
-│   Timeline: Week 9-16 (accumulate RLCF data)            │
-└─────────────────────────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────────────────────────┐
-│ PHASE 4: Domain-Specific Hard Negative Mining           │
-│   Model: Fine-tuned from Phase 3                        │
-│   Training data: RLCF + Hard negatives                  │
-│     (chunks semantically similar but legally distinct)  │
-│   Quality: +25% vs Phase 1                              │
-│   Timeline: Week 17-24                                  │
-└─────────────────────────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────────────────────────┐
-│ PHASE 5: Knowledge Distillation (Deployment Optimization)│
-│   Model: Distilled from Phase 4                         │
-│   Size: 768 dims (vs 1024 Phase 4) → 3x faster          │
-│   Quality: +22% vs Phase 1 (slight drop from Phase 4)   │
-│   Timeline: Week 25+                                    │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Training Data for Phase 3+**:
-
-```json
-{
-  "triplet_example": {
-    "anchor": "È valido un contratto firmato da un minorenne?",
-    "positive": "Art. 2 c.c. - La maggiore età è fissata al compimento del diciottesimo anno. Con la maggiore età si acquista la capacità di compiere tutti gli atti...",
-    "negative": "Art. 1350 c.c. - Devono farsi per atto pubblico o per scrittura privata, sotto pena di nullità: 1) i contratti che trasferiscono la proprietà di beni immobili...",
-    "source": "rlcf_feedback",
-    "feedback_id": "uuid",
-    "user_authority": 0.85
-  }
-}
-```
-
-**Performance Evolution**:
-
-| Phase | Model | Dims | Latency (per chunk) | Quality (MRR@10) |
-|-------|-------|------|---------------------|------------------|
-| 1 | text-embedding-3-large | 3072 | 50ms | 0.60 (baseline) |
-| 2 | multilingual-e5-large | 1024 | 30ms | 0.66 (+10%) |
-| 3 | Fine-tuned (contrastive) | 1024 | 30ms | 0.72 (+20%) |
-| 4 | Fine-tuned (hard neg) | 1024 | 30ms | 0.75 (+25%) |
-| 5 | Distilled | 768 | 15ms | 0.73 (+22%) |
-
----
-
-### 6.6 Metadata Enrichment Pipeline
-
-**Enrichment Steps**:
-
-```
-Chunk Text
-    ↓
-┌──────────────────────────────────────┐
-│ 1. Temporal Metadata Extraction      │
-│    - date_published (from source)    │
-│    - date_effective (from Akoma Ntoso│
-│    - is_current (check date_end)     │
-└──────────┬───────────────────────────┘
-           ↓
-┌──────────────────────────────────────┐
-│ 2. Entity Extraction (NER)           │
-│    - norm_references                 │
-│    - case_references                 │
-│    - legal_concepts                  │
-│    - named_entities (courts, persons)│
-└──────────┬───────────────────────────┘
-           ↓
-┌──────────────────────────────────────┐
-│ 3. Classification                    │
-│    - legal_area (civil, criminal...) │
-│    - legal_domain_tags (ML model)    │
-│    - complexity_level (0.0-1.0)      │
-└──────────┬───────────────────────────┘
-           ↓
-┌──────────────────────────────────────┐
-│ 4. Authority Scoring                 │
-│    - hierarchical_level              │
-│    - binding_force (based on court)  │
-│    - authority_score (citation_count)│
-└──────────┬───────────────────────────┘
-           ↓
-┌──────────────────────────────────────┐
-│ 5. KG Linking                        │
-│    - primary_article_id              │
-│    - referenced_norm_ids             │
-│    - related_concept_ids (KG lookup) │
-└──────────┬───────────────────────────┘
-           ↓
-   Enriched Chunk Metadata
-```
-
-**Performance**: ~300ms per chunk (NER + classification + KG lookup)
-
----
-
-## 7. Technology Mapping
-
-### 7.1 Vector Database
-
-| Component | Technology Options | Recommended | Rationale |
-|-----------|-------------------|------------|-----------|
-| **Vector DB** | • Weaviate<br>• Qdrant<br>• Pinecone<br>• pgvector | **Weaviate** | Hybrid search native, open-source, GraphQL API |
-| **Embedding Model** | • text-embedding-3-large<br>• multilingual-e5-large<br>• Fine-tuned legal | **text-embedding-3-large** (Phase 1-2)<br>**Fine-tuned** (Phase 3+) | Best quality for Italian legal domain |
-| **Cross-Encoder** | • ms-marco-MiniLM<br>• Legal-BERT fine-tuned | **ms-marco fine-tuned on legal data** | Balance speed/accuracy |
-
-**Decision Tree for Vector DB**:
-
-```
-Need managed service (no ops)?
-  ├─ YES → Pinecone (managed, proprietary)
-  └─ NO  → Need hybrid search native?
-             ├─ YES → Weaviate (open-source, self-hosted)
-             └─ NO  → Qdrant (open-source, simpler)
+# Pattern 3: Search per hierarchical level
+results = await qdrant.search(
+    collection_name="legal_chunks",
+    query_vector=query_embedding,
+    query_filter=Filter(
+        must=[
+            FieldCondition(
+                key="hierarchical_level",
+                match=MatchAny(any=["Costituzione", "Legge Costituzionale"])
+            )
+        ]
+    ),
+    limit=20
+)
 ```
 
 ---
 
-### 7.2 Knowledge Graph
+## 6. PostgreSQL: RLCF e Metadata
 
-| Component | Technology | Rationale |
-|-----------|-----------|-----------|
-| **Graph DB** | Neo4j Enterprise | Industry standard, best Cypher support, APOC plugins |
-| **Graph Algorithms** | Neo4j GDS (Graph Data Science) | Shortest path, community detection for jurisprudence clustering |
+### 6.1 Schema per RLCF
+
+```sql
+-- Feedback multilivello (vedi 05-learning-layer.md)
+CREATE TABLE multilevel_feedback (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    query_id UUID REFERENCES queries(id),
+    expert_user_id UUID REFERENCES users(id),
+    domain VARCHAR(50),
+    feedback_level VARCHAR(20),
+    -- ... altri campi RLCF
+);
+
+-- Authority multilivello
+CREATE TABLE user_authority_multilevel (
+    user_id UUID PRIMARY KEY REFERENCES users(id),
+    authority_retrieval FLOAT DEFAULT 0.5,
+    authority_reasoning FLOAT DEFAULT 0.5,
+    authority_synthesis FLOAT DEFAULT 0.5,
+    authority_domains JSONB DEFAULT '{}'
+);
+
+-- Pesi appresi (checkpoint)
+CREATE TABLE learned_weights (
+    id UUID PRIMARY KEY,
+    checkpoint_name VARCHAR(100),
+    traversal_weights JSONB,
+    gating_weights BYTEA,
+    reranker_weights BYTEA,
+    validation_accuracy FLOAT,
+    is_active BOOLEAN DEFAULT FALSE
+);
+```
+
+### 6.2 Schema per Authentication
+
+```sql
+-- API Keys
+CREATE TABLE api_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    key_hash VARCHAR(64) NOT NULL,
+    user_id UUID REFERENCES users(id),
+    role VARCHAR(50) DEFAULT 'user',
+    rate_limit_tier VARCHAR(20) DEFAULT 'standard',
+    created_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+-- Usage tracking
+CREATE TABLE api_usage (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    api_key_id UUID REFERENCES api_keys(id),
+    endpoint VARCHAR(200),
+    timestamp TIMESTAMP DEFAULT NOW(),
+    response_time_ms INT,
+    status_code INT
+);
+```
 
 ---
 
-### 7.3 Data Ingestion
+## 7. Data Ingestion Pipeline v2
 
-| Component | Technology Options | Recommended | Rationale |
-|-----------|-------------------|------------|-----------|
-| **PDF Parser** | • PyPDF2<br>• pdfplumber<br>• Apache Tika | **pdfplumber** | Best for structured Italian legal PDFs |
-| **OCR** | • Tesseract<br>• AWS Textract | **Tesseract (Italian trained)** | Open-source, good Italian support |
-| **Task Queue** | • Celery + RabbitMQ<br>• Redis Queue | **Celery + RabbitMQ** | Mature, retry logic, monitoring |
+### 7.1 Flow con Bridge Table
+
+```
+INGESTION FLOW v2
+================================================================
+
+1. DOCUMENTO INPUT (Normattiva, PDF, etc.)
+   │
+   ▼
+2. PARSING
+   │ Akoma Ntoso, PDF extraction
+   │
+   ▼
+3. CHUNKING
+   │ Semantic chunking per tipo documento
+   │
+   ▼
+4. NER + ENTITY RESOLUTION
+   │ Estrai entita, risolvi a nodi grafo
+   │
+   ▼
+5. EMBEDDING GENERATION
+   │ E5-large (1024 dims)
+   │
+   ▼
+6. PARALLEL STORAGE
+   │
+   ├─► QDRANT: chunk + embedding + metadata
+   │
+   ├─► FALKORDB: nodi + relazioni (se nuovo)
+   │
+   └─► BRIDGE TABLE: chunk_id ↔ node_id mappings
+```
+
+### 7.2 Implementazione
+
+```python
+class IngestionPipelineV2:
+    """
+    Pipeline di ingestion con costruzione Bridge Table.
+    """
+
+    async def ingest_document(self, document: RawDocument) -> IngestionResult:
+        # 1. Parse
+        parsed = await self.parser.parse(document)
+
+        # 2. Chunk
+        chunks = await self.chunker.chunk(parsed)
+
+        # 3. NER + Entity Resolution
+        for chunk in chunks:
+            entities = await self.ner.extract(chunk.text)
+            resolved = await self.entity_resolver.resolve(entities)
+            chunk.entities = resolved
+
+        # 4. Generate embeddings (batch)
+        embeddings = await self.embedder.embed_batch([c.text for c in chunks])
+
+        # 5. Store in parallel
+        await asyncio.gather(
+            self._store_vectors(chunks, embeddings),
+            self._store_graph_nodes(parsed, chunks),
+            self._build_bridge_entries(chunks)
+        )
+
+        return IngestionResult(
+            chunks_created=len(chunks),
+            graph_nodes_created=self._count_new_nodes(),
+            bridge_entries_created=self._count_bridge_entries()
+        )
+
+    async def _build_bridge_entries(self, chunks: List[Chunk]):
+        """Costruisce le entry della Bridge Table."""
+        entries = []
+
+        for chunk in chunks:
+            # PRIMARY link
+            if chunk.source_urn:
+                entries.append(BridgeEntry(
+                    chunk_id=chunk.id,
+                    graph_node_id=chunk.source_urn,
+                    relation_type="PRIMARY",
+                    weight=1.0
+                ))
+
+            # CONCEPT links
+            for entity in chunk.entities:
+                if entity.graph_node_id:
+                    entries.append(BridgeEntry(
+                        chunk_id=chunk.id,
+                        graph_node_id=entity.graph_node_id,
+                        relation_type="CONCEPT",
+                        weight=entity.confidence
+                    ))
+
+            # REFERENCE links
+            for ref in chunk.norm_references:
+                entries.append(BridgeEntry(
+                    chunk_id=chunk.id,
+                    graph_node_id=ref.target_urn,
+                    relation_type="REFERENCE",
+                    weight=0.7
+                ))
+
+        await self.bridge_table.insert_batch(entries)
+```
 
 ---
 
-## 8. Docker Compose Architecture
+## 8. Aggiornamento Pesi da RLCF
 
-### 8.1 Service Definitions
+### 8.1 Bridge Table Weights
+
+I pesi nella Bridge Table sono **apprendibili** da RLCF:
+
+```python
+async def update_bridge_from_feedback(feedback: RetrievalFeedback):
+    """
+    Aggiorna i pesi della Bridge Table basandosi sul feedback.
+
+    Se un chunk era rilevante per un certo nodo → aumenta peso
+    Se un chunk era irrilevante → diminuisci peso
+    """
+    authority = feedback.expert_authority
+
+    for chunk_id, relevance in feedback.chunk_relevance.items():
+        for node_id in feedback.context_nodes:
+            delta = 0.1 if relevance else -0.1
+
+            await bridge_table.update_weight(
+                chunk_id=chunk_id,
+                node_id=node_id,
+                delta=delta * authority
+            )
+```
+
+### 8.2 Alpha Parameter Learning
+
+Anche il parametro α (peso semantico vs grafo) e apprendibile:
+
+```python
+class AlphaLearner:
+    """
+    Apprende il parametro α ottimale per il retriever ibrido.
+
+    Basato su feedback: se il graph score aiutava a trovare
+    documenti rilevanti, aumenta (1-α).
+    """
+
+    def __init__(self, initial_alpha: float = 0.7):
+        self.alpha = initial_alpha
+        self.history = []
+
+    def update(self, feedback: RetrievalFeedback):
+        """
+        Aggiorna α basandosi sul feedback.
+        """
+        # Se i chunk con alto graph_score erano rilevanti
+        graph_helped = self._graph_correlation(feedback)
+
+        if graph_helped > 0.5:
+            # Aumenta peso grafo (diminuisci α)
+            delta = -0.01 * feedback.expert_authority
+        else:
+            # Aumenta peso semantico (aumenta α)
+            delta = 0.01 * feedback.expert_authority
+
+        self.alpha = max(0.3, min(0.9, self.alpha + delta))
+        self.history.append((self.alpha, graph_helped))
+```
+
+---
+
+## 9. Docker Compose v2
 
 ```yaml
 version: '3.8'
 
 services:
-  # Weaviate Vector Database
-  weaviate:
-    image: semitechnologies/weaviate:1.22.4
+  # FalkorDB (sostituisce Neo4j)
+  falkordb:
+    image: falkordb/falkordb:latest
     ports:
-      - "8080:8080"
-    environment:
-      - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
-      - PERSISTENCE_DATA_PATH=/var/lib/weaviate
-      - DEFAULT_VECTORIZER_MODULE=none
-      - ENABLE_MODULES=text2vec-openai,generative-openai
-      - CLUSTER_HOSTNAME=node1
+      - "6379:6379"  # Redis protocol
     volumes:
-      - weaviate_data:/var/lib/weaviate
+      - falkordb_data:/data
+    command: >
+      --loadmodule /usr/lib/redis/modules/falkordb.so
     deploy:
       resources:
         limits:
-          memory: 8G
-        reservations:
           memory: 4G
 
-  # Neo4j Knowledge Graph
-  neo4j:
-    image: neo4j:5.13-enterprise
+  # Qdrant Vector DB
+  qdrant:
+    image: qdrant/qdrant:v1.7.0
     ports:
-      - "7474:7474"  # HTTP
-      - "7687:7687"  # Bolt
-    environment:
-      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}
-      - NEO4J_PLUGINS=["apoc", "graph-data-science"]
-      - NEO4J_dbms_memory_heap_initial__size=4G
-      - NEO4J_dbms_memory_heap_max__size=8G
-      - NEO4J_dbms_memory_pagecache__size=2G
+      - "6333:6333"
     volumes:
-      - neo4j_data:/data
-      - neo4j_logs:/logs
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
     deploy:
       resources:
         limits:
-          memory: 12G
+          memory: 4G
 
   # PostgreSQL
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     ports:
       - "5432:5432"
     environment:
@@ -1337,116 +869,60 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
-    deploy:
-      resources:
-        limits:
-          memory: 2G
 
-  # Data Ingestion Worker (Celery)
-  ingestion-worker:
-    build: ./services/ingestion-worker
-    environment:
-      - CELERY_BROKER_URL=amqp://rabbitmq:5672
-      - WEAVIATE_URL=http://weaviate:8080
-      - NEO4J_URI=bolt://neo4j:7687
-      - POSTGRES_URI=postgresql://merl_t:${POSTGRES_PASSWORD}@postgres:5432/merl_t
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - EMBEDDING_MODEL=text-embedding-3-large
-    depends_on:
-      - rabbitmq
-      - weaviate
-      - neo4j
-      - postgres
-    deploy:
-      replicas: 3
-
-  # RabbitMQ (Message Broker)
-  rabbitmq:
-    image: rabbitmq:3.12-management
+  # Redis (cache + rate limiting)
+  redis:
+    image: redis:7-alpine
     ports:
-      - "5672:5672"   # AMQP
-      - "15672:15672" # Management UI
-    environment:
-      - RABBITMQ_DEFAULT_USER=admin
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+      - "6380:6379"  # Porta diversa da FalkorDB
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - redis_data:/data
 
 volumes:
-  weaviate_data:
-  neo4j_data:
-  neo4j_logs:
+  falkordb_data:
+  qdrant_data:
   postgres_data:
-  rabbitmq_data:
+  redis_data:
 ```
 
 ---
 
-## 9. Error Handling & Resilience
+## 10. Performance Target v2
 
-### 9.1 Ingestion Failures
-
-**Failure Types**:
-- **Parse error**: Document format invalid → Skip document, log error
-- **Chunking error**: Chunking fails → Fall back to fixed-size chunking (1024 tokens)
-- **Embedding error**: API timeout → Retry 3 times, then skip chunk
-- **Storage error**: VectorDB/Neo4j unavailable → Queue chunk for retry (exponential backoff)
-
-**Retry Strategy**:
-- **Transient errors**: Retry 3 times with exponential backoff (1s, 2s, 4s)
-- **Permanent errors**: Log error, notify admin, skip item
-- **Dead Letter Queue**: Failed items after 3 retries → DLQ for manual inspection
+| Operazione | Latenza Target | v1 | v2 |
+|------------|---------------|----|----|
+| Vector search (top-20) | < 100ms | 150ms | 80ms |
+| Graph traversal (3-hop) | < 10ms | 496ms | 1ms |
+| Hybrid retrieval | < 150ms | N/A | 120ms |
+| Bridge lookup | < 5ms | N/A | 3ms |
+| Full retrieval pipeline | < 200ms | 500ms | 150ms |
 
 ---
 
-## 10. Performance Characteristics
+## 11. Roadmap Implementazione
 
-### 10.1 Latency
+### Fase 1: Setup FalkorDB (1 settimana)
+- [ ] Deploy FalkorDB container
+- [ ] Migrazione schema da Neo4j
+- [ ] Test query Cypher
 
-| Operation | Latency (P95) | Optimization |
-|-----------|--------------|--------------|
-| **Vector search** (top-20) | 150ms | HNSW ef_search=64 |
-| **Vector search + filters** | 200ms | Pre-filtering with metadata index |
-| **Hybrid search** (P2) | 180ms | Parallel vector + BM25 |
-| **Reranked search** (P4) | 2.2s | Cross-encoder on 50 candidates |
-| **KG traversal** (depth-3) | 50ms | Indexed relationships |
-| **Ingestion** (per chunk) | 1.15s | Pipeline latency |
+### Fase 2: Bridge Table (2 settimane)
+- [ ] Schema PostgreSQL
+- [ ] Builder durante ingestion
+- [ ] Query functions
 
----
+### Fase 3: Graph-Aware Retriever (2-3 settimane)
+- [ ] `GraphAwareRetriever` class
+- [ ] Integrazione con expert tools
+- [ ] Alpha parameter learning
 
-### 10.2 Throughput
-
-| Operation | Throughput | Conditions |
-|-----------|-----------|-----------|
-| **Ingestion** | 3,000 chunks/hour | 1 worker |
-| **Ingestion** | 9,000 chunks/hour | 3 workers (parallel) |
-| **Vector search** | 1,000 queries/sec | Single Weaviate instance |
-| **KG queries** | 500 queries/sec | Single Neo4j instance |
+### Fase 4: RLCF Integration (1-2 settimane)
+- [ ] Update pesi Bridge Table
+- [ ] Feedback collection
+- [ ] Metriche di validazione
 
 ---
 
-## 11. Cross-References
-
-### Section 02 Methodology
-- **Vector Database**: `docs/02-methodology/vector-database.md`
-  - §3: Metadata Schema
-  - §4: Embedding Strategy (5-phase bootstrap)
-  - §5: Retrieval Patterns P1-P6
-
-- **Knowledge Graph**: `docs/02-methodology/knowledge-graph.md`
-  - §2: KG Schema (23 node types, 65 relationships)
-  - §3: Query Patterns
-
-- **Data Ingestion**: `docs/02-methodology/data-ingestion.md`
-  - §3: Chunking Strategies
-  - §4: Metadata Enrichment
-
-### Section 03 Architecture
-- **Orchestration Layer**: `docs/03-architecture/02-orchestration-layer.md`
-  - VectorDB Agent consumes VectorDB from Storage Layer
-
----
-
-**Document Version**: 1.0
-**Last Updated**: 2024-11-03
-**Status**: ✅ Complete
+**Changelog**:
+- 2025-12-02: v2.0 - FalkorDB + Bridge Table + Hybrid Retrieval
+- 2025-11-14: v1.0 - Neo4j + storage separati (ora in archive/)

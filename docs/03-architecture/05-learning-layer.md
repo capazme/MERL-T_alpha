@@ -1,1091 +1,716 @@
-# Learning Layer Architecture (RLCF Framework)
+# Learning Layer Architecture - RLCF Multilivello (v2)
 
-**Implementation Status**: 🚧 **PARZIALMENTE IMPLEMENTATO**
-**Current Version**: v0.1.0 (RLCF Core)
-**Last Updated**: November 2025
+**Version**: 2.0
+**Status**: 🚧 IN RIPROGETTAZIONE
+**Last Updated**: Dicembre 2025
 
-**Implemented Components**:
-- ✅ RLCF Core Framework: Authority scoring, feedback aggregation, bias detection (Phase 1)
-- ✅ Authority Calculation: A_u(t) = α·B_u + β·T_u(t-1) + γ·P_u(t) formula implemented
-- ✅ Uncertainty Preservation: Shannon entropy-based disagreement quantification
-- ✅ Dynamic Configuration: Hot-reload YAML configs, backup/restore
-- ✅ Feedback API Endpoints: Submit feedback, batch feedback, NER corrections
-- ✅ Test Suite: 68 tests for RLCF core (90%+ coverage)
-- ⏳ Training Data Generator: Architecture defined, not yet implemented
-- ⏳ Model Retraining Pipeline: Architecture defined, not yet automated
-- ⏳ A/B Testing Framework: Architecture defined, not yet implemented
-- ⏳ 4 Learning Loops: Planned for future implementation
-
-**Code Location**: `backend/rlcf_framework/`, `backend/orchestration/api/routers/feedback.py`
-**Tests**: `tests/rlcf/`, `tests/orchestration/test_api_feedback.py`
+> **Nota**: Questo documento descrive RLCF v2 (multilivello con pesi apprendibili).
+> Per RLCF v1 (scalare), vedere `archive/v1-05-learning-layer.md`
 
 ---
 
-## 1. Introduction
+## 1. Evoluzione: RLCF v1 → v2
 
-The **Learning Layer** implements the **Reinforcement Learning from Community Feedback (RLCF)** framework, enabling MERL-T to continuously evolve based on real-world usage and expert validation. This layer consists of:
+### RLCF v1 (Originale)
 
-1. **Community Feedback Interface** (collect user/expert feedback)
-2. **Training Data Generator** (convert feedback to training examples)
-3. **Model Update Orchestrator** (retrain models, A/B test, deploy)
-4. **4 Learning Loops** (Router, VectorDB Embeddings, Query Understanding, Synthesizer)
+```
+Feedback → Authority scalare → Aggregazione → Fine
+             A_u(t) = uno score
+```
 
-**Design Principles**:
-- **Community-Driven**: Legal experts (ALIS community) drive system evolution
-- **Dynamic Authority**: User authority weighted by track record (not static credentials)
-- **Continuous Learning**: Weekly lightweight updates, monthly heavy retraining
-- **A/B Testing**: New models deployed cautiously with performance monitoring
-- **Transparent**: All feedback and model updates logged for audit
+**Limitazioni v1**:
+- Un esperto bravo in contratti ha stesso peso anche in penale
+- Non distingue tra "bravo a trovare fonti" e "bravo a interpretare"
+- Nessun apprendimento dei parametri del sistema
 
-**Performance Targets**:
-- Feedback collection: < 5s (user submission)
-- Training data generation: < 1 hour (daily batch)
-- Model retraining: < 24 hours (weekly cycle)
-- A/B test duration: 7 days (10% traffic to new model)
+### RLCF v2 (Multilivello)
 
-**Reference**: See `docs/02-methodology/rlcf-framework.md` for theoretical foundation.
+```
+Feedback → Authority MULTILIVELLO → Aggiorna PESI del sistema → Migliora
+              │
+              ├─ A_retrieval: Quanto sei bravo a trovare fonti
+              ├─ A_reasoning: Quanto sei bravo a interpretare
+              ├─ A_synthesis: Quanto sei bravo a sintetizzare
+              └─ A_domain[d]: Quanto sei bravo nel dominio d
+```
 
 ---
 
-## 2. Architecture Overview
+## 2. I Tre Pilastri di RLCF v2
 
-```
-┌────────────────────────────────────────────────────────┐
-│              USER INTERACTION WITH MERL-T              │
-│   Query → QueryContext → Router → Agents → Experts    │
-│                  → Synthesizer → Final Answer          │
-└──────────────────────┬─────────────────────────────────┘
-                       ↓
-┌────────────────────────────────────────────────────────┐
-│          COMMUNITY FEEDBACK INTERFACE                  │
-│   User provides:                                       │
-│   • Rating (1-5 stars)                                 │
-│   • Corrections (structured)                           │
-│   • Suggestions (free text)                            │
-└──────────────────────┬─────────────────────────────────┘
-                       ↓
-              Feedback Record (PostgreSQL)
-              (trace_id, rating, corrections, context)
-                       ↓
-┌────────────────────────────────────────────────────────┐
-│          TRAINING DATA GENERATOR (daily batch)         │
-│   Convert feedback → training examples:                │
-│   • Router: (context, plan, outcome) → training       │
-│   • VectorDB: (query, relevant_chunk, irrelevant_chunk) → triplet│
-│   • Query Understanding: (query, entities, corrections) → annotation│
-│   • Synthesizer: (expert_outputs, final_answer, rating) → training│
-└──────────────────────┬─────────────────────────────────┘
-                       ↓
-         Training Examples Database (PostgreSQL)
-                       ↓
-┌────────────────────────────────────────────────────────┐
-│       MODEL UPDATE ORCHESTRATOR (weekly/monthly)       │
-│   • Trigger retraining when threshold met              │
-│   • A/B test new model (10% traffic for 7 days)       │
-│   • Monitor metrics (precision, recall, user ratings)  │
-│   • Gradual rollout if metrics improve                │
-└──────────────────────┬─────────────────────────────────┘
-                       ↓
-         ┌─────────────┴─────────────┐
-         │                           │
-         ↓                           ↓
-┌──────────────────┐       ┌──────────────────┐
-│ Updated Models   │       │ System Logs      │
-│ (versioned)      │       │ (audit trail)    │
-│                  │       │                  │
-│ • Router prompt  │       │ • Model versions │
-│ • Embeddings     │       │ • A/B results    │
-│ • NER model      │       │ • Rollouts       │
-│ • Synthesizer    │       │                  │
-└──────────────────┘       └──────────────────┘
-```
+### Pilastro 1: Authority Multilivello
 
-**Key Characteristics**:
-- **Feedback-driven**: All learning triggered by community feedback
-- **Multi-model**: 4 independent learning loops running in parallel
-- **Gradual deployment**: A/B testing ensures stability
-- **Traceable**: Full audit trail of model evolution
+```python
+class MultilevelAuthority:
+    """
+    Authority score multidimensionale per ogni esperto.
 
----
+    Invece di un singolo score, ogni esperto ha un profilo
+    di competenze che viene aggiornato in base al feedback.
+    """
 
-## 3. Community Feedback Interface
+    def __init__(self, user_id: str):
+        self.user_id = user_id
 
-### 3.1 Feedback Collection UI
-
-**User Journey**:
-
-```
-User receives MERL-T answer
-         ↓
-┌────────────────────────────────────────┐
-│ Answer Display with Provenance         │
-│ • Final answer text                    │
-│ • Sources cited (norms, case law)      │
-│ • Expert reasoning (expandable)        │
-│ • Confidence indicator                 │
-└──────────────┬─────────────────────────┘
-               ↓
-      User clicks "Provide Feedback"
-               ↓
-┌────────────────────────────────────────┐
-│ Feedback Form                          │
-│                                        │
-│ 1. Rating: ⭐⭐⭐⭐⭐ (1-5 stars)        │
-│                                        │
-│ 2. Feedback Type (multi-select):      │
-│    □ Risposta corretta                 │
-│    □ Risposta incompleta               │
-│    □ Fonti errate                      │
-│    □ Ragionamento giuridico errato     │
-│    □ Esperti sbagliati selezionati     │
-│                                        │
-│ 3. Corrections (optional):             │
-│    [Text area for detailed corrections]│
-│                                        │
-│ 4. Suggested Sources (optional):      │
-│    Add norm/case: [Art. ___]          │
-│                                        │
-│ 5. Submit Feedback                     │
-└────────────┬───────────────────────────┘
-             ↓
-┌────────────────────────────────────────┐
-│ Dynamic Authority Check                │
-│ Calculate user_authority_score:        │
-│ • User role (expert, lawyer, citizen)  │
-│ • Historical accuracy of feedback      │
-│ • Consensus with other experts         │
-│ Output: authority_score (0.0-1.0)      │
-└────────────┬───────────────────────────┘
-             ↓
-┌────────────────────────────────────────┐
-│ Store Feedback in PostgreSQL           │
-│ Table: answer_feedback                 │
-│ Fields: trace_id, user_id, rating,     │
-│         corrections, authority_score   │
-└────────────────────────────────────────┘
-```
-
-**Feedback Form Schema**:
-
-```json
-{
-  "feedback": {
-    "trace_id": "SYN-20241103-abc123",
-    "user_id": "uuid",
-    "rating": 4,
-    "feedback_types": ["risposta_incompleta", "fonti_errate"],
-    "corrections": {
-      "missing_sources": [
-        {
-          "source_type": "norm",
-          "source_id": "art_1454_cc",
-          "citation": "Art. 1454 c.c.",
-          "relevance": "Regola complementare sulla diffida ad adempiere"
+        # Authority per LIVELLO di competenza
+        self.level_authority = {
+            "retrieval": 0.5,   # Trova fonti rilevanti?
+            "reasoning": 0.5,   # Interpreta correttamente?
+            "synthesis": 0.5,   # Sintetizza bene il disaccordo?
         }
-      ],
-      "wrong_interpretation": "L'Expert ha ignorato la distinzione tra risoluzione di diritto e risoluzione giudiziale",
-      "suggested_answer": "La risposta dovrebbe distinguere tra risoluzione ex Art. 1453 (giudiziale) e Art. 1454 (di diritto)."
-    },
-    "suggested_sources": ["art_1454_cc"],
-    "free_text_comments": "Buona risposta ma manca riferimento alla diffida ad adempiere (Art. 1454)",
-    "timestamp": "2024-11-03T10:30:00Z"
-  }
-}
+
+        # Authority per DOMINIO giuridico
+        self.domain_authority = {
+            "civile": 0.5,
+            "penale": 0.5,
+            "amministrativo": 0.5,
+            "costituzionale": 0.5,
+            "lavoro": 0.5,
+            "commerciale": 0.5,
+        }
+
+        # Formula base (come v1, ma applicata per dimensione)
+        # A_u(t) = α·B + β·T + γ·P
+        self.alpha = 0.3  # Base (credentials)
+        self.beta = 0.5   # Temporal (track record)
+        self.gamma = 0.2  # Performance (recent)
+
+    def get_authority(
+        self,
+        level: str = None,
+        domain: str = None
+    ) -> float:
+        """
+        Ritorna authority score.
+
+        - level=None, domain=None: Media globale (backward compatible)
+        - level="retrieval": Authority per retrieval
+        - domain="civile": Authority per diritto civile
+        - Entrambi: Authority specifica (livello + dominio)
+        """
+        if level is None and domain is None:
+            # Backward compatible: media globale
+            return np.mean(list(self.level_authority.values()))
+
+        score = 1.0
+
+        if level:
+            score *= self.level_authority.get(level, 0.5)
+
+        if domain:
+            score *= self.domain_authority.get(domain, 0.5)
+
+        return score
+
+    def update_from_feedback(self, feedback: RLCFFeedback):
+        """Aggiorna authority basandosi sul feedback."""
+
+        # Aggiorna authority per livello
+        if feedback.level:
+            old = self.level_authority[feedback.level]
+            reward = 1.0 if feedback.was_correct else -0.5
+            new = old + self.gamma * reward * (1 - old)  # Bounded update
+            self.level_authority[feedback.level] = np.clip(new, 0.0, 1.0)
+
+        # Aggiorna authority per dominio
+        if feedback.domain:
+            old = self.domain_authority[feedback.domain]
+            reward = 1.0 if feedback.was_correct else -0.5
+            new = old + self.gamma * reward * (1 - old)
+            self.domain_authority[feedback.domain] = np.clip(new, 0.0, 1.0)
+```
+
+### Pilastro 2: Pesi Apprendibili del Sistema
+
+RLCF v2 aggiorna non solo l'authority degli esperti, ma anche i **parametri del sistema**:
+
+```python
+class LearnableSystemParameters:
+    """
+    Parametri del sistema che vengono aggiornati da RLCF.
+
+    Il feedback degli esperti "cristallizza" conoscenza in questi pesi,
+    migliorando il sistema per le future generazioni.
+    """
+
+    def __init__(self):
+        # θ_traverse: Pesi per traversal nel grafo (per expert)
+        self.traversal_weights = {
+            "literal": nn.ParameterDict({...}),
+            "systemic": nn.ParameterDict({...}),
+            "principles": nn.ParameterDict({...}),
+            "precedent": nn.ParameterDict({...}),
+        }
+
+        # θ_gating: Gating network per pesare gli expert
+        self.gating_network = ExpertGatingNetwork(
+            input_dim=1024,
+            num_experts=4
+        )
+
+        # θ_rerank: Re-ranker per ordinare i risultati
+        self.reranker = LearnedReranker(
+            embedding_dim=1024,
+            hidden_dim=256
+        )
+
+    def get_trainable_parameters(self) -> List[nn.Parameter]:
+        """Ritorna tutti i parametri apprendibili."""
+        params = []
+        for expert_weights in self.traversal_weights.values():
+            params.extend(expert_weights.parameters())
+        params.extend(self.gating_network.parameters())
+        params.extend(self.reranker.parameters())
+        return params
+```
+
+### Pilastro 3: Feedback Multilivello
+
+```python
+class MultilevelFeedback:
+    """
+    Schema di feedback che cattura informazioni a ogni livello.
+    """
+
+    def __init__(self):
+        # Metadata
+        self.query_id: str
+        self.expert_user_id: str
+        self.timestamp: datetime
+        self.domain: str  # civile, penale, etc.
+
+        # LIVELLO 1: Feedback su Retrieval
+        self.retrieval_feedback = {
+            "sources_relevant": bool,        # Le fonti erano pertinenti?
+            "sources_complete": bool,        # Mancava qualcosa?
+            "sources_ranking": List[int],    # Ranking corretto? [1,2,3...]
+            "relations_useful": Dict[str, bool],  # Per ogni relazione seguita
+        }
+
+        # LIVELLO 2: Feedback su Reasoning (per expert)
+        self.reasoning_feedback = {
+            "literal_correct": Optional[bool],
+            "systemic_correct": Optional[bool],
+            "principles_correct": Optional[bool],
+            "precedent_correct": Optional[bool],
+            "best_expert": Optional[str],  # Quale aveva più ragione?
+        }
+
+        # LIVELLO 3: Feedback su Synthesis
+        self.synthesis_feedback = {
+            "final_correct": bool,          # Risposta finale corretta?
+            "disagreement_shown": bool,     # Il disaccordo era evidente?
+            "confidence_appropriate": bool, # Il livello di certezza era giusto?
+        }
+
+        # Feedback testuale (per training futuro)
+        self.correction_text: Optional[str]
+        self.notes: Optional[str]
 ```
 
 ---
 
-### 3.2 Dynamic Authority Calculator
+## 3. Policy Gradient per Apprendimento
 
-**Purpose**: Weight feedback by user authority (not static credentials).
-
-**Authority Formula**:
+### Formulazione Matematica
 
 ```
-user_authority_score = (
-    0.4 * role_weight +
-    0.3 * historical_accuracy +
-    0.2 * consensus_score +
-    0.1 * reputation_score
-)
+OBIETTIVO
+══════════════════════════════════════════════════════════════════
 
-Where:
-- role_weight:
-    • Legal expert (professor, judge, senior lawyer): 1.0
-    • Practicing lawyer: 0.7
-    • Law student: 0.4
-    • Citizen: 0.2
+Massimizzare il reward atteso, pesato per l'authority di chi dà feedback:
 
-- historical_accuracy:
-    Count of validated feedback / Total feedback submitted
-    (Feedback is "validated" when majority of experts agree)
+J(θ) = E_{q~Q, a~π_θ, f~RLCF} [ A(f) · R(f) ]
 
-- consensus_score:
-    For this specific feedback, how many other experts agree?
-    consensus_score = agreeing_experts / total_experts_who_reviewed
+dove:
+- θ = {θ_traverse, θ_gating, θ_rerank} parametri apprendibili
+- q = query
+- a = azioni del sistema (traversal, gating, ranking)
+- f = feedback dell'esperto
+- A(f) = authority dell'esperto (multilivello)
+- R(f) = reward dal feedback
 
-- reputation_score:
-    Cumulative reputation from ALIS community
-    (Upvotes on contributions, badges, etc.)
 
-Output: user_authority_score ∈ [0.0, 1.0]
+GRADIENT (REINFORCE)
+══════════════════════════════════════════════════════════════════
+
+∇_θ J(θ) = E [ A(f) · R(f) · ∇_θ log π_θ(a|q) ]
+
+In pratica (con baseline per ridurre varianza):
+
+∇_θ J(θ) ≈ (1/N) Σ_i [ A(f_i) · (R(f_i) - b) · ∇_θ log π_θ(a_i|q_i) ]
+
+dove b = baseline (media mobile dei reward)
+
+
+CREDIT ASSIGNMENT PER LIVELLO
+══════════════════════════════════════════════════════════════════
+
+Il reward totale viene decomposto per livello:
+
+R_total = w_1 · R_retrieval + w_2 · R_reasoning + w_3 · R_synthesis
+
+dove w_1 + w_2 + w_3 = 1 (pesi configurabili)
+
+Ogni componente di θ riceve il gradient appropriato:
+- θ_traverse ← gradient da R_retrieval
+- θ_gating   ← gradient da R_reasoning
+- θ_rerank   ← gradient da R_retrieval + R_reasoning
 ```
 
-**Example Calculation**:
+### Implementazione
 
+```python
+class RLCFPolicyGradient:
+    """
+    Training loop con policy gradient per RLCF.
+    """
+
+    def __init__(self, system_params: LearnableSystemParameters):
+        self.params = system_params
+        self.optimizer = torch.optim.Adam(
+            self.params.get_trainable_parameters(),
+            lr=1e-4
+        )
+        self.baseline = MovingAverage(window=100)
+
+    def update(self, batch: List[FeedbackWithTrace]):
+        """
+        Aggiorna i parametri usando un batch di feedback.
+
+        Ogni FeedbackWithTrace contiene:
+        - Il feedback dell'esperto
+        - La trace delle azioni prese dal sistema
+        - I log-prob delle azioni
+        """
+        total_loss = 0.0
+
+        for item in batch:
+            feedback = item.feedback
+            trace = item.execution_trace
+
+            # Calcola authority dell'esperto (multilivello)
+            authority = self._get_authority(
+                expert_id=feedback.expert_user_id,
+                level=feedback.feedback_level,
+                domain=feedback.domain
+            )
+
+            # Calcola reward
+            reward = self._compute_reward(feedback)
+
+            # Advantage (reward - baseline)
+            advantage = reward - self.baseline.get()
+            self.baseline.update(reward)
+
+            # Policy gradient loss
+            # L = -A(f) · advantage · log_prob
+            loss = -authority * advantage * trace.total_log_prob
+
+            total_loss += loss
+
+        # Backprop
+        total_loss.backward()
+        self.optimizer.step()
+        self.optimizer.zero_grad()
+
+    def _compute_reward(self, feedback: MultilevelFeedback) -> float:
+        """Calcola reward totale dal feedback multilivello."""
+        reward = 0.0
+
+        # Retrieval reward
+        if feedback.retrieval_feedback:
+            r = feedback.retrieval_feedback
+            retrieval_reward = (
+                0.4 * float(r.get("sources_relevant", False)) +
+                0.3 * float(r.get("sources_complete", False)) +
+                0.3 * self._ranking_reward(r.get("sources_ranking", []))
+            )
+            reward += 0.3 * retrieval_reward
+
+        # Reasoning reward
+        if feedback.reasoning_feedback:
+            r = feedback.reasoning_feedback
+            correct_count = sum([
+                r.get("literal_correct", False),
+                r.get("systemic_correct", False),
+                r.get("principles_correct", False),
+                r.get("precedent_correct", False),
+            ])
+            reasoning_reward = correct_count / 4.0
+            reward += 0.4 * reasoning_reward
+
+        # Synthesis reward
+        if feedback.synthesis_feedback:
+            s = feedback.synthesis_feedback
+            synthesis_reward = (
+                0.5 * float(s.get("final_correct", False)) +
+                0.25 * float(s.get("disagreement_shown", False)) +
+                0.25 * float(s.get("confidence_appropriate", False))
+            )
+            reward += 0.3 * synthesis_reward
+
+        return reward
 ```
-User: Maria Rossi, Avvocato (practicing lawyer)
-- role_weight: 0.7
-- historical_accuracy: 48 validated / 52 submitted = 0.923
-- consensus_score: 3 agree / 4 reviewed this feedback = 0.75
-- reputation_score: 850 points → 0.85 (normalized)
-
-user_authority_score = 0.4 * 0.7 + 0.3 * 0.923 + 0.2 * 0.75 + 0.1 * 0.85
-                     = 0.28 + 0.277 + 0.15 + 0.085
-                     = 0.792
-```
-
-**Use of Authority Score**:
-- **Training Data**: High authority feedback weighted more in training
-- **Model Updates**: Low authority feedback requires more consensus before acting
-- **Feedback Display**: Show authority score to help users assess feedback quality
 
 ---
 
-### 3.3 Feedback Storage Schema
+## 4. Resilienza agli Aggiornamenti
 
-**PostgreSQL Table** (from Storage Layer):
+### Problema: Obsolescenza dei Pesi
+
+Quando la normativa cambia o una sentenza fa overruling, i pesi appresi potrebbero diventare obsoleti.
+
+### Soluzione: Triple Layer di Resilienza
+
+```python
+class ResilientLearning:
+    """
+    Gestisce l'obsolescenza dei pesi appresi.
+    """
+
+    # ═══════════════════════════════════════════════════════════
+    # MECCANISMO 1: TEMPORAL DECAY
+    # ═══════════════════════════════════════════════════════════
+
+    def apply_temporal_decay(self):
+        """
+        I pesi decadono verso il prior se non ricevono feedback recente.
+
+        Intuizione: se nessuno valida un peso da mesi,
+        la situazione potrebbe essere cambiata.
+        """
+        for expert, weights in self.traversal_weights.items():
+            for relation, weight in weights.items():
+                days_since_feedback = self._days_since_last_feedback(
+                    expert, relation
+                )
+
+                decay_rate = 0.995  # ~50% in 6 mesi
+                decay = decay_rate ** days_since_feedback
+
+                prior = self.EXPERT_PRIORS[expert][relation]
+                new_weight = decay * weight + (1 - decay) * prior
+
+                weights[relation] = new_weight
+
+    # ═══════════════════════════════════════════════════════════
+    # MECCANISMO 2: GRAPH EVENT TRIGGERS
+    # ═══════════════════════════════════════════════════════════
+
+    def on_graph_event(self, event: GraphEvent):
+        """
+        Reagisce a modifiche nel grafo della conoscenza.
+        """
+        if event.type == "ABROGA":
+            # Norma abrogata: depreca i pesi collegati
+            self._deprecate_related_weights(event.target_node)
+
+        elif event.type == "OVERRULES":
+            # Sentenza superata: trasferisci credito
+            self._transfer_weight_credit(
+                from_node=event.old_node,
+                to_node=event.new_node
+            )
+
+        elif event.type == "MODIFICA":
+            # Norma modificata: schedule re-validation
+            self._schedule_revalidation(event.target_node)
+
+    # ═══════════════════════════════════════════════════════════
+    # MECCANISMO 3: RECENCY-WEIGHTED FEEDBACK
+    # ═══════════════════════════════════════════════════════════
+
+    def compute_effective_weight(self, feedback: Feedback) -> float:
+        """
+        I feedback recenti pesano di più nel training.
+        """
+        # Authority base dell'esperto
+        authority = self.get_authority(feedback.expert_id)
+
+        # Recency decay (feedback di 1 anno fa pesa ~50%)
+        days_old = (datetime.now() - feedback.created_at).days
+        recency = 0.998 ** days_old
+
+        # Stabilità del nodo (nodi modificati di recente sono instabili)
+        stability = self._get_node_stability(feedback.related_nodes)
+
+        return authority * recency * stability
+```
+
+---
+
+## 5. Schema Database
 
 ```sql
-CREATE TABLE answer_feedback (
-    feedback_id UUID PRIMARY KEY,
-    trace_id VARCHAR(100) NOT NULL,
-    user_id UUID NOT NULL,
-    user_authority_score FLOAT NOT NULL,
+-- ═══════════════════════════════════════════════════════════
+-- AUTHORITY MULTILIVELLO
+-- ═══════════════════════════════════════════════════════════
 
-    -- Feedback content
-    rating INTEGER CHECK (rating BETWEEN 1 AND 5),
-    feedback_types TEXT[], -- Array: ['risposta_incompleta', 'fonti_errate', ...]
-    corrections JSONB,
-    suggested_sources TEXT[],
-    free_text_comments TEXT,
+CREATE TABLE user_authority_multilevel (
+    user_id UUID PRIMARY KEY REFERENCES users(id),
 
-    -- Context (for training data generation)
-    query_text TEXT NOT NULL,
-    final_answer TEXT NOT NULL,
-    execution_plan JSONB,
-    expert_outputs JSONB,
-    retrieval_result JSONB,
+    -- Authority per LIVELLO
+    authority_retrieval FLOAT DEFAULT 0.5,
+    authority_reasoning FLOAT DEFAULT 0.5,
+    authority_synthesis FLOAT DEFAULT 0.5,
 
-    -- Timestamps
-    created_at TIMESTAMP DEFAULT NOW(),
-    processed BOOLEAN DEFAULT false,
-    processed_at TIMESTAMP
+    -- Authority per DOMINIO (JSONB per flessibilità)
+    authority_domains JSONB DEFAULT '{
+        "civile": 0.5,
+        "penale": 0.5,
+        "amministrativo": 0.5,
+        "costituzionale": 0.5,
+        "lavoro": 0.5,
+        "commerciale": 0.5
+    }',
+
+    -- Metriche aggregate
+    total_feedbacks INT DEFAULT 0,
+    feedbacks_by_level JSONB DEFAULT '{}',
+    feedbacks_by_domain JSONB DEFAULT '{}',
+
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_feedback_trace_id ON answer_feedback(trace_id);
-CREATE INDEX idx_feedback_rating ON answer_feedback(rating);
-CREATE INDEX idx_feedback_processed ON answer_feedback(processed);
-CREATE INDEX idx_feedback_authority ON answer_feedback(user_authority_score);
+
+-- ═══════════════════════════════════════════════════════════
+-- FEEDBACK MULTILIVELLO
+-- ═══════════════════════════════════════════════════════════
+
+CREATE TABLE multilevel_feedback (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    query_id UUID REFERENCES queries(id),
+    expert_user_id UUID REFERENCES users(id),
+
+    -- Metadata
+    domain VARCHAR(50),
+    feedback_level VARCHAR(20),  -- 'retrieval', 'reasoning', 'synthesis'
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    -- Feedback Retrieval
+    sources_relevant BOOLEAN,
+    sources_complete BOOLEAN,
+    sources_ranking JSONB,  -- [1, 3, 2, 4] ordinamento corretto
+    relations_useful JSONB, -- {"INTERPRETA": true, "CITA": false}
+
+    -- Feedback Reasoning (per expert)
+    literal_correct BOOLEAN,
+    systemic_correct BOOLEAN,
+    principles_correct BOOLEAN,
+    precedent_correct BOOLEAN,
+    best_expert VARCHAR(20),
+
+    -- Feedback Synthesis
+    final_correct BOOLEAN,
+    disagreement_shown BOOLEAN,
+    confidence_appropriate BOOLEAN,
+
+    -- Testo libero
+    correction_text TEXT,
+    notes TEXT
+);
+
+
+-- ═══════════════════════════════════════════════════════════
+-- PESI APPRESI (CHECKPOINTING)
+-- ═══════════════════════════════════════════════════════════
+
+CREATE TABLE learned_weights (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    checkpoint_name VARCHAR(100),
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    -- Pesi serializzati
+    traversal_weights JSONB,  -- Per ogni expert
+    gating_weights BYTEA,     -- Serialized PyTorch state_dict
+    reranker_weights BYTEA,
+
+    -- Metriche al momento del checkpoint
+    validation_accuracy FLOAT,
+    total_feedbacks_used INT,
+
+    -- Flag
+    is_active BOOLEAN DEFAULT FALSE
+);
+
+CREATE INDEX idx_active_weights ON learned_weights(is_active)
+WHERE is_active = TRUE;
 ```
 
 ---
 
-## 4. Training Data Generator
+## 6. Interfaccia Feedback per Utenti
 
-**Purpose**: Convert feedback into training examples for model retraining.
-
-**Processing Flow**:
+### UI per Raccolta Feedback (Wireframe)
 
 ```
-Daily Batch Job (runs at 2 AM)
-         ↓
-┌────────────────────────────────────────┐
-│ 1. Fetch Unprocessed Feedback          │
-│    SELECT * FROM answer_feedback       │
-│    WHERE processed = false             │
-└──────────────┬─────────────────────────┘
-               ↓
-┌────────────────────────────────────────┐
-│ 2. Generate Training Examples          │
-│    For each feedback:                  │
-│    - Router training (context → plan)  │
-│    - VectorDB triplets (query, pos, neg)│
-│    - Query Understanding annotations   │
-│    - Synthesizer examples              │
-└──────────────┬─────────────────────────┘
-               ↓
-┌────────────────────────────────────────┐
-│ 3. Quality Filtering                   │
-│    Filter by:                          │
-│    - user_authority_score > 0.6        │
-│    - rating != 3 (neutral)             │
-│    - corrections not empty             │
-└──────────────┬─────────────────────────┘
-               ↓
-┌────────────────────────────────────────┐
-│ 4. Store Training Examples             │
-│    INSERT INTO training_examples       │
-└──────────────┬─────────────────────────┘
-               ↓
-┌────────────────────────────────────────┐
-│ 5. Mark Feedback as Processed          │
-│    UPDATE answer_feedback              │
-│    SET processed = true                │
-└────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    FEEDBACK SU QUESTA RISPOSTA                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  📊 LIVELLO 1: Le fonti trovate                                │
+│  ──────────────────────────────────────────────────────────    │
+│  Le fonti erano pertinenti?     [Sì] [Parzialmente] [No]       │
+│  Mancava qualcosa?              [Sì] [No]                       │
+│  Se sì, cosa? [________________________]                        │
+│                                                                 │
+│  📊 LIVELLO 2: L'interpretazione                               │
+│  ──────────────────────────────────────────────────────────    │
+│  Quale interpretazione era più corretta?                        │
+│  [ ] Letterale    [Corretta] [Parziale] [Sbagliata]           │
+│  [ ] Sistematica  [Corretta] [Parziale] [Sbagliata]           │
+│  [ ] Principi     [Corretta] [Parziale] [Sbagliata]           │
+│  [ ] Precedenti   [Corretta] [Parziale] [Sbagliata]           │
+│                                                                 │
+│  📊 LIVELLO 3: La risposta finale                              │
+│  ──────────────────────────────────────────────────────────    │
+│  La risposta finale è corretta?  [Sì] [Parzialmente] [No]      │
+│  Il disaccordo era visibile?     [Sì] [No] [N/A]               │
+│                                                                 │
+│  📝 Note aggiuntive (opzionale)                                │
+│  [____________________________________________]                  │
+│                                                                 │
+│                                        [Invia Feedback]         │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### 4.1 Router Training Data
+## 7. Metriche di Validazione per Tesi
 
-**Purpose**: Improve Router's execution plan generation.
+### Esperimento 1: RLCF Scalare vs Multilivello
 
-**Training Example Schema**:
-
-```json
-{
-  "example_type": "router_decision",
-  "input_data": {
-    "query_context": {
-      "original_query": "È valido un contratto firmato da un minorenne?",
-      "entities": [...],
-      "concepts": [...],
-      "intent": {"primary": "validità_atto"},
-      "complexity": {"score": 0.62}
+```python
+# Setup sperimentale
+experiment = {
+    "gruppi": {
+        "A": "RLCF scalare (authority unico)",
+        "B": "RLCF multilivello (authority per competenza)"
     },
-    "enriched_context": {
-      "mapped_norms": [...]
-    }
-  },
-  "expected_output": {
-    "execution_plan": {
-      "retrieval_plan": {
-        "api_agent": {"enabled": true, ...},
-        "vectordb_agent": {"enabled": false}
-      },
-      "reasoning_plan": {
-        "experts": ["Literal_Interpreter", "Precedent_Analyst"]
-      }
-    }
-  },
-  "outcome": {
-    "actual_plan_generated": {...},
-    "final_answer_rating": 2,
-    "expert_correction": "Should have activated Precedent_Analyst to cite case law"
-  },
-  "quality_score": 0.85,
-  "source_feedback_id": "uuid"
-}
-```
-
-**Training Strategy**:
-- **Fine-tune system prompt**: Add examples of good/bad ExecutionPlans to few-shot prompt
-- **Preference learning**: Train on (query, good_plan, bad_plan) triplets using RLHF techniques
-- **Evaluation**: Test new prompt on held-out feedback, measure rating improvement
-
----
-
-### 4.2 Embedding Training Data (Triplets)
-
-**Purpose**: Fine-tune VectorDB embeddings for better retrieval.
-
-**Training Example Schema** (Contrastive Learning):
-
-```json
-{
-  "example_type": "embedding_triplet",
-  "input_data": {
-    "anchor": "È valido un contratto firmato da un minorenne?",
-    "positive": "Art. 2 c.c. - La maggiore età è fissata al compimento del diciottesimo anno. Con la maggiore età si acquista la capacità di compiere tutti gli atti per i quali non sia stabilita un'età diversa.",
-    "negative": "Art. 1350 c.c. - Devono farsi per atto pubblico o per scrittura privata, sotto pena di nullità: 1) i contratti che trasferiscono la proprietà di beni immobili..."
-  },
-  "expected_output": {
-    "anchor_to_positive_distance": "< anchor_to_negative_distance"
-  },
-  "quality_score": 0.92,
-  "source_feedback_id": "uuid",
-  "derivation": "User said 'Art. 2 c.c. is the correct source' (positive), system retrieved Art. 1350 c.c. (negative)"
-}
-```
-
-**Derivation Logic**:
-
-```
-Feedback: "Fonti errate - manca Art. 2 c.c."
-
-Derivation:
-1. anchor = original query
-2. positive = Art. 2 c.c. (suggested by user as correct)
-3. negative = Art. 1350 c.c. (was retrieved by system but user said it's wrong)
-
-Training: Minimize distance(anchor, positive), maximize distance(anchor, negative)
-```
-
-**Training Strategy**:
-- **Contrastive loss**: Triplet margin loss
-- **Hard negative mining**: Find chunks semantically similar but legally distinct
-- **Batch size**: 64 triplets per batch
-- **Epochs**: 3-5 epochs on accumulated RLCF data
-
----
-
-### 4.3 Query Understanding Training Data
-
-**Purpose**: Improve entity extraction, intent classification, complexity scoring.
-
-**Training Example Schema**:
-
-```json
-{
-  "example_type": "query_understanding_annotation",
-  "input_data": {
-    "query": "È valido un contratto firmato da un minorenne nel 2010?"
-  },
-  "expected_output": {
-    "entities": [
-      {"text": "contratto", "type": "LEGAL_OBJECT", "start": 11, "end": 20},
-      {"text": "minorenne", "type": "PERSON", "start": 35, "end": 44},
-      {"text": "2010", "type": "DATE", "start": 49, "end": 53}
-    ],
-    "intent": {"primary": "validità_atto", "confidence": 0.92},
-    "complexity": {"score": 0.62}
-  },
-  "outcome": {
-    "system_output": {
-      "entities": [...], // Missing "2010" entity
-      "intent": {"primary": "validità_atto"},
-      "complexity": {"score": 0.45} // Too low
-    },
-    "expert_correction": {
-      "entities": "Missing DATE entity '2010'",
-      "complexity": "Should be 0.62 (medium complexity) due to temporal reference"
-    }
-  },
-  "quality_score": 0.88,
-  "source_feedback_id": "uuid"
-}
-```
-
-**Training Strategy**:
-- **Entity extraction**: Add corrected annotations to NER fine-tuning dataset
-- **Intent classification**: Retrain multi-label classifier on corrected labels
-- **Complexity scoring**: Retrain Random Forest on corrected complexity scores
-
----
-
-### 4.4 Synthesizer Training Data
-
-**Purpose**: Improve answer synthesis quality (convergent vs divergent modes).
-
-**Training Example Schema**:
-
-```json
-{
-  "example_type": "synthesizer_training",
-  "input_data": {
-    "expert_outputs": [
-      {
-        "expert_type": "Literal_Interpreter",
-        "interpretation": "...",
-        "confidence": 0.95
-      },
-      {
-        "expert_type": "Systemic_Teleological",
-        "interpretation": "...",
-        "confidence": 0.78
-      }
-    ],
-    "synthesis_mode": "convergent",
-    "query_context": {...}
-  },
-  "expected_output": {
-    "final_answer": "Il contratto firmato da un minorenne è annullabile (Art. 1425 c.c.). [Improved version with better synthesis]",
-    "provenance": [...]
-  },
-  "outcome": {
-    "system_output": {
-      "final_answer": "Il contratto è annullabile.", // Too brief
-      "rating": 2
-    },
-    "expert_correction": "Answer should integrate both literal interpretation (Art. 1425) and systemic context (tutela del minore). Missing provenance for claims."
-  },
-  "quality_score": 0.80,
-  "source_feedback_id": "uuid"
-}
-```
-
-**Training Strategy**:
-- **Prompt engineering**: Update synthesizer system prompt with examples of good synthesis
-- **Preference learning**: Train on (expert_outputs, good_synthesis, bad_synthesis) triplets
-- **Evaluation**: Measure answer quality (rating) and provenance completeness
-
----
-
-## 5. Model Update Orchestrator
-
-### 5.1 Weekly Update Cycle
-
-**Schedule**:
-
-```
-WEEKLY CYCLE (Lightweight Updates):
-┌────────────────────────────────────────────────────────┐
-│ Monday 2 AM: Generate Training Data (daily batch)     │
-│ ├─ Fetch unprocessed feedback from past week          │
-│ ├─ Generate training examples                         │
-│ └─ Store in training_examples table                   │
-└────────────────────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────┐
-│ Monday 10 AM: Trigger Model Updates (if threshold met)│
-│ ├─ Check: New training examples > 100?                │
-│ ├─ YES → Trigger retraining                           │
-│ └─ NO  → Skip this week                               │
-└────────────────────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────┐
-│ Tuesday: Retraining (automated)                        │
-│ ├─ Router: Update few-shot prompt with new examples   │
-│ ├─ Query Understanding: Fine-tune NER on new annotations│
-│ └─ Synthesizer: Update prompt with new synthesis examples│
-└────────────────────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────┐
-│ Wednesday: A/B Test Deployment                         │
-│ ├─ Deploy new models to 10% of traffic                │
-│ ├─ Monitor metrics (precision, recall, user ratings)  │
-│ └─ Continue A/B test for 7 days                       │
-└────────────────────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────┐
-│ Next Wednesday: Evaluate A/B Test                      │
-│ ├─ Compare metrics: new model vs old model            │
-│ ├─ IF new model improves → Gradual rollout (50%, 100%)│
-│ └─ IF no improvement → Rollback to old model          │
-└────────────────────────────────────────────────────────┘
-
-
-MONTHLY CYCLE (Heavy Retraining):
-┌────────────────────────────────────────────────────────┐
-│ First Monday of Month: Heavy Retraining                │
-│ ├─ VectorDB Embeddings: Full fine-tuning (3-5 epochs) │
-│ │   on accumulated RLCF triplets (1,000-5,000 examples)│
-│ │   Duration: ~12 hours                                │
-│ ├─ Query Understanding: Full NER retraining            │
-│ │   Duration: ~6 hours                                 │
-│ └─ Complexity Model: Retrain Random Forest             │
-│     Duration: ~1 hour                                  │
-└────────────────────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────┐
-│ Tuesday-Wednesday: A/B Test (same as weekly)           │
-│ Next Tuesday: Evaluate & Rollout (same as weekly)      │
-└────────────────────────────────────────────────────────┘
-```
-
----
-
-### 5.2 A/B Testing Strategy
-
-**Test Configuration**:
-
-```json
-{
-  "ab_test_config": {
-    "test_id": "uuid",
-    "model_component": "router_prompt | vectordb_embeddings | ner_model | synthesizer_prompt",
-    "old_model_version": "v2.3",
-    "new_model_version": "v2.4",
-    "traffic_split": {
-      "old_model": 0.9,
-      "new_model": 0.1
-    },
-    "duration_days": 7,
-    "start_date": "2024-11-04",
-    "end_date": "2024-11-11",
-    "metrics_tracked": [
-      "answer_quality_rating",
-      "retrieval_precision",
-      "retrieval_recall",
-      "latency_p95",
-      "error_rate"
+    "partecipanti": "20-30 esperti (colleghi/professori)",
+    "task": "100 domande giuridiche con gold standard",
+    "metriche": [
+        "Accuratezza risposta finale",
+        "Tempo di convergenza (quanti feedback per stabilizzare)",
+        "Soddisfazione esperti (quanto è faticoso dare feedback)",
+        "Correlazione authority-correttezza"
     ]
-  }
 }
 ```
 
-**Traffic Routing**:
+### Esperimento 2: Impatto dei Pesi Apprendibili
 
-```
-User Query arrives
-       ↓
-┌──────────────────────────────┐
-│ A/B Test Router              │
-│ hash(user_id) % 100          │
-│   < 10  → new_model (10%)    │
-│   >= 10 → old_model (90%)    │
-└──────────┬───────────────────┘
-           ↓
-    Route to appropriate model
-```
-
-**Metrics Collection**:
-
-```sql
-CREATE TABLE ab_test_metrics (
-    metric_id UUID PRIMARY KEY,
-    test_id UUID NOT NULL,
-    model_version VARCHAR(50) NOT NULL, -- 'v2.3' or 'v2.4'
-    trace_id VARCHAR(100) NOT NULL,
-
-    -- Metrics
-    answer_quality_rating FLOAT, -- User rating (1-5)
-    retrieval_precision FLOAT,   -- Relevant chunks / Retrieved chunks
-    retrieval_recall FLOAT,      -- Relevant chunks / All relevant chunks
-    latency_ms INTEGER,
-    error_occurred BOOLEAN,
-
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_ab_test_version ON ab_test_metrics(test_id, model_version);
+```python
+# Confronto
+comparison = {
+    "baseline": "Pesi statici (hardcoded da domain expert)",
+    "learned": "Pesi appresi da 1000 feedback RLCF",
+    "metriche": [
+        "Precision@10 nel retrieval",
+        "Accuracy per tipo di expert",
+        "Explainability (path nel grafo)",
+    ]
+}
 ```
 
-**Evaluation Query**:
+### Esperimento 3: Resilienza
 
-```sql
--- Compare new vs old model
-SELECT
-    model_version,
-    AVG(answer_quality_rating) AS avg_rating,
-    AVG(retrieval_precision) AS avg_precision,
-    AVG(latency_ms) AS avg_latency_ms,
-    COUNT(*) AS sample_size
-FROM ab_test_metrics
-WHERE test_id = $test_id
-GROUP BY model_version;
-```
-
-**Decision Logic**:
-
-```
-IF new_model.avg_rating > old_model.avg_rating + 0.1  (10% improvement)
-   AND new_model.avg_latency_ms < old_model.avg_latency_ms * 1.2  (< 20% slowdown)
-   AND new_model.error_rate < old_model.error_rate * 1.1  (< 10% more errors)
-THEN
-   Gradual rollout: 10% → 50% → 100% (over 3 days)
-ELSE
-   Rollback to old model
+```python
+# Test resilienza
+resilience_test = {
+    "scenario": "Simulare cambio normativo (nuova sentenza)",
+    "misura": "Quanto tempo/feedback per ri-adattarsi",
+    "confronto": [
+        "Senza temporal decay",
+        "Con temporal decay",
+        "Con graph event triggers"
+    ]
+}
 ```
 
 ---
 
-### 5.3 Model Versioning
+## 8. Requisiti Infrastrutturali
 
-**Versioning Schema**:
+### Hardware Minimo (Development)
 
-```
-Model Version Format: v{major}.{minor}.{patch}
+| Componente | Requisito | Note |
+|------------|-----------|------|
+| CPU | M1/M2/M4 o x86 8+ core | Training può essere CPU-only |
+| RAM | 16GB | Per modelli piccoli |
+| GPU | Opzionale | MPS su Mac, CUDA su Linux |
+| Storage | 50GB SSD | Per embeddings e checkpoint |
 
-Examples:
-- v2.3.0 = Major version 2, Minor 3, Patch 0
-- v2.3.1 = Bug fix (patch)
-- v2.4.0 = New features (minor)
-- v3.0.0 = Breaking changes (major)
+### Hardware Raccomandato (Production)
 
-Version Increments:
-- Weekly updates: Patch increment (v2.3.0 → v2.3.1)
-- Monthly updates: Minor increment (v2.3.1 → v2.4.0)
-- Architecture changes: Major increment (v2.4.0 → v3.0.0)
-```
+| Componente | Requisito | Note |
+|------------|-----------|------|
+| CPU | 16+ core | Per parallelismo expert |
+| RAM | 64GB | Server universitari |
+| GPU | 16GB+ VRAM | Per training veloce |
+| Storage | 500GB NVMe | Per corpus legale completo |
 
-**Model Registry**:
-
-```sql
-CREATE TABLE model_registry (
-    model_id UUID PRIMARY KEY,
-    model_component VARCHAR(100) NOT NULL, -- 'router_prompt', 'vectordb_embeddings', etc.
-    version VARCHAR(50) NOT NULL,
-    model_artifact_url TEXT, -- S3/MinIO URL to model file
-    training_data_size INTEGER,
-    training_examples_ids TEXT[], -- Array of example UUIDs
-
-    -- Performance
-    validation_metrics JSONB, -- Precision, recall, etc.
-
-    -- Deployment
-    deployment_status VARCHAR(50), -- 'testing', 'deployed', 'deprecated'
-    deployed_at TIMESTAMP,
-    deprecated_at TIMESTAMP,
-
-    created_at TIMESTAMP DEFAULT NOW(),
-
-    CONSTRAINT unique_version UNIQUE(model_component, version)
-);
-
-CREATE INDEX idx_model_component ON model_registry(model_component);
-CREATE INDEX idx_model_status ON model_registry(deployment_status);
-```
-
----
-
-## 6. Learning Loops
-
-### 6.1 Router Learning Loop
-
-**Objective**: Improve Router's execution plan generation based on feedback.
-
-**Learning Process**:
-
-```
-Feedback: "Esperti sbagliati selezionati"
-Correction: "Should have activated Precedent_Analyst"
-
-Training Data Generation:
-┌────────────────────────────────────────┐
-│ Input: QueryContext + EnrichedContext  │
-│ Output (system): ExecutionPlan with    │
-│         experts = [Literal_Interpreter]│
-│ Expected (expert): ExecutionPlan with  │
-│         experts = [Literal_Interpreter,│
-│                    Precedent_Analyst]  │
-└──────────────┬─────────────────────────┘
-               ↓
-         Few-Shot Prompt Update
-         (Add example to system prompt)
-
-System Prompt (updated):
-"...
-Example of good plan:
-Query: 'È valido un contratto firmato da un minorenne?'
-Context: complexity=0.62, intent=validità_atto
-Correct Plan: Activate Literal_Interpreter + Precedent_Analyst
-Rationale: Even for medium complexity, case law provides
-           valuable context for validity checks.
-..."
-```
-
-**Evaluation**:
-- Metric: % of queries where expert selection matches expert expectations
-- Target: > 85% agreement
-
----
-
-### 6.2 VectorDB Embedding Loop
-
-**Objective**: Fine-tune embeddings to improve retrieval precision/recall.
-
-**Learning Process**:
-
-```
-Feedback: "Fonti errate - manca Art. 2 c.c."
-
-Training Data Generation (Contrastive Triplet):
-┌────────────────────────────────────────┐
-│ anchor   = "È valido un contratto      │
-│             firmato da un minorenne?"  │
-│ positive = Art. 2 c.c. (user suggested)│
-│ negative = Art. 1350 c.c. (system      │
-│            retrieved but wrong)        │
-└──────────────┬─────────────────────────┘
-               ↓
-    Accumulate 1,000-5,000 triplets/month
-               ↓
-┌────────────────────────────────────────┐
-│ Monthly Fine-Tuning                    │
-│ Model: multilingual-e5-large (Phase 2) │
-│ Loss: Triplet margin loss              │
-│ Epochs: 3-5                            │
-│ Batch size: 64                         │
-│ Duration: ~12 hours                    │
-└──────────────┬─────────────────────────┘
-               ↓
-       Updated Embedding Model
-       (v2.4 → v2.5)
-               ↓
-┌────────────────────────────────────────┐
-│ Re-embed All Chunks (offline)          │
-│ • Fetch all chunks from VectorDB       │
-│ • Re-embed with new model              │
-│ • Update vectors in VectorDB           │
-│ Duration: ~48 hours (1M chunks)        │
-└────────────────────────────────────────┘
-```
-
-**Evaluation**:
-- Metric: Precision@10, Recall@10, MRR@10 (Mean Reciprocal Rank)
-- Target: +5% improvement per monthly cycle
-
----
-
-### 6.3 Query Understanding Loop
-
-**Objective**: Improve entity extraction, intent classification, complexity scoring.
-
-**Learning Process**:
-
-```
-Feedback: "Intent classification wrong"
-Correction: "Should be 'interpretazione_norma' not 'validità_atto'"
-
-Training Data Generation:
-┌────────────────────────────────────────┐
-│ Input: Query                           │
-│ Output (system): intent = 'validità_atto' (confidence: 0.85)│
-│ Expected (expert): intent = 'interpretazione_norma'│
-└──────────────┬─────────────────────────┘
-               ↓
-    Accumulate 100-500 annotations/month
-               ↓
-┌────────────────────────────────────────┐
-│ Monthly Fine-Tuning                    │
-│ • NER Model: BERT fine-tuned on        │
-│   corrected entity annotations         │
-│ • Intent Classifier: Multi-label BERT  │
-│   retrained on corrected intents       │
-│ • Complexity Model: Random Forest      │
-│   retrained on corrected scores        │
-│ Duration: ~6 hours                     │
-└────────────────────────────────────────┘
-```
-
-**Evaluation**:
-- **NER**: F1 score on entity extraction
-- **Intent**: Accuracy on intent classification
-- **Complexity**: Mean absolute error (MAE) on complexity score
-- Target: F1 > 0.90, Accuracy > 0.85, MAE < 0.1
-
----
-
-### 6.4 Synthesizer Loop
-
-**Objective**: Improve answer synthesis quality (convergent/divergent modes).
-
-**Learning Process**:
-
-```
-Feedback: "Risposta troppo breve, manca contesto"
-Rating: 2/5
-
-Training Data Generation:
-┌────────────────────────────────────────┐
-│ Input: Expert outputs (2 experts)      │
-│ Output (system): "Il contratto è       │
-│         annullabile." (1 sentence)     │
-│ Expected (expert): "Il contratto       │
-│         firmato da un minorenne è      │
-│         annullabile (Art. 1425 c.c.).  │
-│         La norma prevede... [3 paragraphs]"│
-└──────────────┬─────────────────────────┘
-               ↓
-    Accumulate 50-200 examples/month
-               ↓
-┌────────────────────────────────────────┐
-│ Monthly Prompt Update                  │
-│ • Add examples of good synthesis       │
-│   to system prompt                     │
-│ • Emphasize provenance completeness    │
-│ • Provide counter-examples (bad        │
-│   synthesis = too brief)               │
-└────────────────────────────────────────┘
-```
-
-**Evaluation**:
-- Metric: User rating (1-5), answer length, provenance completeness
-- Target: Avg rating > 4.0, provenance completeness > 95%
-
----
-
-## 7. Technology Mapping
-
-### 7.1 RLCF Infrastructure
-
-| Component | Technology | Rationale |
-|-----------|-----------|-----------|
-| **Feedback Storage** | PostgreSQL | ACID compliance, JSONB for flexible schemas |
-| **Training Data Processing** | Celery + RabbitMQ | Async task queue for batch jobs |
-| **Model Training** | Python + PyTorch/Transformers | Standard ML stack for NLP |
-| **A/B Testing** | Custom traffic router (Python) | Deterministic routing based on user_id hash |
-| **Model Registry** | PostgreSQL + MinIO/S3 | Metadata in PostgreSQL, artifacts in object storage |
-
----
-
-### 7.2 Model Training Tools
-
-| Model | Training Framework | Infrastructure |
-|-------|-------------------|---------------|
-| **VectorDB Embeddings** | Sentence-Transformers (PyTorch) | GPU instance (A100, 24 hours) |
-| **NER Model** | Hugging Face Transformers | GPU instance (V100, 6 hours) |
-| **Intent Classifier** | Scikit-learn / Transformers | CPU instance (4 cores, 2 hours) |
-| **Complexity Model** | Scikit-learn (Random Forest) | CPU instance (2 cores, 1 hour) |
-
----
-
-## 8. Docker Compose Architecture
-
-### 8.1 Service Definitions
+### Configurabilità API
 
 ```yaml
-version: '3.8'
+# config/rlcf_config.yaml
 
-services:
-  # RLCF Feedback API
-  rlcf-feedback-api:
-    build: ./services/rlcf-feedback-api
-    ports:
-      - "8040:8000"
-    environment:
-      - POSTGRES_URI=postgresql://merl_t:${POSTGRES_PASSWORD}@postgres:5432/merl_t
-      - AUTH_SECRET_KEY=${AUTH_SECRET_KEY}
-    depends_on:
-      - postgres
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+learning:
+  # Utente può usare propria API key
+  llm_provider: "openrouter"  # o "openai", "anthropic"
+  llm_api_key: "${OPENROUTER_API_KEY}"  # Dalla propria .env
 
-  # Training Data Generator (Celery Worker)
-  training-data-generator:
-    build: ./services/training-data-generator
-    environment:
-      - CELERY_BROKER_URL=amqp://rabbitmq:5672
-      - POSTGRES_URI=postgresql://merl_t:${POSTGRES_PASSWORD}@postgres:5432/merl_t
-    depends_on:
-      - rabbitmq
-      - postgres
-    deploy:
-      replicas: 2
+  # Training parameters (tunable)
+  learning_rate: 0.0001
+  batch_size: 32
+  baseline_window: 100
 
-  # Model Update Orchestrator (Celery Beat Scheduler)
-  model-update-orchestrator:
-    build: ./services/model-update-orchestrator
-    environment:
-      - CELERY_BROKER_URL=amqp://rabbitmq:5672
-      - POSTGRES_URI=postgresql://merl_t:${POSTGRES_PASSWORD}@postgres:5432/merl_t
-      - MODEL_REGISTRY_S3_BUCKET=merl-t-models
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    depends_on:
-      - rabbitmq
-      - postgres
+  # Decay parameters
+  temporal_decay_rate: 0.995
+  recency_weight: 0.998
 
-  # A/B Test Router (Traffic Splitter)
-  ab-test-router:
-    build: ./services/ab-test-router
-    ports:
-      - "8041:8000"
-    environment:
-      - POSTGRES_URI=postgresql://merl_t:${POSTGRES_PASSWORD}@postgres:5432/merl_t
-      - ROUTER_V2_3_URL=http://router-v2-3:8000
-      - ROUTER_V2_4_URL=http://router-v2-4:8000
-      - AB_TEST_CONFIG_TABLE=ab_test_config
-    depends_on:
-      - postgres
+  # Authority weights (formula RLCF)
+  alpha: 0.3  # Base
+  beta: 0.5   # Temporal
+  gamma: 0.2  # Performance
 
-  # PostgreSQL (from Storage Layer)
-  postgres:
-    image: postgres:15-alpine
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_USER=merl_t
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=merl_t
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  # RabbitMQ (from Storage Layer)
-  rabbitmq:
-    image: rabbitmq:3.12-management
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      - RABBITMQ_DEFAULT_USER=admin
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-
-volumes:
-  postgres_data:
-  rabbitmq_data:
+privacy:
+  # Dati sensibili
+  anonymize_feedback: true
+  retention_days: 365
+  export_format: "anonymized_json"
 ```
 
 ---
 
-## 9. Performance Characteristics
+## 9. Roadmap Implementazione
 
-### 9.1 Latency
+### Fase 1: Core RLCF Multilivello (2-3 settimane)
+- [ ] Schema database multilivello
+- [ ] `MultilevelAuthority` class
+- [ ] `MultilevelFeedback` schema
+- [ ] API endpoint per feedback multilivello
 
-| Operation | Latency | Frequency |
-|-----------|---------|-----------|
-| **Feedback submission** | < 5s | Per user interaction |
-| **Training data generation** | ~1 hour | Daily (batch) |
-| **Weekly model update** | ~6 hours | Weekly |
-| **Monthly embedding retraining** | ~12 hours | Monthly |
-| **Re-embedding corpus** | ~48 hours | After embedding update |
-| **A/B test evaluation** | ~10 minutes | Weekly |
+### Fase 2: Pesi Apprendibili (3-4 settimane)
+- [ ] `LearnableSystemParameters` con θ_traverse, θ_gating
+- [ ] Policy gradient training loop
+- [ ] Checkpointing pesi
 
----
+### Fase 3: Resilienza (2 settimane)
+- [ ] Temporal decay
+- [ ] Graph event handlers
+- [ ] Recency weighting
 
-### 9.2 Throughput
-
-| Operation | Throughput | Conditions |
-|-----------|-----------|-----------|
-| **Feedback collection** | 1,000 submissions/day | Avg user base |
-| **Training data generation** | 500 examples/hour | 2 Celery workers |
-| **Model training** | 1 model/week | GPU instance |
-
----
-
-## 10. Cross-References
-
-### Section 02 Methodology
-- **RLCF Framework**: `docs/02-methodology/rlcf-framework.md`
-  - §2: Dynamic Authority Calculation
-  - §3: Feedback Collection Interface
-  - §4: Training Data Generation
-  - §5: Model Update Orchestration
-
-### Section 03 Architecture
-- **All Layers**: RLCF feedback loop integrated across all components
-  - Preprocessing Layer: Query Understanding evolution
-  - Orchestration Layer: Router learning
-  - Reasoning Layer: Expert/Synthesizer evolution
-  - Storage Layer: Embedding fine-tuning
+### Fase 4: Validazione Empirica (4-6 settimane)
+- [ ] Setup esperimenti
+- [ ] Raccolta feedback con colleghi/professori
+- [ ] Analisi statistica
+- [ ] Scrittura risultati per tesi
 
 ---
 
-## 11. Appendices
+**Changelog**:
+- 2025-12-02: v2.0 - RLCF Multilivello con pesi apprendibili
+- 2025-11-14: v1.0 - RLCF scalare (ora in archive/)
 
-### A. Feedback Quality Metrics
-
-**Metrics Tracked**:
-- **Feedback volume**: Submissions per day/week
-- **Feedback distribution**: Rating distribution (1-5 stars)
-- **Authority distribution**: User authority score distribution
-- **Correction rate**: % of feedback with structured corrections
-- **Consensus rate**: % of feedback validated by multiple experts
-
----
-
-### B. Model Performance Tracking
-
-**Metrics Dashboard**:
-- **Router**: Plan effectiveness (correlation plan ↔ rating)
-- **VectorDB**: Precision@10, Recall@10, MRR@10
-- **Query Understanding**: NER F1, Intent accuracy, Complexity MAE
-- **Synthesizer**: Avg user rating, Provenance completeness
-
-**Alert Thresholds**:
-- Rating drop > 0.5 → Alert dev team
-- Precision drop > 10% → Rollback model
-- Latency increase > 50% → Investigate bottleneck
-
----
-
-**Document Version**: 1.0
-**Last Updated**: 2024-11-03
-**Status**: ✅ Complete

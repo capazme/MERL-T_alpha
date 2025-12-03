@@ -26,9 +26,12 @@ from .models import (
     Node, Edge, EntityType, RelationType, GraphMetadata,
     Provenance, ExtractionMethod, ExtractionResult, ValidationStatus
 )
-from .neo4j_graph_builder import (
-    Neo4jGraphDatabase, Neo4jLegalKnowledgeGraph, EntityCentricNeo4jStrategy
-)
+
+# v2: Neo4j archived - will be replaced by FalkorDB
+# See docs/03-architecture/04-storage-layer.md for v2 design
+# from .neo4j_graph_builder import (
+#     Neo4jGraphDatabase, Neo4jLegalKnowledgeGraph, EntityCentricNeo4jStrategy
+# )
 
 logger = logging.getLogger(__name__)
 

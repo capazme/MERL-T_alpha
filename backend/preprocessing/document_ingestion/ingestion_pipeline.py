@@ -17,13 +17,15 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-from neo4j import AsyncDriver
+# v2: Neo4j archived - will be replaced by FalkorDB
+# from neo4j import AsyncDriver
 
 from .models import IngestionResult
 from .document_reader import DocumentReader
 from .llm_extractor import LLMExtractor
 from .validator import Validator
-from .neo4j_writer import Neo4jWriter
+# v2: Neo4j archived - will be replaced by FalkorDB
+# from .neo4j_writer import Neo4jWriter
 
 logger = logging.getLogger(__name__)
 

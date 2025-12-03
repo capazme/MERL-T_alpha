@@ -1,15 +1,24 @@
 """
-Reasoning Experts for Legal Analysis
+Reasoning Experts for Legal Analysis (v2)
+==========================================
 
-This module contains 4 reasoning experts based on Italian legal tradition:
-- LiteralInterpreter: Positivismo Giuridico (strict textual analysis)
-- SystemicTeleological: Teleologia Giuridica (purpose-oriented interpretation)
-- PrinciplesBalancer: Costituzionalismo (constitutional principle balancing)
-- PrecedentAnalyst: Empirismo Giuridico (case law analysis)
+This module contains expert agents with autonomous tools.
 
-Each expert analyzes the same query using different legal reasoning methodologies.
+v2 Architecture:
+- ExpertWithTools: Base class for autonomous experts
+- Each expert has tools for retrieval specific to their perspective
+- Expert-specific traversal weights (theta_traverse)
+
+See docs/03-architecture/03-reasoning-layer.md for v2 design.
+
+Expert Types:
+- LiteralInterpreterV2: Positivismo Giuridico (text-based)
+- SystemicTeleologicalV2: Teleologia Giuridica (purpose-based)
+- PrinciplesBalancerV2: Costituzionalismo (constitutional balancing)
+- PrecedentAnalystV2: Empirismo Giuridico (case law analysis)
 """
 
+# Base classes and data models (from v1, still valid)
 from .base import (
     ReasoningExpert,
     ExpertContext,
@@ -19,14 +28,22 @@ from .base import (
     ConfidenceFactors
 )
 
-from .literal_interpreter import LiteralInterpreter
-from .systemic_teleological import SystemicTeleological
-from .principles_balancer import PrinciplesBalancer
-from .precedent_analyst import PrecedentAnalyst
+# Synthesizer (to be adapted for v2)
 from .synthesizer import Synthesizer, ProvisionalAnswer
 
+# v2 Expert with Tools
+from .expert_with_tools import (
+    ExpertWithTools,
+    Tool,
+    TraversalWeights,
+    LiteralInterpreterV2,
+    SystemicTeleologicalV2,
+    PrinciplesBalancerV2,
+    PrecedentAnalystV2,
+)
+
 __all__ = [
-    # Base classes
+    # Base classes (v1, still valid)
     "ReasoningExpert",
     "ExpertContext",
     "ExpertOpinion",
@@ -34,13 +51,16 @@ __all__ = [
     "ReasoningStep",
     "ConfidenceFactors",
 
-    # Experts
-    "LiteralInterpreter",
-    "SystemicTeleological",
-    "PrinciplesBalancer",
-    "PrecedentAnalyst",
-
     # Synthesizer
     "Synthesizer",
     "ProvisionalAnswer",
+
+    # v2 Expert with Tools
+    "ExpertWithTools",
+    "Tool",
+    "TraversalWeights",
+    "LiteralInterpreterV2",
+    "SystemicTeleologicalV2",
+    "PrinciplesBalancerV2",
+    "PrecedentAnalystV2",
 ]

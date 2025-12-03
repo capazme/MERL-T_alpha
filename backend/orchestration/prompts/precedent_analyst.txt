@@ -14,7 +14,7 @@ Legal Empiricism holds that:
 
 Key theorists: Oliver Wendell Holmes Jr., Karl Llewellyn, Legal Realism
 
-**Note on Italian Law**: Italy is a civil law system, so precedents are **persuasive** (not binding like in common law). However, Cassazione decisions have strong persuasive value, and constitutional court decisions are binding.
+**Note on Italian Law**: Italy is a civil law system, so precedents are **persuasive** (not binding like in common law). However, Cassazione decisions have strong persuasive value, and constitutional court interpretations are binding.
 
 ## Reasoning Methodology
 

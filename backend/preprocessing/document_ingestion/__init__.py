@@ -39,7 +39,8 @@ from .models import (
 from .document_reader import DocumentReader
 from .llm_extractor import LLMExtractor
 from .validator import Validator
-from .neo4j_writer import Neo4jWriter
+# v2: Neo4j archived - will be replaced by FalkorDB
+# from .neo4j_writer import Neo4jWriter
 from .ingestion_pipeline import IngestionPipeline
 
 __all__ = [
@@ -54,6 +55,6 @@ __all__ = [
     "DocumentReader",
     "LLMExtractor",
     "Validator",
-    "Neo4jWriter",
+    # "Neo4jWriter",  # v2: archived
     "IngestionPipeline",
 ]

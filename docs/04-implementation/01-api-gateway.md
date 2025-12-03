@@ -67,7 +67,7 @@ External Client
 
 ### 2.1 Factory Function
 
-**File**: `src/api_gateway/app.py`
+**File**: `backend/orchestration/api/main.py`
 
 ```python
 from contextlib import asynccontextmanager
@@ -223,7 +223,7 @@ app = create_app()
 
 ### 2.2 Configuration Management
 
-**File**: `src/api_gateway/config.py`
+**File**: `backend/orchestration/api/config.py` (or equivalent)
 
 ```python
 from functools import lru_cache

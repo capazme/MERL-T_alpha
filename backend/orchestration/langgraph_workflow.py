@@ -29,13 +29,20 @@ from langgraph.graph import StateGraph, END
 
 # Import orchestration components
 from backend.orchestration.llm_router import RouterService
-from backend.orchestration.agents import KGAgent, APIAgent, VectorDBAgent
-from backend.orchestration.experts import (
-    LiteralInterpreter,
-    SystemicTeleological,
-    PrinciplesBalancer,
-    PrecedentAnalyst
-)
+
+# v1 agents ARCHIVED - to be replaced by v2 expert tools
+# See docs/03-architecture/03-reasoning-layer.md for v2 design
+# from backend.orchestration.agents import KGAgent, APIAgent, VectorDBAgent
+
+# v1 experts ARCHIVED - to be replaced by v2 ExpertWithTools
+# See docs/03-architecture/03-reasoning-layer.md for v2 design
+# from backend.orchestration.experts import (
+#     LiteralInterpreter,
+#     SystemicTeleological,
+#     PrinciplesBalancer,
+#     PrecedentAnalyst
+# )
+
 from backend.orchestration.experts.base import ExpertContext
 from backend.orchestration.experts.synthesizer import Synthesizer
 from backend.orchestration.iteration.controller import IterationController
@@ -462,7 +469,11 @@ async def retrieval_node(state: MEGLTState) -> MEGLTState:
 
     start_time = time.time()
 
-    from backend.orchestration.agents.base import AgentTask
+    # v2 NOTE: Centralized agents (KGAgent, APIAgent, VectorDBAgent) have been archived.
+    # In v2 architecture, each expert has autonomous tools for retrieval.
+    # See docs/03-architecture/03-reasoning-layer.md for v2 design.
+    #
+    # This node now returns empty results - retrieval will be done by expert tools in v2.
 
     plan = state.get("execution_plan")
     if not plan:
@@ -474,137 +485,43 @@ async def retrieval_node(state: MEGLTState) -> MEGLTState:
             "execution_time_ms": state.get("execution_time_ms", 0.0)
         }
 
-    retrieval_plan = plan.retrieval_plan
-    tasks = []
-    agent_names = []
+    # v2 PLACEHOLDER: Return empty results - experts will do their own retrieval
+    logger.warning(
+        f"[{state['trace_id']}] v2 DEGRADED MODE: Centralized retrieval disabled. "
+        "Experts will use their own tools (to be implemented)."
+    )
 
-    try:
-        # KG Agent
-        if retrieval_plan.kg_agent.enabled:
-            kg_agent = KGAgent()
-            # KG tasks are already AgentTask objects (generic)
-            kg_tasks = retrieval_plan.kg_agent.tasks
-            logger.debug(f"[{state['trace_id']}] KG Agent: {len(kg_tasks)} tasks")
-            tasks.append(kg_agent.execute(kg_tasks))
-            agent_names.append("kg_agent")
+    agent_results = {
+        "kg_agent": {"success": True, "data": [], "note": "v2: retrieval moved to expert tools"},
+        "api_agent": {"success": True, "data": [], "note": "v2: retrieval moved to expert tools"},
+        "vectordb_agent": {"success": True, "data": [], "note": "v2: retrieval moved to expert tools"},
+    }
 
-        # API Agent
-        if retrieval_plan.api_agent.enabled:
-            api_agent = APIAgent()
-            # Convert APIAgentTask to standard AgentTask (put norm_references in params)
-            api_tasks = [
-                AgentTask(
-                    task_type=task.task_type,
-                    params={"norm_references": task.norm_references},
-                    priority=task.priority
-                )
-                for task in retrieval_plan.api_agent.tasks
-            ]
-            logger.debug(f"[{state['trace_id']}] API Agent: {len(api_tasks)} tasks")
-            tasks.append(api_agent.execute(api_tasks))
-            agent_names.append("api_agent")
+    elapsed_ms = (time.time() - start_time) * 1000
 
-        # VectorDB Agent
-        if retrieval_plan.vectordb_agent.enabled:
-            vectordb_agent = VectorDBAgent()
-            # Convert VectorDBAgentTask to standard AgentTask (put query_text and filters in params)
-            vectordb_tasks = [
-                AgentTask(
-                    task_type=task.task_type,
-                    params={"query_text": task.query_text, "filters": task.filters},
-                    priority=task.priority
-                )
-                for task in retrieval_plan.vectordb_agent.tasks
-            ]
-            logger.debug(f"[{state['trace_id']}] VectorDB Agent: {len(vectordb_tasks)} tasks")
-            tasks.append(vectordb_agent.execute(vectordb_tasks))
-            agent_names.append("vectordb_agent")
+    logger.info(
+        f"[{state['trace_id']}] Retrieval completed in {elapsed_ms:.0f}ms (v2 DEGRADED MODE)"
+    )
 
-        # Execute in parallel
-        if not tasks:
-            logger.warning(f"[{state['trace_id']}] No agents enabled")
-            return {
-                **state,
-                "agent_results": {},
-                "execution_time_ms": state.get("execution_time_ms", 0.0)
+    # Update status
+    await get_cache_service().set_query_status(
+        state['trace_id'],
+        {
+            "current_stage": "retrieval_complete",
+            "progress_percent": 42.9,
+            "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] Retrieval skipped (v2: experts have tools)"],
+            "stage_results": {
+                "retrieval": {"note": "v2 architecture - retrieval moved to expert tools"}
             }
-
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Process results
-        agent_results = {}
-        errors = []
-
-        for i, agent_name in enumerate(agent_names):
-            result = results[i]
-
-            if isinstance(result, Exception):
-                logger.error(
-                    f"[{state['trace_id']}] {agent_name} failed: {result}",
-                    exc_info=result
-                )
-                agent_results[agent_name] = {
-                    "success": False,
-                    "error": str(result),
-                    "data": []
-                }
-                errors.append(f"{agent_name} failed: {str(result)}")
-            else:
-                # Convert AgentResult to dict
-                result_dict = result.to_dict() if hasattr(result, 'to_dict') else result
-                logger.debug(
-                    f"[{state['trace_id']}] {agent_name} succeeded: "
-                    f"{len(result_dict.get('data', []))} results"
-                )
-                agent_results[agent_name] = result_dict
-
-        elapsed_ms = (time.time() - start_time) * 1000
-
-        logger.info(
-            f"[{state['trace_id']}] Retrieval completed in {elapsed_ms:.0f}ms: "
-            f"agents={len(agent_results)}, errors={len(errors)}"
-        )
-
-        # Update status: retrieval complete with sources
-        sources_summary = {}
-        for agent_name, result_dict in agent_results.items():
-            sources_summary[agent_name] = {
-                "count": len(result_dict.get("data", [])),
-                "success": result_dict.get("success", False),
-            }
-
-        await get_cache_service().set_query_status(
-            state['trace_id'],
-            {
-                "current_stage": "retrieval_complete",
-                "progress_percent": 42.9,
-                "stage_logs": [f"[{datetime.utcnow().strftime('%H:%M:%S')}] ✓ Retrieval completed: {len(agent_results)} agents ({elapsed_ms:.0f}ms)"],
-                "stage_results": {
-                    "retrieval": sources_summary
-                }
-            }
-        )
-
-        return {
-            **state,
-            "agent_results": agent_results,
-            "errors": errors if errors else state.get("errors", []),
-            "execution_time_ms": state.get("execution_time_ms", 0.0) + elapsed_ms
         }
+    )
 
-    except Exception as e:
-        elapsed_ms = (time.time() - start_time) * 1000
-        logger.error(
-            f"[{state['trace_id']}] Retrieval node failed after {elapsed_ms:.0f}ms: {e}",
-            exc_info=True
-        )
-
-        return {
-            **state,
-            "agent_results": {},
-            "errors": [f"Retrieval failed: {str(e)}"],
-            "execution_time_ms": state.get("execution_time_ms", 0.0) + elapsed_ms
-        }
+    return {
+        **state,
+        "agent_results": agent_results,
+        "errors": state.get("errors", []),
+        "execution_time_ms": state.get("execution_time_ms", 0.0) + elapsed_ms
+    }
 
 
 # ============================================================================
@@ -667,13 +584,17 @@ async def experts_node(state: MEGLTState) -> MEGLTState:
             trace_id=state["trace_id"]
         )
 
-        # Map expert types to classes
-        expert_map = {
-            "literal_interpreter": LiteralInterpreter,
-            "systemic_teleological": SystemicTeleological,
-            "principles_balancer": PrinciplesBalancer,
-            "precedent_analyst": PrecedentAnalyst
-        }
+        # v2 NOTE: Individual expert classes have been archived.
+        # In v2 architecture, experts are autonomous with their own tools.
+        # See docs/03-architecture/03-reasoning-layer.md for v2 design.
+        #
+        # v2 TODO: Replace with ExpertWithTools classes
+        # expert_map = {
+        #     "literal_interpreter": LiteralInterpreterWithTools,
+        #     "systemic_teleological": SystemicTeleologicalWithTools,
+        #     "principles_balancer": PrinciplesBalancerWithTools,
+        #     "precedent_analyst": PrecedentAnalystWithTools
+        # }
 
         # Get selected experts from execution plan (Pydantic object)
         plan = state.get("execution_plan")
@@ -691,48 +612,38 @@ async def experts_node(state: MEGLTState) -> MEGLTState:
         # Extract expert types from Pydantic objects
         selected_experts = [expert.expert_type for expert in reasoning_plan.experts]
 
-        if not selected_experts:
-            logger.warning(f"[{state['trace_id']}] No experts selected")
-            return {
-                **state,
-                "expert_opinions": [],
-                "expert_context": expert_context.model_dump(),
-                "execution_time_ms": state.get("execution_time_ms", 0.0)
-            }
+        # v2 DEGRADED MODE: Expert classes not yet implemented
+        # Return placeholder opinions until v2 experts are implemented
+        logger.warning(
+            f"[{state['trace_id']}] v2 DEGRADED MODE: Expert classes not implemented. "
+            f"Selected experts: {selected_experts}. Returning placeholder opinions."
+        )
 
-        # Create expert tasks
-        tasks = []
-        expert_types = []
-
-        for expert_type in selected_experts:
-            if expert_type in expert_map:
-                expert = expert_map[expert_type]()
-                tasks.append(expert.analyze(expert_context))
-                expert_types.append(expert_type)
-                logger.debug(f"[{state['trace_id']}] Queuing expert: {expert_type}")
-
-        # Execute in parallel
-        opinions = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Process results
+        # Generate placeholder opinions for each selected expert
         opinion_dicts = []
+        for expert_type in selected_experts:
+            placeholder_opinion = {
+                "expert_type": expert_type,
+                "conclusion": f"[v2 PLACEHOLDER] Expert {expert_type} analysis pending implementation",
+                "confidence": 0.0,
+                "legal_basis": [],
+                "reasoning_steps": [],
+                "limitations": ["v2 expert tools not yet implemented"],
+                "confidence_factors": {
+                    "norm_clarity": 0.0,
+                    "jurisprudence_alignment": 0.0,
+                    "contextual_ambiguity": 1.0,
+                    "source_availability": 0.0
+                },
+                "execution_time_ms": 0.0,
+                "metadata": {
+                    "v2_status": "pending_implementation",
+                    "see_docs": "docs/03-architecture/03-reasoning-layer.md"
+                }
+            }
+            opinion_dicts.append(placeholder_opinion)
+
         errors = []
-
-        for i, expert_type in enumerate(expert_types):
-            opinion = opinions[i]
-
-            if isinstance(opinion, Exception):
-                logger.error(
-                    f"[{state['trace_id']}] Expert {expert_type} failed: {opinion}",
-                    exc_info=opinion
-                )
-                errors.append(f"{expert_type} failed: {str(opinion)}")
-            else:
-                logger.debug(
-                    f"[{state['trace_id']}] Expert {expert_type} succeeded: "
-                    f"confidence={opinion.confidence:.2f}"
-                )
-                opinion_dicts.append(opinion.model_dump())
 
         elapsed_ms = (time.time() - start_time) * 1000
 

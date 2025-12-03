@@ -26,7 +26,8 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from pydantic import BaseModel, Field
 
-from backend.preprocessing.neo4j_connection import Neo4jConnectionManager
+# v2: Neo4j archived - will be replaced by FalkorDB
+# from backend.preprocessing.neo4j_connection import Neo4jConnectionManager
 from backend.preprocessing.redis_connection import RedisConnectionManager
 from backend.preprocessing.kg_enrichment_service import KGEnrichmentService
 from backend.preprocessing.monitoring import (

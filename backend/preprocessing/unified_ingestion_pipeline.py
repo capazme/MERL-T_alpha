@@ -39,7 +39,8 @@ from sqlalchemy import select, update, delete, and_
 # MERL-T imports
 from .sources.visualex_client import VisualexClient, VisualexResponse
 from .models_kg import StagingEntity, EntityTypeEnum, SourceTypeEnum
-from .neo4j_graph_builder import Neo4jLegalKnowledgeGraph
+# v2: Neo4j archived - will be replaced by FalkorDB
+# from .neo4j_graph_builder import Neo4jLegalKnowledgeGraph
 from .document_ingestion.ingestion_pipeline import IngestionPipeline as DocumentIngestionPipeline
 
 log = structlog.get_logger(__name__)
