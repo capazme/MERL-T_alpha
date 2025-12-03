@@ -9,9 +9,9 @@
 
 | Campo | Valore |
 |-------|--------|
-| **Data ultimo aggiornamento** | 3 Dicembre 2025 |
-| **Fase progetto** | GraphAwareRetriever implementato ✅ - Storage Layer v2 completo |
-| **Prossimo obiettivo** | Expand ingestion (~50 articoli) o Expert with Tools |
+| **Data ultimo aggiornamento** | 3 Dicembre 2025 (sera) |
+| **Fase progetto** | Schema definitivo API→Grafo completato ✅ - Ready for ingestion 887 articoli |
+| **Prossimo obiettivo** | Implementare comma parser e structural chunker |
 | **Blocchi attivi** | Nessuno |
 
 ---
@@ -39,7 +39,31 @@
 
 ---
 
-## Cosa Abbiamo Fatto (Ultima Sessione - 3 Dic 2025, Pomeriggio)
+## Cosa Abbiamo Fatto (Sessione Corrente - 3 Dic 2025, Sera)
+
+- [x] **Schema definitivo API → Grafo** ✅:
+  - File: `docs/08-iteration/SCHEMA_DEFINITIVO_API_GRAFO.md` (695 lines)
+  - Complete node properties per 6 tipi (Norma con 21 properties, ConcettoGiuridico, Dottrina, AttoGiudiziario)
+  - URN/URL separation: URN interno con comma (`;262:2~art1453~comma1`), URL esterno senza comma (`;262:2~art1453`)
+  - Documentazione allegati: `:1` (Preleggi), `:2` (Codice Civile) del R.D. 262/1942
+  - Mapping table completa API fields → Graph properties
+  - Chunking strategy: comma-level universale (tutti articoli, no threshold)
+  - Comma parser specification con regex rules
+  - Esempio concreto Art. 1453: 9 nodes + 11 relations + 2 chunks + 10 bridge mappings
+  - Schema **LOCKED** per evitare future migrations
+- [x] **Piano ingestion 887 articoli** ✅:
+  - File: `docs/08-iteration/INGESTION_PLAN_LIBRO_IV.md` (300+ lines)
+  - Target: Libro IV Obbligazioni (art. 1321-2969)
+  - Metriche: 887 articoli → ~2500 chunks → ~11k bridge mappings
+  - Roadmap: 8 componenti, 30 ore effort estimate
+  - Embedding separato post-ingestion (E5-large HuggingFace)
+- [x] **Metodologia scientifica** ✅:
+  - File: `docs/08-iteration/INGESTION_METHODOLOGY.md` (500+ lines)
+  - Paper-ready con research questions, dataset specs, validation strategy
+  - Zero-LLM pipeline per reproducibilità
+  - Ethical considerations (GDPR, bias mitigation)
+
+## Cosa Abbiamo Fatto (Sessione Precedente - 3 Dic 2025, Pomeriggio)
 
 - [x] **Archiviato codice v1** in `backend/archive_v1/`
 - [x] **Struttura modulare v2**:
@@ -99,15 +123,20 @@
 
 ## Prossimi Passi Immediati
 
-### Priorita 1: Storage Layer v2 (Settimana 1-2)
+### Priorita 1: Ingestion Pipeline (Settimana 1-2)
 - [x] Setup FalkorDB container (porta 6380)
 - [x] Test query Cypher su FalkorDB
 - [x] VisualexAPI ingestion pipeline (conforme allo schema)
 - [x] Implementare FalkorDBClient reale con falkordb-py
 - [x] Integrare VisualexAPI scrapers e tools
 - [x] **Primo batch ingestion** - Art. 1453-1456 Codice Civile ✅
-- [ ] Creare Bridge Table in PostgreSQL
-- [ ] Implementare BridgeTableBuilder per ingestion
+- [x] Creare Bridge Table in PostgreSQL ✅
+- [x] Schema definitivo API → Grafo con 21 properties ✅
+- [ ] **Implementare comma parser** dall'output VisualexAPI
+- [ ] **Implementare structural chunker** (comma-level)
+- [ ] **Estendere URN generator** per comma/letter support
+- [ ] **Creare pipeline ingestion** Libro IV (887 articoli) con Brocardi enrichment
+- [ ] Implementare BridgeTableBuilder con mappings e confidence scoring
 
 ### Priorita 2: Expert con Tools (Settimana 3-4)
 - [ ] Implementare classe `ExpertWithTools`
@@ -141,6 +170,10 @@
 | 2025-12-02 | Schema grafo hardcoded | Basato su discussione accademica, non generato da LLM |
 | 2025-12-03 | URN Normattiva (non ELI) | Formato reale per Normattiva.it, non teorico europeo |
 | 2025-12-03 | VisualexAPI integrato | Scrapers embedded per deploy monolith durante tesi |
+| 2025-12-03 | URN/URL separation | URN interno con comma per granularità, URL esterno senza comma per linking |
+| 2025-12-03 | Allegato :2 per CC | Codice Civile è Allegato 2 del R.D. 262/1942, Preleggi è Allegato 1 |
+| 2025-12-03 | Chunking comma-level universale | No threshold, tutti articoli splittati a livello comma |
+| 2025-12-03 | Schema LOCKED | 21 properties per Norma, no future changes senza migration |
 
 ---
 
