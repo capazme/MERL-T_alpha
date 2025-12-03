@@ -50,7 +50,7 @@ class CypherQueries:
         Returns: Norms with interpretations and principles
         """
         return f"""
-        MATCH (c:ConceptoGiuridico)-[:APPLICA_A]->(n:Norma)
+        MATCH (c:ConcettoGiuridico)-[:APPLICA_A]->(n:Norma)
         WHERE c.nome CONTAINS $concept OR n.descrizione CONTAINS $concept
         OPTIONAL MATCH (n)-[:ESPRIME_PRINCIPIO]->(p:PrincipioGiuridico)
         OPTIONAL MATCH (n)-[:CONTIENE]->(cm:Comma)

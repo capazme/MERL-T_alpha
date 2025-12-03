@@ -580,7 +580,7 @@ class TestCypherQueries:
         query = KGCypherQueries.get_norms_by_concept(limit=10)
 
         assert "MATCH" in query
-        assert "ConceptoGiuridico" in query
+        assert "ConcettoGiuridico" in query
         assert "Norma" in query
         assert "LIMIT 10" in query
 

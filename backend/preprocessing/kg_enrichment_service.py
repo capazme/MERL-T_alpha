@@ -344,7 +344,7 @@ class KGEnrichmentService:
                 # Intent-specific query patterns (using QueryIntentType)
                 if query_understanding.intent == QueryIntentType.INTERPRETATION:
                     query = """
-                    MATCH (c:ConceptoGiuridico)-[:APPLICA_A]->(n:Norma)
+                    MATCH (c:ConcettoGiuridico)-[:APPLICA_A]->(n:Norma)
                     WHERE c.nome CONTAINS $concept OR n.descrizione CONTAINS $concept
                     RETURN n.estremi as estremi, n.titolo as titolo, n.descrizione as descrizione,
                            n.stato as stato, n.testo_vigente as testo_vigente,

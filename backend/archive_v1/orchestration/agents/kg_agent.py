@@ -198,8 +198,8 @@ class KGAgent(RetrievalAgent):
             raise ValueError("'concept' parameter required")
 
         cypher = f"""
-        MATCH path = (c:ConceptoGiuridico {{nome: $concept}})-[r*1..{max_depth}]-(related)
-        WHERE related:ConceptoGiuridico OR related:Norma
+        MATCH path = (c:ConcettoGiuridico {{nome: $concept}})-[r*1..{max_depth}]-(related)
+        WHERE related:ConcettoGiuridico OR related:Norma
         RETURN
             related.nome AS nome,
             labels(related) AS tipo,

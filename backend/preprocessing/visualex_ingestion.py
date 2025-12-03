@@ -48,55 +48,46 @@ class NormaMetadata:
 
     def to_urn(self) -> str:
         """
-        Generate URN conforme a ELI (European Legislation Identifier).
+        Generate URN Normattiva usando VisualexAPI urngenerator.
 
-        Format: /eli/{jurisdiction}/{type}/{year}/{month}/{day}/{natural_identifier}/{language}
-        Example: /eli/it/cc/1942/03/16/262/art1453/ita
+        Format: https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:{tipo}:{data};{numero}~art{articolo}
+        Example: https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.civile:1942-03-16;262~art1453
 
-        Per Codice Civile: /eli/it/cc/1942/03/16/262/art{numero}/ita
+        Uses VisualexAPI urngenerator which:
+        - Has hardcoded dates for major codes (CC, CP, etc.) - instant
+        - Uses LRU cache for repeated queries - fast
+        - Falls back to Selenium scraping only when needed - slow but accurate
         """
-        tipo_map = {
-            "codice civile": "cc",
-            "codice penale": "cp",
-            "codice di procedura civile": "cpc",
-            "codice di procedura penale": "cpp",
-            "legge": "l",
-            "decreto legge": "dl",
-            "decreto legislativo": "dlgs",
-            "d.p.r.": "dpr",
-            "regio decreto": "rd",
-        }
+        from backend.external_sources.visualex.tools import urngenerator
 
-        tipo_short = tipo_map.get(self.tipo_atto.lower(), "unknown")
-
-        # Parse date
-        if self.data:
-            parts = self.data.split("-")
-            year, month, day = parts[0], parts[1], parts[2]
-        else:
-            year, month, day = "0000", "00", "00"
-
-        # Build ELI URN
-        return f"/eli/it/{tipo_short}/{year}/{month}/{day}/{self.numero_atto}/art{self.numero_articolo}/ita"
+        # For sync function in async context
+        return urngenerator.generate_urn(
+            act_type=self.tipo_atto,
+            date=self.data,
+            act_number=self.numero_atto,
+            article=self.numero_articolo,
+            version=self.versione,
+            version_date=self.data_versione,
+            urn_flag=True  # Include full URL
+        )
 
     def to_codice_urn(self) -> str:
-        """Generate URN for the codice (root norm)."""
-        tipo_map = {
-            "codice civile": "cc",
-            "codice penale": "cp",
-            "codice di procedura civile": "cpc",
-            "codice di procedura penale": "cpp",
-        }
+        """
+        Generate URN for the codice (root norm) without article.
 
-        tipo_short = tipo_map.get(self.tipo_atto.lower(), self.tipo_atto.lower().replace(" ", "_"))
+        Example: https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.civile:1942-03-16;262
+        """
+        from backend.external_sources.visualex.tools import urngenerator
 
-        if self.data:
-            parts = self.data.split("-")
-            year, month, day = parts[0], parts[1], parts[2]
-        else:
-            year, month, day = "0000", "00", "00"
-
-        return f"/eli/it/{tipo_short}/{year}/{month}/{day}/{self.numero_atto}/ita"
+        return urngenerator.generate_urn(
+            act_type=self.tipo_atto,
+            date=self.data,
+            act_number=self.numero_atto,
+            article=None,  # No article for codice root
+            version=self.versione,
+            version_date=self.data_versione,
+            urn_flag=True
+        )
 
     def to_estremi(self) -> str:
         """
@@ -394,7 +385,7 @@ class VisualexIngestionPipeline:
             # Create Concetto Giuridico (Node Type B)
             await self.falkordb.query(
                 """
-                MERGE (c:ConceptoGiuridico {node_id: $concept_id})
+                MERGE (c:ConcettoGiuridico {node_id: $concept_id})
                 ON CREATE SET
                     c.nome = $nome,
                     c.definizione = $definizione,
@@ -407,13 +398,13 @@ class VisualexIngestionPipeline:
                     "definizione": brocardi["Ratio"],
                 }
             )
-            results["nodes_created"].append(f"ConceptoGiuridico:{concept_id}")
+            results["nodes_created"].append(f"ConcettoGiuridico:{concept_id}")
 
             # Create 'disciplina' relation (§3.4.15)
             await self.falkordb.query(
                 """
                 MATCH (art:Norma {URN: $art_urn})
-                MATCH (c:ConceptoGiuridico {node_id: $concept_id})
+                MATCH (c:ConcettoGiuridico {node_id: $concept_id})
                 MERGE (art)-[r:disciplina]->(c)
                 ON CREATE SET
                     r.certezza = 'inferita',
