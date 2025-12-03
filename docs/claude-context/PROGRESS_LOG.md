@@ -35,57 +35,102 @@
 
 ## Log Sessioni
 
-### 2025-12-03 (Sessione 3) - Ristrutturazione Codice v2
+### 2025-12-03 (Sessione 3) - Ristrutturazione v2 + Docker Setup
 
-**Durata**: ~2 ore
-**Obiettivo**: Rimuovere codice v1, creare struttura cartelle v2
-**Risultato**: Completato - Struttura v2 pronta con placeholder
+**Durata**: ~3.5 ore
+**Obiettivo**: Rimuovere codice v1, creare struttura modulare, setup Docker
+**Risultato**: Completato - Infrastruttura v2 completa e operativa
 
 #### Completato
-- Archiviato codice v1 in `backend/archive_v1/`:
-  - `orchestration/agents/` (KGAgent, APIAgent, VectorDBAgent)
-  - `preprocessing/neo4j_*` (neo4j_connection, neo4j_writer, etc.)
-  - `orchestration/experts/` singoli file (literal_interpreter.py, etc.)
-- Creata nuova struttura cartelle v2:
-  - `backend/storage/` (nuovo layer)
-  - `backend/storage/falkordb/` - FalkorDBClient placeholder
-  - `backend/storage/bridge/` - BridgeTable placeholder
-  - `backend/storage/retriever/` - GraphAwareRetriever placeholder
-  - `backend/orchestration/gating/` - ExpertGatingNetwork placeholder
-  - `backend/orchestration/experts/expert_with_tools.py` - ExpertWithTools + 4 expert v2
-- Fixato tutti gli import rotti dopo archiviazione:
-  - `langgraph_workflow.py` - commentato import v1
-  - `preprocessing/*.py` - commentato import neo4j
-  - `rlcf_framework/pipeline_integration.py` - commentato import neo4j
-- Aggiornati tutti `__init__.py` con export corretti
-- Verificato import con Python 3.12
+- **Archiviazione v1**:
+  - Spostato codice v1 in `backend/archive_v1/`
+  - Rimossi agents centrali, expert passivi, codice Neo4j
+
+- **Struttura Storage Layer**:
+  - `backend/storage/falkordb/` - FalkorDBClient (placeholder)
+  - `backend/storage/bridge/` - BridgeTable (placeholder)
+  - `backend/storage/retriever/` - GraphAwareRetriever (placeholder)
+
+- **Interfacce Astratte** (backend/interfaces/):
+  - `storage.py` - IStorageService, IGraphDB, IVectorDB, IBridgeTable
+  - `experts.py` - IExpert, IExpertGating, ISynthesizer
+  - `rlcf.py` - IRLCFService, IAuthorityCalculator
+  - Supporto per deploy monolith/distributed via DI
+
+- **Service Layer** (backend/services/):
+  - `registry.py` - ServiceRegistry con supporto monolith/distributed
+  - `storage_service.py` - StorageServiceImpl (placeholder)
+  - `rlcf_service.py` - RLCFServiceImpl (placeholder)
+
+- **Expert v2 Autonomi**:
+  - `expert_with_tools.py` - ExpertWithTools + 4 expert
+  - Tools specifici per prospettiva
+  - Traversal weights apprendibili
+
+- **Gating Network**:
+  - `gating_network.py` - ExpertGatingNetwork (MoE-style)
+
+- **Docker Setup**:
+  - `docker-compose.dev.yml` - Database per sviluppo:
+    - FalkorDB (6380) - testato con query Cypher ✓
+    - PostgreSQL (5432) ✓
+    - Qdrant (6333) ✓
+    - Redis (6379) ✓
+  - `docker-compose.distributed.yml` - Deploy multi-container completo
+  - `docker/` - Dockerfile per tutti i servizi (placeholder)
+
+- **Import Fix**:
+  - Commentati import v1 in tutto il codebase
+  - Aggiornati `__init__.py` con export corretti
+  - Verificato import con Python 3.12
 
 #### Struttura v2 Finale
 ```
 backend/
-├── storage/                     # NEW
-│   ├── falkordb/               # FalkorDBClient
-│   ├── bridge/                 # BridgeTable
-│   └── retriever/              # GraphAwareRetriever
+├── interfaces/                  # ✓ Contratti astratti
+├── services/                    # ✓ Impl + DI
+├── storage/                     # ✓ FalkorDB, Bridge, Retriever
 ├── orchestration/
-│   ├── gating/                 # NEW - ExpertGatingNetwork
-│   └── experts/
-│       ├── base.py             # Kept
-│       ├── synthesizer.py      # Kept
-│       └── expert_with_tools.py # NEW v2
-└── archive_v1/                 # Old code
+│   ├── gating/                 # ✓ ExpertGatingNetwork
+│   └── experts/                # ✓ ExpertWithTools
+└── archive_v1/                 # Codice vecchio
+
+docker/
+├── docker-compose.dev.yml      # ✓ Database operativi
+├── docker-compose.distributed.yml  # Per futuro
+└── Dockerfile.*                # Placeholder servizi
 ```
 
-#### Problemi Incontrati
-- Import rotti dopo archiviazione -> risolto commentando con note "v2: ..."
-- venv con path sbagliato -> utente ha ricreato con Python 3.12
+#### Test Effettuati
+```bash
+# FalkorDB
+redis-cli -p 6380 GRAPH.QUERY test_graph "CREATE (:Norma {urn: 'art_1453_cc'})"
+# ✓ Funziona - 9.58ms execution time
+
+# Python imports
+from backend.interfaces import IStorageService
+from backend.services import ServiceRegistry
+# ✓ Tutti funzionanti
+```
+
+#### Problemi Risolti
+- Import rotti -> commentati con note "v2: ..."
+- Docker credentials -> fixato config.json
+- Qdrant healthcheck -> cambiato endpoint da /health a /
+- venv Python -> ricreato con 3.12
+
+#### Decisioni Architetturali
+1. **Interfacce astratte** per supportare monolith ora, multi-container dopo
+2. **ServiceRegistry** con DI per switching trasparente
+3. **FalkorDB su 6380** per non confliggere con Redis (6379)
+4. **Dockerfile placeholder** pronti ma non implementati (per tesi serve monolith)
 
 #### Prossimi Passi
-1. Avviare FalkorDB container (Docker)
-2. Implementare FalkorDBClient reale (con falkordb-py)
-3. Implementare BridgeTable reale (con SQLAlchemy)
-4. Implementare GraphAwareRetriever reale
-5. Collegare ExpertWithTools a retriever
+1. Implementare FalkorDBClient reale (falkordb-py)
+2. Implementare BridgeTable con SQLAlchemy
+3. Implementare GraphAwareRetriever
+4. Collegare ExpertWithTools al retriever
+5. Test end-to-end con query reale
 
 ---
 
@@ -215,8 +260,9 @@ backend/
 | Metrica | Valore |
 |---------|--------|
 | Sessioni totali | 3 |
-| Ore totali | ~7 |
-| LOC scritte | ~800 (placeholder v2) |
-| LOC documentazione | ~2000 (4 docs architettura v2) |
-| Test aggiunti | 0 |
-| Bug risolti | 0 |
+| Ore totali | ~9 |
+| LOC scritte | ~1500 (interfaces + services + placeholders) |
+| LOC documentazione | ~2500 (docs + docker) |
+| Container attivi | 4 (FalkorDB, PostgreSQL, Qdrant, Redis) |
+| Test aggiunti | 2 (FalkorDB, imports) |
+| Bug risolti | 4 (import, docker creds, healthcheck, venv) |

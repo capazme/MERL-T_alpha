@@ -10,9 +10,9 @@
 | Campo | Valore |
 |-------|--------|
 | **Data ultimo aggiornamento** | 3 Dicembre 2025 |
-| **Fase progetto** | Struttura v2 completata - Placeholder pronti |
-| **Prossimo obiettivo** | Implementare FalkorDB client reale |
-| **Blocchi attivi** | FalkorDB container da avviare, implementazioni placeholder da completare |
+| **Fase progetto** | Infrastruttura v2 completa - Database operativi |
+| **Prossimo obiettivo** | Implementare FalkorDBClient e StorageService reali |
+| **Blocchi attivi** | Nessuno - infrastruttura pronta |
 
 ---
 
