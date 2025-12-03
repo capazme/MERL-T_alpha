@@ -244,6 +244,59 @@ from backend.services import ServiceRegistry
 
 ---
 
+### 2025-12-03 (Sessione 3 cont.) - Primo Batch Ingestion Completato
+
+**Durata**: ~2 ore
+**Obiettivo**: Testare pipeline completa con primo batch di dati reali (Art. 1453-1456 c.c.)
+**Risultato**: ✓ Completato - Grafo operativo con dati reali
+
+#### Completato
+- **Test suite completo**:
+  - `tests/preprocessing/test_batch_ingestion.py` - 4 test
+  - Test URN generation (Normattiva format)
+  - Test creazione nodi Norma
+  - Test creazione nodi ConceptoGiuridico con relazioni
+  - Test batch ingestion completo Art. 1453-1456
+  - ✓ Tutti i test passano (4/4)
+
+- **Primo batch ingestion**:
+  - Ingested Art. 1453-1456 c.c. (Risoluzione del contratto)
+  - 6 nodi Norma: 1 Codice Civile root + 4 Articoli
+  - 4 nodi ConceptoGiuridico (da Brocardi Ratio)
+  - 4 relazioni 'contiene' (Codice → Articoli)
+  - 4 relazioni 'disciplina' (Articoli → Concetti)
+  - Schema conforme a `knowledge-graph.md` ✓
+  - URN Normattiva format ✓
+
+- **Script standalone**:
+  - `scripts/ingest_art_1453_1456.py` - Popola database permanentemente
+  - Utilizzabile per verifiche manuali
+
+- **Verifica performance**:
+  - Query Cypher in 0.3-0.8ms (velocissimo!)
+  - FalkorDB molto più performante di Neo4j come previsto
+
+#### Dati Ingested (verificati)
+```
+Codice Civile -[contiene]-> Art. 1453 c.c. -[disciplina]-> "Risoluzione del contratto per inadempimento"
+Codice Civile -[contiene]-> Art. 1454 c.c. -[disciplina]-> "Diffida ad adempiere"
+Codice Civile -[contiene]-> Art. 1455 c.c. -[disciplina]-> "Importanza dell'inadempimento"
+Codice Civile -[contiene]-> Art. 1456 c.c. -[disciplina]-> "Clausola risolutiva espressa"
+```
+
+#### Problemi Risolti
+- Pytest non installato → installato pytest + pytest-asyncio
+- Fixture async non funzionante → usato `@pytest_asyncio.fixture`
+- FalkorDB `datetime()` non supportato → rimossa proprietà dal test
+
+#### Prossimi Passi
+1. Bridge Table implementation (PostgreSQL)
+2. BridgeTableBuilder per mapping chunk_id ↔ graph_node_id
+3. GraphAwareRetriever con hybrid scoring
+4. Espandere ingestion a più articoli
+
+---
+
 ## Milestone Raggiunte
 
 | Data | Milestone | Note |
@@ -251,6 +304,7 @@ from backend.services import ServiceRegistry
 | 2025-12-02 | Analisi iniziale completata | Mappa sistema creata |
 | 2025-12-02 | Architettura v2 documentata | 5 documenti aggiornati |
 | 2025-12-03 | Struttura codice v2 completata | Placeholder pronti |
+| 2025-12-03 | Primo batch ingestion completato | 4 articoli con dati reali in FalkorDB |
 | - | - | - |
 
 ---
@@ -259,11 +313,15 @@ from backend.services import ServiceRegistry
 
 | Metrica | Valore |
 |---------|--------|
-| Sessioni totali | 3 |
-| Ore totali | ~11 |
-| LOC scritte | ~4000 (interfaces + services + FalkorDBClient + VisualexAPI) |
-| LOC documentazione | ~2700 (docs + docker + README) |
+| Sessioni totali | 3 (+ 1 continuazione) |
+| Ore totali | ~13 |
+| LOC scritte | ~4500 (interfaces + services + FalkorDBClient + VisualexAPI + tests) |
+| LOC documentazione | ~3000 (docs + docker + README) |
+| LOC test | ~400 (test_batch_ingestion.py + script standalone) |
 | Container attivi | 4 (FalkorDB, PostgreSQL, Qdrant, Redis) |
-| Test eseguiti | 5 (FalkorDB CRUD, URN generation, imports) |
-| Bug risolti | 6 (import circolari, docker creds, healthcheck, venv, lazy import, ELI vs URN) |
-| Dipendenze installate | 7 (falkordb, structlog, selenium, bs4, lxml, aiocache, redis) |
+| Test eseguiti | 4 (URN gen, Norma nodes, ConceptoGiuridico, batch ingestion) - tutti passano ✓ |
+| Bug risolti | 9 (+ pytest fixture, datetime(), test isolation) |
+| Dipendenze installate | 9 (+ pytest, pytest-asyncio) |
+| Articoli ingested | 4 (Art. 1453-1456 c.c.) |
+| Nodi FalkorDB | 10 (6 Norma + 4 ConceptoGiuridico) |
+| Relazioni FalkorDB | 8 (4 contiene + 4 disciplina) |

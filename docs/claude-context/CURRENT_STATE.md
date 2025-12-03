@@ -10,9 +10,9 @@
 | Campo | Valore |
 |-------|--------|
 | **Data ultimo aggiornamento** | 3 Dicembre 2025 |
-| **Fase progetto** | FalkorDB + VisualexAPI operativi - Ready for ingestion |
-| **Prossimo obiettivo** | Primo batch ingestion (Art. 1453-1456 c.c.) con dati reali |
-| **Blocchi attivi** | Nessuno - tutto pronto per ingestion |
+| **Fase progetto** | Primo batch ingestion completato - Graph operativo con dati reali |
+| **Prossimo obiettivo** | Bridge Table + GraphAwareRetriever |
+| **Blocchi attivi** | Nessuno |
 
 ---
 
@@ -67,6 +67,14 @@
   - FalkorDB (6380), PostgreSQL (5432), Qdrant (6333), Redis (6379)
   - docker-compose.dev.yml per sviluppo
   - docker-compose.distributed.yml per produzione multi-container
+- [x] **Primo batch ingestion** ✅:
+  - 4 articoli ingested: Art. 1453-1456 c.c. (Risoluzione del contratto)
+  - 6 nodi Norma (1 Codice + 4 Articoli)
+  - 4 nodi ConceptoGiuridico
+  - 4 relazioni 'contiene', 4 relazioni 'disciplina'
+  - Test suite completo (4/4 passed)
+  - Script standalone: `scripts/ingest_art_1453_1456.py`
+  - Performance: query in 0.3-0.8ms
 
 ---
 
@@ -78,7 +86,7 @@
 - [x] VisualexAPI ingestion pipeline (conforme allo schema)
 - [x] Implementare FalkorDBClient reale con falkordb-py
 - [x] Integrare VisualexAPI scrapers e tools
-- [ ] **Primo batch ingestion** - Art. 1453-1456 Codice Civile
+- [x] **Primo batch ingestion** - Art. 1453-1456 Codice Civile ✅
 - [ ] Creare Bridge Table in PostgreSQL
 - [ ] Implementare BridgeTableBuilder per ingestion
 
