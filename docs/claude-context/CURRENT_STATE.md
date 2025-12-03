@@ -10,9 +10,9 @@
 | Campo | Valore |
 |-------|--------|
 | **Data ultimo aggiornamento** | 3 Dicembre 2025 |
-| **Fase progetto** | Ingestion pipeline completo - Pronto per dati reali |
-| **Prossimo obiettivo** | Implementare FalkorDBClient, ingest primo batch articoli |
-| **Blocchi attivi** | Nessuno - pipeline VisualexAPI pronto |
+| **Fase progetto** | FalkorDB + VisualexAPI operativi - Ready for ingestion |
+| **Prossimo obiettivo** | Primo batch ingestion (Art. 1453-1456 c.c.) con dati reali |
+| **Blocchi attivi** | Nessuno - tutto pronto per ingestion |
 
 ---
 
@@ -41,20 +41,32 @@
 
 ## Cosa Abbiamo Fatto (Ultima Sessione - 3 Dic 2025)
 
-- [x] Archiviato codice v1 in `backend/archive_v1/`
-- [x] Creata struttura cartelle v2:
-  - `backend/storage/` (FalkorDB, Bridge, Retriever)
-  - `backend/orchestration/gating/` (Expert Gating Network)
-  - `backend/orchestration/experts/expert_with_tools.py`
-- [x] Implementati placeholder v2:
-  - `FalkorDBClient` - client grafo (placeholder)
-  - `BridgeTable` - mapping vector-graph (placeholder)
-  - `GraphAwareRetriever` - hybrid retrieval (placeholder)
-  - `ExpertGatingNetwork` - MoE weights (placeholder)
-  - `ExpertWithTools` + 4 expert v2 (placeholder)
-- [x] Aggiornati tutti `__init__.py` con export corretti
-- [x] Verificato import funzionanti con Python 3.12
-- [x] Fixato import rotti dopo archiviazione v1
+- [x] **Archiviato codice v1** in `backend/archive_v1/`
+- [x] **Struttura modulare v2**:
+  - `backend/interfaces/` - IStorageService, IExpert, IRLCFService
+  - `backend/services/` - ServiceRegistry (monolith/distributed)
+  - `backend/storage/` - FalkorDB, Bridge, Retriever
+  - `backend/orchestration/gating/` - ExpertGatingNetwork
+  - `backend/external_sources/visualex/` - Scrapers + tools integrati
+- [x] **FalkorDBClient reale**:
+  - Implementato con falkordb-py
+  - Async wrapper con executor (library è sync)
+  - Metodi: query(), shortest_path(), traverse(), health_check()
+  - ✓ Testato: CREATE, MATCH funzionanti su database reale
+- [x] **VisualexAPI integrato**:
+  - Copiati scrapers (normattiva, brocardi, eurlex)
+  - Copiati tools (urngenerator, text_op, http_client, etc.)
+  - ✓ URN generator operativo con URN Normattiva reali
+  - Fix import circolari (lazy import)
+- [x] **Ingestion pipeline conforme a schema KG**:
+  - Node types: Norma, ConceptoGiuridico, Dottrina, AttoGiudiziario
+  - Relations: contiene, disciplina, commenta, interpreta
+  - URN Normattiva (non ELI teorico)
+  - Zero LLM per costruzione grafo base
+- [x] **Docker setup completo**:
+  - FalkorDB (6380), PostgreSQL (5432), Qdrant (6333), Redis (6379)
+  - docker-compose.dev.yml per sviluppo
+  - docker-compose.distributed.yml per produzione multi-container
 
 ---
 
@@ -64,7 +76,9 @@
 - [x] Setup FalkorDB container (porta 6380)
 - [x] Test query Cypher su FalkorDB
 - [x] VisualexAPI ingestion pipeline (conforme allo schema)
-- [ ] Implementare FalkorDBClient reale con falkordb-py
+- [x] Implementare FalkorDBClient reale con falkordb-py
+- [x] Integrare VisualexAPI scrapers e tools
+- [ ] **Primo batch ingestion** - Art. 1453-1456 Codice Civile
 - [ ] Creare Bridge Table in PostgreSQL
 - [ ] Implementare BridgeTableBuilder per ingestion
 
@@ -98,6 +112,8 @@
 | 2025-12-02 | RLCF multilivello | Authority diversa per retrieval/reasoning/synthesis e per dominio |
 | 2025-12-02 | Pesi apprendibili | theta_traverse, theta_gating, theta_rerank migliorano con feedback |
 | 2025-12-02 | Schema grafo hardcoded | Basato su discussione accademica, non generato da LLM |
+| 2025-12-03 | URN Normattiva (non ELI) | Formato reale per Normattiva.it, non teorico europeo |
+| 2025-12-03 | VisualexAPI integrato | Scrapers embedded per deploy monolith durante tesi |
 
 ---
 
@@ -141,14 +157,22 @@
 ```bash
 # Avviare ambiente
 cd /Users/gpuzio/Desktop/CODE/MERL-T_alpha
-source venv/bin/activate
+source .venv/bin/activate  # Python 3.12
 
-# Database (v2 - con FalkorDB)
-docker-compose up -d  # Aggiornare docker-compose per FalkorDB
+# Database (v2 - FalkorDB + Qdrant + PostgreSQL + Redis)
+docker-compose -f docker-compose.dev.yml up -d
+
+# Verifica database
+docker-compose -f docker-compose.dev.yml ps
+redis-cli -p 6380 ping  # FalkorDB
+curl http://localhost:6333/  # Qdrant
 
 # Backend
 uvicorn backend.orchestration.api.main:app --reload --port 8000
 
 # Test
 pytest tests/ -v
+
+# Test FalkorDB
+.venv/bin/python -c "from backend.storage.falkordb import FalkorDBClient; import asyncio; asyncio.run(FalkorDBClient().health_check())"
 ```

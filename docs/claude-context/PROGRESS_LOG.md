@@ -35,11 +35,11 @@
 
 ## Log Sessioni
 
-### 2025-12-03 (Sessione 3) - Ristrutturazione v2 + Docker Setup
+### 2025-12-03 (Sessione 3) - FalkorDB + VisualexAPI Operativi
 
-**Durata**: ~3.5 ore
-**Obiettivo**: Rimuovere codice v1, creare struttura modulare, setup Docker
-**Risultato**: Completato - Infrastruttura v2 completa e operativa
+**Durata**: ~5 ore
+**Obiettivo**: Implementare FalkorDBClient reale, integrare VisualexAPI, setup Docker
+**Risultato**: ✓ Completato - Database operativi, pipeline pronto per ingestion
 
 #### Completato
 - **Archiviazione v1**:
@@ -260,9 +260,10 @@ from backend.services import ServiceRegistry
 | Metrica | Valore |
 |---------|--------|
 | Sessioni totali | 3 |
-| Ore totali | ~9 |
-| LOC scritte | ~1500 (interfaces + services + placeholders) |
-| LOC documentazione | ~2500 (docs + docker) |
+| Ore totali | ~11 |
+| LOC scritte | ~4000 (interfaces + services + FalkorDBClient + VisualexAPI) |
+| LOC documentazione | ~2700 (docs + docker + README) |
 | Container attivi | 4 (FalkorDB, PostgreSQL, Qdrant, Redis) |
-| Test aggiunti | 2 (FalkorDB, imports) |
-| Bug risolti | 4 (import, docker creds, healthcheck, venv) |
+| Test eseguiti | 5 (FalkorDB CRUD, URN generation, imports) |
+| Bug risolti | 6 (import circolari, docker creds, healthcheck, venv, lazy import, ELI vs URN) |
+| Dipendenze installate | 7 (falkordb, structlog, selenium, bs4, lxml, aiocache, redis) |
