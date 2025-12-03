@@ -10,9 +10,9 @@
 | Campo | Valore |
 |-------|--------|
 | **Data ultimo aggiornamento** | 3 Dicembre 2025 |
-| **Fase progetto** | Infrastruttura v2 completa - Database operativi |
-| **Prossimo obiettivo** | Implementare FalkorDBClient e StorageService reali |
-| **Blocchi attivi** | Nessuno - infrastruttura pronta |
+| **Fase progetto** | Ingestion pipeline completo - Pronto per dati reali |
+| **Prossimo obiettivo** | Implementare FalkorDBClient, ingest primo batch articoli |
+| **Blocchi attivi** | Nessuno - pipeline VisualexAPI pronto |
 
 ---
 
@@ -61,11 +61,12 @@
 ## Prossimi Passi Immediati
 
 ### Priorita 1: Storage Layer v2 (Settimana 1-2)
-- [ ] Setup FalkorDB container
-- [ ] Migrazione schema grafo da Neo4j
+- [x] Setup FalkorDB container (porta 6380)
+- [x] Test query Cypher su FalkorDB
+- [x] VisualexAPI ingestion pipeline (conforme allo schema)
+- [ ] Implementare FalkorDBClient reale con falkordb-py
 - [ ] Creare Bridge Table in PostgreSQL
 - [ ] Implementare BridgeTableBuilder per ingestion
-- [ ] Test query Cypher su FalkorDB
 
 ### Priorita 2: Expert con Tools (Settimana 3-4)
 - [ ] Implementare classe `ExpertWithTools`
