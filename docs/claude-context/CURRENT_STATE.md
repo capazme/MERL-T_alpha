@@ -59,7 +59,7 @@
   - ✓ URN generator operativo con URN Normattiva reali
   - Fix import circolari (lazy import)
 - [x] **Ingestion pipeline conforme a schema KG**:
-  - Node types: Norma, ConceptoGiuridico, Dottrina, AttoGiudiziario
+  - Node types: Norma, ConcettoGiuridico, Dottrina, AttoGiudiziario
   - Relations: contiene, disciplina, commenta, interpreta
   - URN Normattiva (non ELI teorico)
   - Zero LLM per costruzione grafo base
@@ -70,7 +70,7 @@
 - [x] **Primo batch ingestion** ✅:
   - 4 articoli ingested: Art. 1453-1456 c.c. (Risoluzione del contratto)
   - 6 nodi Norma (1 Codice + 4 Articoli)
-  - 4 nodi ConceptoGiuridico
+  - 4 nodi ConcettoGiuridico
   - 4 relazioni 'contiene', 4 relazioni 'disciplina'
   - Test suite completo (4/4 passed)
   - Script standalone: `scripts/ingest_art_1453_1456.py`

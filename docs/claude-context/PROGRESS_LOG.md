@@ -255,14 +255,14 @@ from backend.services import ServiceRegistry
   - `tests/preprocessing/test_batch_ingestion.py` - 4 test
   - Test URN generation (Normattiva format)
   - Test creazione nodi Norma
-  - Test creazione nodi ConceptoGiuridico con relazioni
+  - Test creazione nodi ConcettoGiuridico con relazioni
   - Test batch ingestion completo Art. 1453-1456
   - ✓ Tutti i test passano (4/4)
 
 - **Primo batch ingestion**:
   - Ingested Art. 1453-1456 c.c. (Risoluzione del contratto)
   - 6 nodi Norma: 1 Codice Civile root + 4 Articoli
-  - 4 nodi ConceptoGiuridico (da Brocardi Ratio)
+  - 4 nodi ConcettoGiuridico (da Brocardi Ratio)
   - 4 relazioni 'contiene' (Codice → Articoli)
   - 4 relazioni 'disciplina' (Articoli → Concetti)
   - Schema conforme a `knowledge-graph.md` ✓
@@ -319,9 +319,9 @@ Codice Civile -[contiene]-> Art. 1456 c.c. -[disciplina]-> "Clausola risolutiva 
 | LOC documentazione | ~3000 (docs + docker + README) |
 | LOC test | ~400 (test_batch_ingestion.py + script standalone) |
 | Container attivi | 4 (FalkorDB, PostgreSQL, Qdrant, Redis) |
-| Test eseguiti | 4 (URN gen, Norma nodes, ConceptoGiuridico, batch ingestion) - tutti passano ✓ |
+| Test eseguiti | 4 (URN gen, Norma nodes, ConcettoGiuridico, batch ingestion) - tutti passano ✓ |
 | Bug risolti | 9 (+ pytest fixture, datetime(), test isolation) |
 | Dipendenze installate | 9 (+ pytest, pytest-asyncio) |
 | Articoli ingested | 4 (Art. 1453-1456 c.c.) |
-| Nodi FalkorDB | 10 (6 Norma + 4 ConceptoGiuridico) |
+| Nodi FalkorDB | 10 (6 Norma + 4 ConcettoGiuridico) |
 | Relazioni FalkorDB | 8 (4 contiene + 4 disciplina) |

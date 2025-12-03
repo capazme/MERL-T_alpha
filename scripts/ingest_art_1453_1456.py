@@ -127,11 +127,11 @@ async def main():
             {"codice_urn": codice_urn, "art_urn": art_urn}
         )
 
-        # Create ConceptoGiuridico
+        # Create ConcettoGiuridico
         concetto_id = f"concetto_art_{article['numero']}"
         await client.query(
             """
-            MERGE (concetto:ConceptoGiuridico {node_id: $concetto_id})
+            MERGE (concetto:ConcettoGiuridico {node_id: $concetto_id})
             ON CREATE SET
                 concetto.denominazione = $denominazione,
                 concetto.categoria = 'diritto_civile_contratti'
@@ -146,7 +146,7 @@ async def main():
         await client.query(
             """
             MATCH (norma:Norma {URN: $norma_urn})
-            MATCH (concetto:ConceptoGiuridico {node_id: $concetto_id})
+            MATCH (concetto:ConcettoGiuridico {node_id: $concetto_id})
             MERGE (norma)-[r:disciplina]->(concetto)
             ON CREATE SET r.certezza = 'diretta'
             """,

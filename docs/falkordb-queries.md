@@ -52,7 +52,7 @@ GRAPH.QUERY merl_t_legal "MATCH (n)-[r]->(m) RETURN labels(n)[0] AS from_type, t
 GRAPH.QUERY merl_t_legal "MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 50"
 
 # Struttura completa (Codice -> Articoli -> Concetti)
-GRAPH.QUERY merl_t_legal "MATCH (c:Norma)-[r1:contiene]->(a:Norma)-[r2:disciplina]->(con:ConceptoGiuridico) RETURN c, r1, a, r2, con"
+GRAPH.QUERY merl_t_legal "MATCH (c:Norma)-[r1:contiene]->(a:Norma)-[r2:disciplina]->(con:ConcettoGiuridico) RETURN c, r1, a, r2, con"
 ```
 
 ---
@@ -81,26 +81,26 @@ GRAPH.QUERY merl_t_legal "MATCH (n:Norma) WHERE n.URN CONTAINS 'art1453' RETURN 
 
 ---
 
-## Query su ConceptoGiuridico
+## Query su ConcettoGiuridico
 
 ### Lista Concetti
 
 ```redis
 # Tutti i concetti giuridici
-GRAPH.QUERY merl_t_legal "MATCH (c:ConceptoGiuridico) RETURN c.denominazione, c.categoria, c.fonte"
+GRAPH.QUERY merl_t_legal "MATCH (c:ConcettoGiuridico) RETURN c.denominazione, c.categoria, c.fonte"
 
 # Concetti per categoria
-GRAPH.QUERY merl_t_legal "MATCH (c:ConceptoGiuridico) WHERE c.categoria = 'diritto_civile_contratti' RETURN c.denominazione"
+GRAPH.QUERY merl_t_legal "MATCH (c:ConcettoGiuridico) WHERE c.categoria = 'diritto_civile_contratti' RETURN c.denominazione"
 ```
 
 ### Concetti legati a Norme
 
 ```redis
 # Articoli che disciplinano un concetto
-GRAPH.QUERY merl_t_legal "MATCH (a:Norma)-[r:disciplina]->(c:ConceptoGiuridico) RETURN a.estremi, c.denominazione, r.certezza"
+GRAPH.QUERY merl_t_legal "MATCH (a:Norma)-[r:disciplina]->(c:ConcettoGiuridico) RETURN a.estremi, c.denominazione, r.certezza"
 
 # Concetti disciplinati da un articolo specifico
-GRAPH.QUERY merl_t_legal "MATCH (a:Norma {estremi: 'Art. 1453 c.c.'})-[:disciplina]->(c:ConceptoGiuridico) RETURN c.denominazione, c.definizione"
+GRAPH.QUERY merl_t_legal "MATCH (a:Norma {estremi: 'Art. 1453 c.c.'})-[:disciplina]->(c:ConcettoGiuridico) RETURN c.denominazione, c.definizione"
 ```
 
 ---
@@ -121,10 +121,10 @@ GRAPH.QUERY merl_t_legal "MATCH path = (root:Norma)-[:contiene*]->(leaf:Norma) W
 
 ```redis
 # Tutte le relazioni 'disciplina'
-GRAPH.QUERY merl_t_legal "MATCH (n:Norma)-[r:disciplina]->(c:ConceptoGiuridico) RETURN n.estremi, c.denominazione, r.certezza, r.fonte_relazione"
+GRAPH.QUERY merl_t_legal "MATCH (n:Norma)-[r:disciplina]->(c:ConcettoGiuridico) RETURN n.estremi, c.denominazione, r.certezza, r.fonte_relazione"
 
 # Articoli correlati tramite concetto comune
-GRAPH.QUERY merl_t_legal "MATCH (a1:Norma)-[:disciplina]->(c:ConceptoGiuridico)<-[:disciplina]-(a2:Norma) WHERE a1 <> a2 RETURN a1.estremi, c.denominazione, a2.estremi"
+GRAPH.QUERY merl_t_legal "MATCH (a1:Norma)-[:disciplina]->(c:ConcettoGiuridico)<-[:disciplina]-(a2:Norma) WHERE a1 <> a2 RETURN a1.estremi, c.denominazione, a2.estremi"
 ```
 
 ---
@@ -155,10 +155,10 @@ GRAPH.QUERY merl_t_legal "MATCH (start:Norma {estremi: 'Art. 1453 c.c.'})-[*1..2
 
 ```redis
 # Triangoli semantici (Norma1 -> Concetto <- Norma2)
-GRAPH.QUERY merl_t_legal "MATCH (n1:Norma)-[:disciplina]->(c:ConceptoGiuridico)<-[:disciplina]-(n2:Norma) WHERE id(n1) < id(n2) RETURN n1.estremi, c.denominazione, n2.estremi"
+GRAPH.QUERY merl_t_legal "MATCH (n1:Norma)-[:disciplina]->(c:ConcettoGiuridico)<-[:disciplina]-(n2:Norma) WHERE id(n1) < id(n2) RETURN n1.estremi, c.denominazione, n2.estremi"
 
 # Norme con più concetti
-GRAPH.QUERY merl_t_legal "MATCH (n:Norma)-[:disciplina]->(c:ConceptoGiuridico) WITH n, count(c) AS num_concetti WHERE num_concetti > 1 RETURN n.estremi, num_concetti ORDER BY num_concetti DESC"
+GRAPH.QUERY merl_t_legal "MATCH (n:Norma)-[:disciplina]->(c:ConcettoGiuridico) WITH n, count(c) AS num_concetti WHERE num_concetti > 1 RETURN n.estremi, num_concetti ORDER BY num_concetti DESC"
 ```
 
 ---

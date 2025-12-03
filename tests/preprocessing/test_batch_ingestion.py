@@ -8,7 +8,7 @@ Articles to ingest: Art. 1453-1456 c.c. (Risoluzione del contratto)
 
 Flow:
 1. Generate URN using VisualexAPI urngenerator
-2. Create FalkorDB nodes (Norma, ConceptoGiuridico, etc.)
+2. Create FalkorDB nodes (Norma, ConcettoGiuridico, etc.)
 3. Verify graph structure
 
 This test uses embedded VisualexAPI tools (no external API calls).
@@ -209,8 +209,8 @@ async def test_create_norma_nodes(falkor_client):
 
 @pytest.mark.asyncio
 async def test_create_concetto_giuridico(falkor_client):
-    """Test creating ConceptoGiuridico nodes with 'disciplina' relation."""
-    log.info("Testing ConceptoGiuridico node creation")
+    """Test creating ConcettoGiuridico nodes with 'disciplina' relation."""
+    log.info("Testing ConcettoGiuridico node creation")
 
     # Generate URN for Art. 1453
     art_urn = urngenerator.generate_urn(
@@ -232,11 +232,11 @@ async def test_create_concetto_giuridico(falkor_client):
         {"urn": art_urn}
     )
 
-    # Create ConceptoGiuridico node (from Brocardi "Ratio")
+    # Create ConcettoGiuridico node (from Brocardi "Ratio")
     concetto_id = "contratto_risoluzione_inadempimento"
     await falkor_client.query(
         """
-        MERGE (concetto:ConceptoGiuridico {node_id: $concetto_id})
+        MERGE (concetto:ConcettoGiuridico {node_id: $concetto_id})
         ON CREATE SET
             concetto.denominazione = 'Risoluzione del contratto per inadempimento',
             concetto.definizione = 'Rimedio contrattuale che consente alla parte adempiente di sciogliere il vincolo contrattuale in caso di inadempimento dell altra parte.',
@@ -250,7 +250,7 @@ async def test_create_concetto_giuridico(falkor_client):
     await falkor_client.query(
         """
         MATCH (norma:Norma {URN: $norma_urn})
-        MATCH (concetto:ConceptoGiuridico {node_id: $concetto_id})
+        MATCH (concetto:ConcettoGiuridico {node_id: $concetto_id})
         MERGE (norma)-[r:disciplina]->(concetto)
         ON CREATE SET
             r.data_decorrenza = '1942-03-16',
@@ -263,12 +263,12 @@ async def test_create_concetto_giuridico(falkor_client):
         }
     )
 
-    log.info("ConceptoGiuridico node and relation created")
+    log.info("ConcettoGiuridico node and relation created")
 
     # Verify
     results = await falkor_client.query(
         """
-        MATCH (norma:Norma)-[r:disciplina]->(concetto:ConceptoGiuridico)
+        MATCH (norma:Norma)-[r:disciplina]->(concetto:ConcettoGiuridico)
         WHERE norma.estremi = 'Art. 1453 c.c.'
         RETURN norma.estremi AS norma_estremi,
                concetto.denominazione AS concetto_nome,
@@ -391,11 +391,11 @@ async def test_batch_ingestion_art_1453_1456(falkor_client):
             {"codice_urn": codice_urn, "art_urn": art_urn}
         )
 
-        # Create ConceptoGiuridico
+        # Create ConcettoGiuridico
         concetto_id = f"concetto_art_{article['numero']}"
         await falkor_client.query(
             """
-            MERGE (concetto:ConceptoGiuridico {node_id: $concetto_id})
+            MERGE (concetto:ConcettoGiuridico {node_id: $concetto_id})
             ON CREATE SET
                 concetto.denominazione = $denominazione,
                 concetto.categoria = 'diritto_civile_contratti'
@@ -410,7 +410,7 @@ async def test_batch_ingestion_art_1453_1456(falkor_client):
         await falkor_client.query(
             """
             MATCH (norma:Norma {URN: $norma_urn})
-            MATCH (concetto:ConceptoGiuridico {node_id: $concetto_id})
+            MATCH (concetto:ConcettoGiuridico {node_id: $concetto_id})
             MERGE (norma)-[r:disciplina]->(concetto)
             ON CREATE SET r.certezza = 'diretta'
             """,
@@ -422,7 +422,7 @@ async def test_batch_ingestion_art_1453_1456(falkor_client):
     # Verify complete structure
     results = await falkor_client.query(
         """
-        MATCH (codice:Norma)-[:contiene]->(art:Norma)-[:disciplina]->(concetto:ConceptoGiuridico)
+        MATCH (codice:Norma)-[:contiene]->(art:Norma)-[:disciplina]->(concetto:ConcettoGiuridico)
         WHERE codice.tipo_documento = 'codice'
         AND art.tipo_documento = 'articolo'
         RETURN codice.estremi AS codice,
