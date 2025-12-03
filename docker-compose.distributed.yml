@@ -1,0 +1,288 @@
+# docker-compose.distributed.yml
+# Multi-container deployment (production/scaling mode)
+#
+# Each component runs in its own container for independent scaling.
+#
+# Usage:
+#   export MERL_T_MODE=distributed
+#   docker-compose -f docker-compose.distributed.yml up
+#
+# v2 Architecture:
+#   - Storage Service: Coordinates all databases
+#   - Expert Services: One container per expert (scalable)
+#   - Orchestration Service: Router + Gating + Synthesis
+#   - RLCF Service: Learning layer
+#   - Databases: PostgreSQL, FalkorDB, Qdrant, Redis
+
+services:
+  # ============================================================================
+  # DATABASE LAYER
+  # ============================================================================
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: merl-t-postgres
+    environment:
+      POSTGRES_DB: merl_t_prod
+      POSTGRES_USER: ${POSTGRES_USER:-merl_t}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - merl-t-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-merl_t}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: merl-t-falkordb
+    ports:
+      - "6380:6379"
+    volumes:
+      - falkordb_data:/data
+    networks:
+      - merl-t-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: merl-t-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - merl-t-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: merl-t-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - merl-t-network
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # STORAGE SERVICE (Unified API for all databases)
+  # ============================================================================
+
+  storage-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.storage
+    container_name: merl-t-storage
+    ports:
+      - "8001:8001"
+    environment:
+      - FALKORDB_HOST=falkordb
+      - FALKORDB_PORT=6379
+      - QDRANT_URL=http://qdrant:6333
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=merl_t_prod
+      - POSTGRES_USER=${POSTGRES_USER:-merl_t}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      falkordb:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - merl-t-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # EXPERT SERVICES (One per expert, independently scalable)
+  # ============================================================================
+
+  expert-literal:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.expert
+    container_name: merl-t-expert-literal
+    ports:
+      - "8010:8010"
+    environment:
+      - EXPERT_TYPE=literal
+      - STORAGE_SERVICE_URL=http://storage-service:8001
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - PORT=8010
+    depends_on:
+      - storage-service
+    networks:
+      - merl-t-network
+
+  expert-systemic:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.expert
+    container_name: merl-t-expert-systemic
+    ports:
+      - "8011:8011"
+    environment:
+      - EXPERT_TYPE=systemic
+      - STORAGE_SERVICE_URL=http://storage-service:8001
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - PORT=8011
+    depends_on:
+      - storage-service
+    networks:
+      - merl-t-network
+
+  expert-principles:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.expert
+    container_name: merl-t-expert-principles
+    ports:
+      - "8012:8012"
+    environment:
+      - EXPERT_TYPE=principles
+      - STORAGE_SERVICE_URL=http://storage-service:8001
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - PORT=8012
+    depends_on:
+      - storage-service
+    networks:
+      - merl-t-network
+
+  expert-precedent:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.expert
+    container_name: merl-t-expert-precedent
+    ports:
+      - "8013:8013"
+    environment:
+      - EXPERT_TYPE=precedent
+      - STORAGE_SERVICE_URL=http://storage-service:8001
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - PORT=8013
+    depends_on:
+      - storage-service
+    networks:
+      - merl-t-network
+
+  # ============================================================================
+  # ORCHESTRATION SERVICE (Router + Gating + Synthesis)
+  # ============================================================================
+
+  orchestration:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.orchestration
+    container_name: merl-t-orchestration
+    ports:
+      - "8000:8000"
+    environment:
+      - MERL_T_MODE=distributed
+      - STORAGE_SERVICE_URL=http://storage-service:8001
+      - EXPERT_LITERAL_URL=http://expert-literal:8010
+      - EXPERT_SYSTEMIC_URL=http://expert-systemic:8011
+      - EXPERT_PRINCIPLES_URL=http://expert-principles:8012
+      - EXPERT_PRECEDENT_URL=http://expert-precedent:8013
+      - RLCF_SERVICE_URL=http://rlcf-service:8002
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    depends_on:
+      - storage-service
+      - expert-literal
+      - expert-systemic
+      - expert-principles
+      - expert-precedent
+    networks:
+      - merl-t-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # RLCF SERVICE (Learning layer)
+  # ============================================================================
+
+  rlcf-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.rlcf
+    container_name: merl-t-rlcf
+    ports:
+      - "8002:8002"
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=merl_t_prod
+      - POSTGRES_USER=${POSTGRES_USER:-merl_t}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - merl-t-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # FRONTEND (Optional, for web UI)
+  # ============================================================================
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: merl-t-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://orchestration:8000
+    depends_on:
+      - orchestration
+    networks:
+      - merl-t-network
+
+networks:
+  merl-t-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  falkordb_data:
+  redis_data:
+  qdrant_data:

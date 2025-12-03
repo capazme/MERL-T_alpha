@@ -1,0 +1,24 @@
+# Dockerfile.orchestration
+# Orchestration Service container (v2 PLACEHOLDER)
+#
+# Provides:
+# - Router (query classification)
+# - Gating Network (expert weighting)
+# - Synthesizer (opinion aggregation)
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY backend /app/backend
+
+# Expose port
+EXPOSE 8000
+
+# Main API
+CMD ["uvicorn", "backend.orchestration.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

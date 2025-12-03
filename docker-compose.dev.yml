@@ -1,7 +1,14 @@
 # docker-compose.dev.yml
 # Development database services only (for native Python/Node.js development)
 # For full stack deployment, use docker-compose.yml
+#
+# v2 Stack:
+# - PostgreSQL: Bridge Table + RLCF data
+# - FalkorDB: Legal knowledge graph (replaces Neo4j)
+# - Qdrant: Vector embeddings
+# - Redis: Caching layer
 services:
+  # PostgreSQL: Bridge Table + RLCF authority/feedback
   postgres:
     image: postgres:15-alpine
     container_name: merl-t-postgres-dev
@@ -19,24 +26,24 @@ services:
       timeout: 5s
       retries: 5
 
-  neo4j:
-    image: neo4j:5.13-community
-    container_name: merl-t-neo4j-dev
-    environment:
-      NEO4J_AUTH: neo4j/devpassword
-      NEO4J_PLUGINS: '["apoc"]'
-      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+  # v2: Neo4j replaced by FalkorDB (496x faster, Cypher compatible)
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: merl-t-falkordb-dev
     ports:
-      - "7474:7474"  # Browser
-      - "7687:7687"  # Bolt
+      - "6380:6379"  # FalkorDB protocol (Redis-compatible)
     volumes:
-      - neo4j_data:/data
+      - falkordb_data:/data
+    environment:
+      FALKORDB_ARGS: "--save 60 1 --loglevel warning"
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p devpassword 'RETURN 1'"]
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    command: ["falkordb-server", "--loadmodule", "/usr/lib/redis/modules/libgraphdb.so"]
 
+  # Redis: Caching layer
   redis:
     image: redis:7-alpine
     container_name: merl-t-redis-dev
@@ -50,6 +57,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # Qdrant: Vector database for semantic search
   qdrant:
     image: qdrant/qdrant:latest
     container_name: merl-t-qdrant-dev
@@ -61,13 +69,13 @@ services:
     environment:
       QDRANT__SERVICE__GRPC_PORT: 6334
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:6333/"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
   postgres_data:
-  neo4j_data:
+  falkordb_data:  # v2: Replaced neo4j_data
   redis_data:
   qdrant_data:

@@ -1,0 +1,25 @@
+# Dockerfile.expert
+# Expert Service container (v2 PLACEHOLDER)
+#
+# Generic container for any expert type.
+# Expert type determined by EXPERT_TYPE env var.
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY backend/interfaces /app/backend/interfaces
+COPY backend/orchestration/experts /app/backend/orchestration/experts
+COPY backend/orchestration/prompts /app/backend/orchestration/prompts
+
+# Expose port (overridden by docker-compose)
+EXPOSE 8010
+
+# v2 TODO: Create FastAPI app for expert service
+# CMD ["uvicorn", "backend.services.expert_api:app", "--host", "0.0.0.0", "--port", "$PORT"]
+CMD ["echo", "Expert service not implemented yet"]
