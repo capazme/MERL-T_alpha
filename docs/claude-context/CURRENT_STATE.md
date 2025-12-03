@@ -10,8 +10,8 @@
 | Campo | Valore |
 |-------|--------|
 | **Data ultimo aggiornamento** | 3 Dicembre 2025 |
-| **Fase progetto** | Bridge Table implementata e testata ✅ |
-| **Prossimo obiettivo** | GraphAwareRetriever con hybrid scoring |
+| **Fase progetto** | GraphAwareRetriever implementato ✅ - Storage Layer v2 completo |
+| **Prossimo obiettivo** | Expand ingestion (~50 articoli) o Expert with Tools |
 | **Blocchi attivi** | Nessuno |
 
 ---
@@ -86,6 +86,14 @@
   - Container spostato su porta 5433
   - Analisi approfondita: lsof, docker logs, pg_hba.conf
   - Entrambe le istanze PostgreSQL coesistono senza problemi
+- [x] **GraphAwareRetriever implementato** ✅:
+  - Hybrid scoring: `final_score = α * similarity + (1-α) * graph_score`
+  - Alpha learnable da RLCF feedback (bounds [0.3, 0.9])
+  - Shortest path calculation con expert-specific traversal weights
+  - Parametri esternalizzati in `backend/config/retriever_weights.yaml`
+  - 4 expert types: LiteralExpert, SystemicExpert, PrinciplesExpert, PrecedentExpert
+  - ✓ 11/12 test passano (1 skipped per mancanza dati)
+  - 510 LOC totali (models.py + retriever.py)
 
 ---
 

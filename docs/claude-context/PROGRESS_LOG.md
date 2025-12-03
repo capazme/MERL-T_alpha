@@ -5,6 +5,80 @@
 
 ---
 
+## 2025-12-03 (Sera) - GraphAwareRetriever Implementato ✅
+
+**Durata**: ~3 ore
+**Obiettivo**: Implementare GraphAwareRetriever con hybrid scoring vector+graph
+**Risultato**: ✓ Retriever completo con 11/12 test passanti + configurazione esternalizzata
+
+### Completato
+1. **GraphAwareRetriever Implementation** (510 LOC):
+   - Hybrid scoring algorithm: `final_score = α * similarity_score + (1-α) * graph_score`
+   - Vector search (Qdrant) → Bridge Table → Graph enrichment (FalkorDB)
+   - Shortest path calculation con max_hops
+   - Expert-specific traversal weights (LiteralExpert, SystemicExpert, PrinciplesExpert, PrecedentExpert)
+   - Learnable alpha parameter con RLCF feedback (bounds [0.3, 0.9])
+
+2. **Models (120 LOC)**:
+   - RetrievalResult: chunk_id, text, similarity_score, graph_score, final_score
+   - VectorSearchResult: intermediate result da Qdrant
+   - GraphPath: path nel grafo con edges e length
+   - RetrieverConfig: alpha, over_retrieve_factor, max_graph_hops, default_graph_score
+
+3. **Configurazione Esternalizzata**:
+   - `backend/config/retriever_weights.yaml` (140 linee)
+   - Parametri retrieval (alpha=0.7, over_retrieve_factor=3, max_graph_hops=3)
+   - Expert traversal weights per 4 expert types
+   - ~140 relation weights totali (contiene, disciplina, interpreta, applica, etc.)
+   - Fallback a default weights se config non trovato
+
+4. **Test Suite (11/12 passed)**:
+   - RetrieverConfig validation: alpha, over_retrieve_factor, max_hops bounds
+   - Core logic: initialization, empty results, combine_scores, score_path, update_alpha
+   - Integration: retrieve con mock vector + real bridge/graph
+   - 1 test skipped per mancanza dati ingestion
+
+### Key Design Decisions
+1. **Parametri esternalizzati**: Su richiesta utente, tutti i pesi in YAML per facile modifica e futuro frontend
+2. **Fallback graceful**: Default weights hardcoded se config file mancante
+3. **Expert-specific weights**: Diversi expert valorizzano diversamente le relazioni (es. LiteralExpert preferisce "disciplina", PrecedentExpert preferisce "interpreta")
+4. **Learnable alpha**: Inizia a 0.7 (70% semantic, 30% graph), si adatta con feedback RLCF
+5. **Over-retrieve + re-rank**: Retrieve 3x più risultati per graph enrichment prima di re-ranking
+
+### Problemi Incontrati
+1. **Import error**: VectorSearchResult/GraphPath non esportati da __init__.py
+   - **Soluzione**: Aggiunti agli __all__ exports
+
+2. **Division by zero**: Log crash quando nessun risultato
+   - **Soluzione**: Check `if top_results:` prima di calcolare avg score
+
+3. **PyYAML marker warning**: pytest.mark.integration non registrato
+   - **Soluzione**: Aggiunto marker a pytest.ini
+
+### Prossimi Passi
+1. **Expand ingestion** (~50 articoli):
+   - Libro IV - Obbligazioni (Art. 1173-2059)
+   - Popolare Bridge Table con mappings chunk→node
+   - Testare retrieval su dataset più ampio
+
+2. **Expert with Tools** (~6-8 ore):
+   - LiteralExpert, SystemicExpert, PrinciplesExpert, PrecedentExpert
+   - Specialized retrieval tools per expert
+   - Integration con GraphAwareRetriever
+
+3. **Gating Network** (~4-5 ore):
+   - MoE-style expert weighting
+   - Policy gradient training con RLCF
+
+### Note per Future Sessioni
+- ✅ Storage Layer v2 **COMPLETO**: FalkorDB + Bridge Table + GraphAwareRetriever
+- 📦 Pronto per ingestion massivo (pipeline meccanica zero-LLM funzionante)
+- 🧪 Test suite robusta (16 test storage layer, tutti passano)
+- ⚙️ Configurazione esternalizzata, pronta per frontend admin panel
+- 🎯 Alpha parameter learnable, pronto per RLCF feedback loop
+
+---
+
 ## 2025-12-03 (Pomeriggio) - Bridge Table Implementata ✅
 
 **Durata**: ~2 ore
