@@ -25,10 +25,13 @@ Schema:
 
 from .models import BridgeTableEntry, Base
 from .bridge_table import BridgeTable, BridgeTableConfig
+from .bridge_builder import BridgeBuilder, insert_ingestion_result
 
 __all__ = [
     "BridgeTable",
     "BridgeTableConfig",
     "BridgeTableEntry",
     "Base",
+    "BridgeBuilder",
+    "insert_ingestion_result",
 ]
