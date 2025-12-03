@@ -1,29 +1,37 @@
 """
-Graph-Aware Retriever (v2)
-==========================
+GraphAwareRetriever (v2)
+========================
 
 Hybrid retrieval combining vector similarity and graph structure.
 
-Final score = alpha * similarity_score + (1-alpha) * graph_score
-
-Where:
-- similarity_score: Cosine similarity from Qdrant
-- graph_score: Path-based score from FalkorDB via Bridge Table
-- alpha: Learnable parameter (default 0.7)
+Components:
+- GraphAwareRetriever: Main retrieval class
+- RetrievalResult: Result dataclass with hybrid scores
+- RetrieverConfig: Configuration
 
 See docs/03-architecture/04-storage-layer.md for design details.
+
+Architecture:
+    Query → Vector Search (Qdrant)
+              ↓
+         Chunk IDs
+              ↓
+    Bridge Table → Graph Nodes (FalkorDB)
+              ↓
+    Graph Score Calculation (shortest path, relation weights)
+              ↓
+    Hybrid Score = α * sim_score + (1-α) * graph_score
+              ↓
+    Re-ranked Results
 """
 
-from .retriever import (
-    GraphAwareRetriever,
-    RetrievalResult,
-    RetrieverConfig,
-    EXPERT_TRAVERSAL_WEIGHTS,
-)
+from .models import RetrievalResult, RetrieverConfig, VectorSearchResult, GraphPath
+from .retriever import GraphAwareRetriever
 
 __all__ = [
     "GraphAwareRetriever",
     "RetrievalResult",
     "RetrieverConfig",
-    "EXPERT_TRAVERSAL_WEIGHTS",
+    "VectorSearchResult",
+    "GraphPath",
 ]

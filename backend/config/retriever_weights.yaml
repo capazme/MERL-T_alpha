@@ -1,0 +1,143 @@
+# GraphAwareRetriever Configuration
+# ==================================
+#
+# Traversal weights for different expert types.
+# Each expert values different relation types based on their reasoning strategy.
+#
+# Weight interpretation:
+#   1.0 = Highly relevant (strong connection)
+#   0.5 = Moderately relevant (weak connection)
+#   0.0 = Irrelevant (ignore this relation)
+#
+# Future: These weights can be learned from RLCF feedback
+# For now: Priors from domain knowledge (diritto civile italiano)
+
+version: "1.0"
+last_updated: "2025-12-03"
+
+# Hybrid retrieval parameters
+retrieval:
+  # Alpha: weight for vector similarity vs graph score
+  # alpha = 0.7 means 70% semantic, 30% structural
+  # Range: [0.3, 0.9] (learnable from RLCF)
+  alpha: 0.7
+
+  # Over-retrieve factor for re-ranking
+  # Retrieve (top_k * over_retrieve_factor) for graph enrichment
+  over_retrieve_factor: 3
+
+  # Maximum graph hops for shortest path
+  max_graph_hops: 3
+
+  # Default graph score when no path found
+  default_graph_score: 0.5
+
+# Expert-specific traversal weights
+# ===================================
+# Each expert has different preferences for relation types
+
+expert_traversal_weights:
+
+  # LiteralExpert: Direct textual interpretation
+  # Cares about: definitions, direct references, containment
+  LiteralExpert:
+    # Structural relations (highest priority)
+    contiene: 1.0         # Article contains comma/number
+    disciplina: 0.95      # Norm regulates concept
+    definisce: 0.95       # Norm defines concept
+
+    # Normative relations
+    modifica: 0.85        # Norm modifies another norm
+    abroga: 0.80          # Norm repeals another norm
+    rinvia: 0.75          # Norm refers to another norm
+
+    # Conceptual relations (lower priority for literal)
+    relazione_concettuale: 0.60
+
+    # Jurisprudential relations (minimal for literal)
+    interpreta: 0.50      # Case interprets norm
+    applica: 0.45         # Case applies norm
+
+    # Default for unknown relations
+    default: 0.50
+
+  # SystemicExpert: Hierarchical and structural interpretation
+  # Cares about: hierarchy, system coherence, derogations
+  SystemicExpert:
+    # Hierarchical relations (highest priority)
+    gerarchia_kelseniana: 1.0   # Constitutional hierarchy
+    attuazione: 0.95            # Implementation relation
+    delega: 0.90                # Delegation
+
+    # Normative modifications (important for system)
+    modifica: 0.90
+    abroga: 0.85
+    deroga: 0.90               # Derogation (exception)
+
+    # Structural relations
+    contiene: 0.85
+    disciplina: 0.85
+
+    # Conceptual relations (moderate)
+    relazione_concettuale: 0.75
+    specifica: 0.80            # Specification relation
+
+    # Jurisprudential (moderate)
+    interpreta: 0.70
+
+    default: 0.50
+
+  # PrinciplesExpert: Abstract principles and constitutional values
+  # Cares about: constitutional principles, balancing, derogations
+  PrinciplesExpert:
+    # Conceptual relations (highest priority)
+    relazione_concettuale: 1.0
+    disciplina: 0.90
+
+    # Constitutional/principle relations
+    attuazione: 0.95           # Implementation of principle
+    deroga: 0.95               # Derogation (balance)
+    bilancia: 0.95             # Balancing of principles
+
+    # Hierarchical (important for principles)
+    gerarchia_kelseniana: 0.90
+
+    # Jurisprudential (very important - case law develops principles)
+    interpreta: 0.85
+    applica: 0.80
+    conferma: 0.75
+
+    # Structural (lower priority)
+    contiene: 0.60
+
+    default: 0.50
+
+  # PrecedentExpert: Jurisprudential interpretation
+  # Cares about: case law, precedents, overruling
+  PrecedentExpert:
+    # Jurisprudential relations (highest priority)
+    interpreta: 1.0            # Case interprets norm
+    applica: 1.0               # Case applies norm
+    conferma: 0.95             # Case confirms precedent
+    overrules: 0.95            # Case overrules precedent
+    distinguishes: 0.90        # Case distinguishes from precedent
+
+    # Citation relations
+    cita: 0.85                 # Case cites norm/other case
+
+    # Normative relations (moderate - need to understand norm)
+    disciplina: 0.75
+    contiene: 0.70
+
+    # Conceptual (moderate)
+    relazione_concettuale: 0.70
+
+    default: 0.50
+
+# Notes for future development
+# =============================
+# 1. These weights can be learned from RLCF feedback
+# 2. Per-user weights can be stored in database
+# 3. A/B testing different weight configurations
+# 4. Frontend UI for weight adjustment (admin panel)
+# 5. Weights can vary by legal domain (civile, penale, amministrativo)
