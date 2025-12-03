@@ -9,9 +9,9 @@
 
 | Campo | Valore |
 |-------|--------|
-| **Data ultimo aggiornamento** | 3 Dicembre 2025 (sera) |
-| **Fase progetto** | Schema definitivo API→Grafo completato ✅ - Ready for ingestion 887 articoli |
-| **Prossimo obiettivo** | Implementare comma parser e structural chunker |
+| **Data ultimo aggiornamento** | 3 Dicembre 2025 (notte) |
+| **Fase progetto** | Ingestion Pipeline v2 COMPLETA ✅ - Ready per batch 887 articoli |
+| **Prossimo obiettivo** | Batch ingestion Libro IV + embedding generation |
 | **Blocchi attivi** | Nessuno |
 
 ---
@@ -39,7 +39,35 @@
 
 ---
 
-## Cosa Abbiamo Fatto (Sessione Corrente - 3 Dic 2025, Sera)
+## Cosa Abbiamo Fatto (Sessione Corrente - 3 Dic 2025, Notte)
+
+- [x] **CommaParser** ✅:
+  - File: `backend/preprocessing/comma_parser.py` (350+ lines)
+  - Parsa article_text → ArticleStructure(numero_articolo, rubrica, List<Comma>)
+  - Regex per bis/ter/quater, rubrica, comma parsing
+  - Token counting con tiktoken (cl100k_base)
+  - 39/39 test passano
+- [x] **StructuralChunker** ✅:
+  - File: `backend/preprocessing/structural_chunker.py` (300+ lines)
+  - Crea Chunk con URN interno (con comma) e URL esterno (senza comma)
+  - Metadata: libro, titolo, capo, sezione da Brocardi position
+  - 17/17 test passano
+- [x] **IngestionPipelineV2** ✅:
+  - File: `backend/preprocessing/ingestion_pipeline_v2.py` (500+ lines)
+  - USA (non modifica) urngenerator e visualex_client esistenti
+  - Integra CommaParser + StructuralChunker
+  - Crea nodi grafo con 21 properties per Norma
+  - Brocardi enrichment: Dottrina (ratio, spiegazione), AttoGiudiziario (massime)
+  - Prepara BridgeMapping objects per Bridge Table
+  - 21/21 test passano
+- [x] **BridgeBuilder** ✅:
+  - File: `backend/storage/bridge/bridge_builder.py` (175 lines)
+  - Converte BridgeMapping → Bridge Table format
+  - Mapping types: PRIMARY, HIERARCHIC, CONCEPT, DOCTRINE, JURISPRUDENCE
+  - Batch insertion support
+  - 14/14 test di integrazione con PostgreSQL reale (no mock)
+
+## Cosa Abbiamo Fatto (Sessione Precedente - 3 Dic 2025, Sera)
 
 - [x] **Schema definitivo API → Grafo** ✅:
   - File: `docs/08-iteration/SCHEMA_DEFINITIVO_API_GRAFO.md` (695 lines)
@@ -123,7 +151,7 @@
 
 ## Prossimi Passi Immediati
 
-### Priorita 1: Ingestion Pipeline (Settimana 1-2)
+### Priorita 1: Ingestion Pipeline (Settimana 1-2) - COMPLETATA ✅
 - [x] Setup FalkorDB container (porta 6380)
 - [x] Test query Cypher su FalkorDB
 - [x] VisualexAPI ingestion pipeline (conforme allo schema)
@@ -132,11 +160,16 @@
 - [x] **Primo batch ingestion** - Art. 1453-1456 Codice Civile ✅
 - [x] Creare Bridge Table in PostgreSQL ✅
 - [x] Schema definitivo API → Grafo con 21 properties ✅
-- [ ] **Implementare comma parser** dall'output VisualexAPI
-- [ ] **Implementare structural chunker** (comma-level)
-- [ ] **Estendere URN generator** per comma/letter support
-- [ ] **Creare pipeline ingestion** Libro IV (887 articoli) con Brocardi enrichment
-- [ ] Implementare BridgeTableBuilder con mappings e confidence scoring
+- [x] **CommaParser** dall'output VisualexAPI ✅
+- [x] **StructuralChunker** (comma-level) ✅
+- [x] **URN extension** per comma (tramite StructuralChunker, non modifica urngenerator) ✅
+- [x] **IngestionPipelineV2** con Brocardi enrichment ✅
+- [x] **BridgeBuilder** con mappings e confidence scoring ✅
+
+### Priorita 1.5: Batch Ingestion (Prossima sessione)
+- [ ] Script batch ingestion per 887 articoli Libro IV
+- [ ] Embedding generation con E5-large (HuggingFace)
+- [ ] Monitoring e progress tracking
 
 ### Priorita 2: Expert con Tools (Settimana 3-4)
 - [ ] Implementare classe `ExpertWithTools`

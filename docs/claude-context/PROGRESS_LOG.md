@@ -5,6 +5,82 @@
 
 ---
 
+## 2025-12-03 (Notte) - Ingestion Pipeline v2 COMPLETA ✅
+
+**Durata**: ~4 ore
+**Obiettivo**: Implementare comma-level chunking e pipeline ingestion per 887 articoli
+**Risultato**: ✓ Pipeline completa con 91 test passanti (comma_parser + structural_chunker + ingestion_pipeline_v2 + bridge_builder)
+
+### Completato
+
+1. **CommaParser** (`backend/preprocessing/comma_parser.py` - 350 LOC):
+   - Parse `article_text` → `ArticleStructure(numero_articolo, rubrica, List<Comma>)`
+   - Regex per: bis/ter/quater articles, rubrica extraction, comma splitting
+   - Token counting con tiktoken (cl100k_base encoding)
+   - 39/39 test passano
+
+2. **StructuralChunker** (`backend/preprocessing/structural_chunker.py` - 300 LOC):
+   - Crea `Chunk` objects con URN interno (con `~comma{N}`) e URL esterno (senza comma)
+   - Preserva article URL per frontend linking
+   - Estrae libro/titolo/capo/sezione da Brocardi position
+   - 17/17 test passano
+
+3. **IngestionPipelineV2** (`backend/preprocessing/ingestion_pipeline_v2.py` - 500 LOC):
+   - USA (non modifica) urngenerator e visualex_client esistenti
+   - Integra CommaParser + StructuralChunker
+   - Crea nodi grafo con 21 properties per Norma (conforme schema locked)
+   - Brocardi enrichment: Dottrina (ratio, spiegazione), AttoGiudiziario (massime)
+   - Prepara BridgeMapping objects per Bridge Table
+   - 21/21 test passano
+
+4. **BridgeBuilder** (`backend/storage/bridge/bridge_builder.py` - 175 LOC):
+   - Converte `BridgeMapping` → Bridge Table format
+   - Mapping types: PRIMARY, HIERARCHIC, CONCEPT, DOCTRINE, JURISPRUDENCE
+   - Batch insertion con configurable batch_size
+   - 14/14 test di integrazione con PostgreSQL reale (no mock)
+
+### Key Design Decisions
+
+1. **URN/URL separation**: URN interno (`~art1453~comma1`) per granularità grafo, URL esterno (`~art1453`) per linking Normattiva
+2. **Non modificare urngenerator**: Critico per agent real-time scraping, comma extension in StructuralChunker
+3. **Allegato :2**: Codice Civile è Allegato 2 del R.D. 262/1942, già hardcoded in `map.py`
+4. **Comma-level universale**: Tutti articoli splittati per comma, nessun threshold
+5. **Zero-LLM pipeline**: Pure regex-based per reproducibilità scientifica
+
+### Test Coverage
+
+| Modulo | Test | Passati |
+|--------|------|---------|
+| comma_parser | 39 | 39 ✅ |
+| structural_chunker | 17 | 17 ✅ |
+| ingestion_pipeline_v2 | 21 | 21 ✅ |
+| bridge_builder | 14 | 14 ✅ |
+| **TOTALE** | **91** | **91 ✅** |
+
+### Prossimi Passi
+
+1. **Batch Ingestion Script** (~2-3 ore):
+   - Script per 887 articoli Libro IV
+   - Progress tracking e error handling
+   - Metriche: ~2500 chunks, ~11k bridge mappings
+
+2. **Embedding Generation** (~3-4 ore):
+   - E5-large via HuggingFace
+   - Batch processing dei chunks
+   - Storage in Qdrant
+
+3. **Integration Test End-to-End** (~2 ore):
+   - Full flow: Visualex → Parser → Chunker → Pipeline → Graph → Bridge → Qdrant
+
+### Note Importanti
+
+- ⚠️ **urngenerator.py**: NON MODIFICARE, usato dall'agent in real-time
+- ⚠️ **visualex_client.py**: NON MODIFICARE, funzioni core per scraping
+- ✅ **Schema LOCKED**: 21 properties per Norma, no changes senza migration
+- 📦 **Pipeline modulare**: Ogni componente testato indipendentemente
+
+---
+
 ## 2025-12-03 (Sera) - GraphAwareRetriever Implementato ✅
 
 **Durata**: ~3 ore
