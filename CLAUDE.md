@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Versione**: 3.0 | **Ultimo aggiornamento**: 2 Dicembre 2025
+> **Versione**: 3.1 | **Ultimo aggiornamento**: 3 Dicembre 2025
 
 Questo file contiene le istruzioni operative per Claude Code. Per i dettagli tecnici, consulta `docs/`.
 
@@ -11,11 +11,16 @@ Questo file contiene le istruzioni operative per Claude Code. Per i dettagli tec
 **Prima di iniziare ogni sessione, leggi:**
 1. `docs/claude-context/CURRENT_STATE.md` - Stato attuale e prossimi passi
 2. `docs/claude-context/PROGRESS_LOG.md` - Cosa è stato fatto
+3. `docs/experiments/INDEX.md` - Esperimenti in corso (se rilevanti)
 
 **Reference tecnico:**
 - `docs/SYSTEM_ARCHITECTURE.md` - Mappa completa del sistema
 - `docs/02-methodology/rlcf/RLCF.md` - Paper teorico RLCF
 - `docs/08-iteration/NEXT_STEPS.md` - Piano dettagliato
+
+**Per esperimenti:**
+- `docs/experiments/` - Documentazione esperimenti per tesi
+- `docs/experiments/TEMPLATE.md` - Template per nuovi esperimenti
 
 ---
 
@@ -27,11 +32,11 @@ Questo file contiene le istruzioni operative per Claude Code. Per i dettagli tec
 Query → [Preprocessing] → [Router LLM] → [3 Agents] → [4 Experts] → [Synthesis] → Answer
                               │                │              │
                               ▼                ▼              ▼
-                          OpenRouter      Neo4j/Qdrant    Claude/Gemini
-                          (API key)       (❌ vuoti)      (API key)
+                          OpenRouter      FalkorDB/Qdrant  Claude/Gemini
+                          (API key)       (in popolamento) (API key)
 ```
 
-**Stato**: 70% funzionante, ma database vuoti e mai testato end-to-end.
+**Stato**: Pipeline ingestion v2 completa. Pronto per batch 887 articoli Libro IV.
 
 ---
 
@@ -69,7 +74,8 @@ Query → [Preprocessing] → [Router LLM] → [3 Agents] → [4 Experts] → [S
 ```
 1. Aggiorna CURRENT_STATE.md con nuovo stato
 2. Aggiungi entry in PROGRESS_LOG.md
-3. Commit con messaggio semantico (feat:, fix:, docs:)
+3. Se esperimento: aggiorna docs/experiments/EXP-NNN/
+4. Commit con messaggio semantico (feat:, fix:, docs:)
 ```
 
 ### 4. Comunicazione
@@ -78,6 +84,19 @@ Query → [Preprocessing] → [Router LLM] → [3 Agents] → [4 Experts] → [S
 - Se vedi che vado nel teorico: fermami
 - Proponi soluzioni concrete con effort stimato
 - Domanda se qualcosa non è chiaro
+```
+
+### 5. Documentazione Esperimenti (per Tesi)
+```
+Per ogni esperimento significativo (ingestion, training, evaluation):
+1. Crea cartella EXP-NNN in docs/experiments/
+2. Compila DESIGN.md PRIMA di eseguire (ipotesi, metodologia)
+3. Documenta EXECUTION.md DURANTE l'esecuzione (comandi, errori)
+4. Registra RESULTS.md con metriche oggettive
+5. Analizza in ANALYSIS.md per la tesi (interpretazione, conclusioni)
+
+Naming: EXP-001_nome_descrittivo (snake_case, max 30 char)
+Status: PLANNED → RUNNING → COMPLETED/FAILED/ABANDONED
 ```
 
 ---
@@ -159,6 +178,15 @@ docs/
 │   ├── CURRENT_STATE.md     # Stato attuale sessione
 │   └── PROGRESS_LOG.md      # Log cronologico
 │
+├── experiments/             # 🧪 Esperimenti per tesi
+│   ├── INDEX.md             # Indice esperimenti
+│   ├── TEMPLATE.md          # Template nuovo esperimento
+│   └── EXP-NNN_nome/        # Cartella per esperimento
+│       ├── DESIGN.md        # Ipotesi, metodologia
+│       ├── EXECUTION.md     # Log esecuzione
+│       ├── RESULTS.md       # Metriche, output
+│       └── ANALYSIS.md      # Interpretazione
+│
 ├── 01-introduction/         # Vision e problem statement
 ├── 02-methodology/          # RLCF framework (paper teorico)
 ├── 03-architecture/         # 5 layer del sistema
@@ -192,6 +220,7 @@ docs/
 - [ ] Nessun import rotto
 - [ ] CURRENT_STATE.md aggiornato
 - [ ] PROGRESS_LOG.md aggiornato (se sessione significativa)
+- [ ] Esperimento documentato (se applicabile: docs/experiments/EXP-NNN/)
 - [ ] Commit message semantico
 
 ---
@@ -201,4 +230,11 @@ docs/
 - **Repo**: MERL-T_alpha (locale)
 - **Documentazione RLCF**: `docs/02-methodology/rlcf/RLCF.md`
 - **API Examples**: `docs/api/API_EXAMPLES.md`
+- **Esperimenti**: `docs/experiments/INDEX.md`
 
+---
+
+## Note Operative
+
+- Facciamo test solidi, quando possibile evita di mockare (preferisci integration test)
+- Documenta ogni esperimento significativo in `docs/experiments/`
