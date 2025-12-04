@@ -5,6 +5,48 @@
 
 ---
 
+## 2025-12-04 (Pomeriggio) - Hierarchical Tree Extraction ✅
+
+**Durata**: ~2 ore
+**Obiettivo**: Estendere treextractor.py per estrarre gerarchia completa da Normattiva
+**Risultato**: ✓ API gerarchica funzionante con test su Codice Civile
+
+### Completato
+
+1. **treextractor.py esteso** (`visualex/src/visualex_api/tools/treextractor.py` - +470 LOC):
+   - Dataclasses: `NormLevel` (enum), `NormNode`, `NormTree`
+   - Pattern extraction: `LEVEL_EXTRACT_PATTERNS` per Libro/Titolo/Capo/Sezione
+   - `get_hierarchical_tree(normurn)` → estrae struttura completa
+   - `get_article_position(tree, article_num)` → position string stile Brocardi
+   - `get_all_articles_with_positions(tree)` → batch processing
+   - `HierarchyState` per tracking parsing state
+
+2. **ingestion_pipeline_v2.py esteso** (+80 LOC):
+   - `HierarchyURNs` dataclass con `closest_parent()` method
+   - Estrazione Capo e Sezione (prima solo Libro/Titolo)
+   - Refactoring: 4 funzioni `_extract_*_titolo` → singola `_extract_hierarchy_title(position, level)`
+   - 24/24 test passano
+
+3. **Sincronizzazione**:
+   - Copia automatica su `backend/external_sources/visualex/tools/treextractor.py`
+
+### Test Results
+
+| Test | Risultato |
+|------|-----------|
+| Codice Civile articoli | 3,263 |
+| Libri identificati | 6 |
+| Art. 1453 position | "Libro IV - DELLE OBBLIGAZIONI, Titolo II - DEI CONTRATTI IN GENERALE, Capo XIV - Della risoluzione del contratto, Sezione I - Della risoluzione per inadempimento" |
+| ingestion_pipeline_v2 tests | 24/24 ✓ |
+
+### Note
+
+- L'estrazione da Normattiva serve come fallback quando Brocardi non è disponibile
+- Normattiva usa struttura HTML flat (non nested) → algoritmo adattato
+- Articoli senza gerarchia (es. Disposizioni sulla legge) restano senza position
+
+---
+
 ## 2025-12-04 (Notte Tarda) - EXP-001 Re-run con Brocardi COMPLETO ✅
 
 **Durata**: ~3 ore

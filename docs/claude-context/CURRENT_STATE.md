@@ -9,8 +9,8 @@
 
 | Campo | Valore |
 |-------|--------|
-| **Data ultimo aggiornamento** | 4 Dicembre 2025 (02:30) |
-| **Fase progetto** | **EXP-001 COMPLETATO con Brocardi** - 887 articoli + 3,346 nodi totali |
+| **Data ultimo aggiornamento** | 4 Dicembre 2025 (15:30) |
+| **Fase progetto** | **Hierarchical Tree Extraction** - treextractor.py + pipeline estesa |
 | **Prossimo obiettivo** | Embedding generation + Query testing |
 | **Blocchi attivi** | Nessuno |
 
@@ -39,7 +39,34 @@
 
 ---
 
-## Cosa Abbiamo Fatto (Sessione Corrente - 4 Dic 2025, Notte Tarda)
+## Cosa Abbiamo Fatto (Sessione Corrente - 4 Dic 2025, Pomeriggio)
+
+### Hierarchical Tree Extraction - COMPLETATO ✅
+
+- [x] **treextractor.py esteso** ✅:
+  - Dataclasses: `NormLevel`, `NormNode`, `NormTree` per struttura gerarchica
+  - `get_hierarchical_tree()`: estrae Libro→Titolo→Capo→Sezione→Articolo
+  - `get_article_position()`: restituisce position string stile Brocardi
+  - `get_all_articles_with_positions()`: per batch processing
+  - Test con Codice Civile: 3,263 articoli, 6 Libri
+  - Art. 1453 position: "Libro IV - DELLE OBBLIGAZIONI, Titolo II - DEI CONTRATTI IN GENERALE, Capo XIV - Della risoluzione del contratto, Sezione I - Della risoluzione per inadempimento"
+
+- [x] **ingestion_pipeline_v2.py esteso** ✅:
+  - `HierarchyURNs` dataclass con `closest_parent()` method
+  - Estrazione Capo e Sezione (prima solo Libro/Titolo)
+  - Refactoring: 4 `_extract_*_titolo` duplicate → singola `_extract_hierarchy_title(position, level)`
+  - 24/24 test passano
+
+- [x] **Sincronizzazione backend** ✅:
+  - Copia su `backend/external_sources/visualex/tools/treextractor.py`
+
+### Note:
+- L'estrazione gerarchica da Normattiva serve come fallback quando Brocardi non è disponibile
+- Gli articoli senza gerarchia (es. Art. 1-2 CC, Disposizioni sulla legge) restano senza position
+
+---
+
+## Cosa Abbiamo Fatto (Sessione Precedente - 4 Dic 2025, Notte Tarda)
 
 ### EXP-001 Re-run con Brocardi Enrichment Integrato - COMPLETATO ✅
 
