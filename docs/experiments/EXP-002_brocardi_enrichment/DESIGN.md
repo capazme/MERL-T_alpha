@@ -1,10 +1,40 @@
 # EXP-002: Brocardi Enrichment - Libro IV
 
-> **Status**: PLANNED
-> **Data inizio**: -
-> **Data fine**: -
+> **Status**: ABSORBED INTO EXP-001
+> **Data**: 2025-12-04
 > **Autore**: Guglielmo Puzio
-> **Prerequisito**: EXP-001 (completato)
+> **Nota**: Questo esperimento è stato integrato direttamente nel Run 2 di EXP-001
+
+---
+
+## NOTA IMPORTANTE
+
+Questo esperimento **non è stato eseguito come esperimento separato**.
+
+Durante la preparazione, abbiamo deciso di integrare l'enrichment Brocardi direttamente nella pipeline di ingestion (EXP-001 Run 2). I motivi:
+
+1. **Efficienza**: Un singolo pass sui dati invece di due
+2. **Consistenza**: Nodi creati già con tutti i dati disponibili
+3. **Semplicità**: Meno complessità operativa
+
+### Risultati Ottenuti (in EXP-001 Run 2)
+
+I risultati che sarebbero stati prodotti da EXP-002 sono stati raggiunti in EXP-001:
+
+| Metrica Target EXP-002 | Target | Risultato EXP-001 |
+|------------------------|--------|-------------------|
+| Coverage Relazioni | >80% | ~92% (Dottrina) |
+| Nuovi link :cita | >2000 | 23,056 :interpreta |
+| Error rate | <5% | 0% |
+| Tempo | <90 min | 7 min (cache) |
+
+### Documentazione Storica
+
+Il resto di questo documento è mantenuto per **riferimento storico** e mostra il design originale dell'esperimento prima dell'integrazione.
+
+---
+
+## Design Originale (Pre-Integrazione)
 
 ---
 

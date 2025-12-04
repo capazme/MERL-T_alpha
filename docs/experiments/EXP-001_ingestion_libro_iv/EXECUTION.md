@@ -222,4 +222,93 @@ stato: vigente
 
 ---
 
-*Log aggiornato: 2025-12-04 00:15*
+## Run 2: Con Brocardi Enrichment (4 dicembre 2025)
+
+### Contesto
+
+Dopo la scoperta che BrocardiScraper non funzionava nella Run 1, è stato ampliato per:
+1. Estrarre **Relazioni Guardasigilli** (1941/1942) via AJAX
+2. Parsing strutturato di **massime giurisprudenziali**
+3. Estrazione **Ratio** e **Spiegazione**
+
+Durante la preparazione della Run 2, si è verificato un **data loss** dovuto alla chiusura accidentale di Docker Desktop. Tutti i dati della Run 1 sono stati persi.
+
+### Fix Applicati
+
+| Problema | Soluzione |
+|----------|-----------|
+| Data loss Docker | Local bind mounts (`./data/`) invece di Docker volumes |
+| FalkorDB non persistente | `--save 10 1 --appendonly yes` |
+| Mount path errato | `/var/lib/falkordb/data` corretto |
+| `'str' object has no attribute 'get'` | `isinstance(brocardi_info, dict)` checks |
+| Massime come stringhe | Conversione automatica `str → dict` |
+| Bridge Table non esistente | `psql -f schema.sql` |
+
+### Esecuzione Run 2
+
+**Inizio**: 2025-12-04 02:17:00
+**Fine**: 2025-12-04 02:24:00
+**Durata**: ~7 minuti
+
+```bash
+# Comando eseguito:
+source .venv/bin/activate && python scripts/batch_ingest_libro_iv.py > logs/exp001.log 2>&1
+```
+
+### Progress Log Run 2
+
+| Timestamp | Articoli | Note |
+|-----------|----------|------|
+| 02:17:00 | 0/887 | Ingestion avviata |
+| 02:20:00 | ~400/887 | ~45% - Brocardi enrichment attivo |
+| 02:24:00 | 887/887 | **COMPLETATO** - 0 errori |
+
+### Metriche Finali Run 2
+
+| Metrica | Run 1 | Run 2 | Delta |
+|---------|-------|-------|-------|
+| Tempo totale | 41 min | **7 min** | -83% (cache) |
+| Articoli processati | 887 | 887 | - |
+| Errori | 0 | 0 | - |
+| **Nodi totali** | 890 | **3,346** | +274% |
+| - Norma | 890 | 889 | - |
+| - Dottrina | 0 | 1,630 | +∞ |
+| - AttoGiudiziario | 0 | 827 | +∞ |
+| **Relazioni totali** | 892 | **25,574** | +2,768% |
+| - :contiene | 888 | 888 | - |
+| - :commenta | 0 | 1,630 | +∞ |
+| - :interpreta | 0 | 23,056 | +∞ |
+| Bridge mappings | 2,546 | 2,546 | - |
+
+### Validazione Run 2
+
+```cypher
+-- Count nodi per tipo
+MATCH (n) RETURN labels(n)[0] as tipo, count(n) as count ORDER BY count DESC
+
+-- Output:
+-- Dottrina: 1,630
+-- Norma: 889
+-- AttoGiudiziario: 827
+```
+
+```cypher
+-- Count relazioni per tipo
+MATCH ()-[r]->() RETURN type(r) as tipo, count(r) as count ORDER BY count DESC
+
+-- Output:
+-- :interpreta: 23,056
+-- :commenta: 1,630
+-- :contiene: 888
+```
+
+### Nota sul Tempo di Esecuzione
+
+Il Run 2 è stato significativamente più veloce (7 min vs 41 min) grazie alla **cache di Brocardi**:
+- Il BrocardiScraper usa `@cached(ttl=86400)` con `Cache.MEMORY`
+- Gli articoli cercati nella Run 1 erano già in cache
+- Il tempo reale senza cache sarebbe ~60-90 minuti
+
+---
+
+*Log aggiornato: 2025-12-04 02:45*

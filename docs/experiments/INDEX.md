@@ -10,8 +10,9 @@
 ### Fase 1: Data Ingestion
 | ID | Nome | Status | Data | RQ | Descrizione |
 |----|------|--------|------|-----|-------------|
-| [EXP-001](./EXP-001_ingestion_libro_iv/) | ingestion_libro_iv | **COMPLETED** | 2025-12-04 | RQ1,RQ2 | Prima ingestion completa: 887 articoli Libro IV CC |
-| [EXP-002](./EXP-002_brocardi_enrichment/) | brocardi_enrichment | **RUNNING** | 2025-12-04 | RQ3 | Enrichment Brocardi: Relazioni Guardasigilli, link articoli citati |
+| [EXP-001](./EXP-001_ingestion_libro_iv/) | ingestion_libro_iv | **COMPLETED** | 2025-12-03/04 | RQ1-4 | Ingestion completa 887 articoli Libro IV CC con Brocardi enrichment |
+
+> **Nota**: EXP-002 (Brocardi Enrichment) è stato integrato direttamente in EXP-001 durante il re-run del 4 dicembre 2025. La documentazione in `EXP-002_brocardi_enrichment/` è mantenuta per riferimento storico.
 
 ### Fase 2: Retrieval & Search
 | ID | Nome | Status | Data | RQ | Descrizione |
@@ -34,9 +35,9 @@
 
 | Metrica | Valore |
 |---------|--------|
-| Esperimenti totali | 2 |
+| Esperimenti totali | 1 |
 | Completati | **1** |
-| In corso | **1** |
+| In corso | 0 |
 | Pianificati | 0 |
 | Falliti | 0 |
 
@@ -45,33 +46,59 @@
 ## Timeline
 
 ```
-2025-12
-├── 03: EXP-001 creato (PLANNED)
-├── 03: EXP-001 avviato (RUNNING)
-├── 04: EXP-001 completato (COMPLETED) - 100% success, 887 articoli
-├── 04: BrocardiScraper ampliato (Relazioni Guardasigilli)
-├── 04: EXP-002 creato (PLANNED)
-├── 04: MAPPING.md + batch_enrich_brocardi.py creati
-├── 04: Test subset (Art. 1285-1287) - PASSED
-└── 04: EXP-002 avviato (RUNNING)
+2025-12-03
+├── EXP-001 design document creato
+├── Pipeline v2 completata (CommaParser + StructuralChunker + IngestionPipelineV2)
+├── EXP-001 Run 1 avviato (23:32)
+└── EXP-001 Run 1 completato (00:14) - 890 nodi, 892 relazioni (solo Normattiva)
 
-2025-01
-└── ...
+2025-12-04
+├── BrocardiScraper ampliato (Relazioni Guardasigilli)
+├── Data loss Docker → fix persistenza locale (./data/)
+├── Bug fix pipeline (isinstance checks, massime conversion)
+├── EXP-001 Run 2 avviato (02:17) - con Brocardi integrato
+└── EXP-001 Run 2 completato (02:24) - 3,346 nodi, 25,574 relazioni
 ```
 
 ---
 
 ## Research Questions Coverage
 
-| RQ | Esperimenti | Status |
-|----|-------------|--------|
-| RQ1: Chunking comma-level | EXP-001 | **Completed** |
-| RQ2: Struttura gerarchica | EXP-001 | **Completed** |
-| RQ3: Enrichment Brocardi | EXP-002 | Planned |
-| RQ4: Bridge Table performance | - | Not started |
-| RQ5: Expert specialization | - | Not started |
-| RQ6: RLCF convergence | - | Not started |
+| RQ | Descrizione | Esperimento | Status |
+|----|-------------|-------------|--------|
+| RQ1 | Chunking comma-level preserva integrità semantica? | EXP-001 | **Verified** ✅ |
+| RQ2 | Struttura gerarchica migliora navigabilità? | EXP-001 | **Verified** ✅ |
+| RQ3 | Enrichment Brocardi aggiunge valore misurabile? | EXP-001 | **Verified** ✅ |
+| RQ4 | Bridge Table riduce latenza vs join runtime? | EXP-001 | **Data Ready** |
+| RQ5 | Expert specialization migliora qualità? | - | Not started |
+| RQ6 | RLCF converge a pesi ottimali? | - | Not started |
 
 ---
 
-*Ultimo aggiornamento: 2025-12-04*
+## Risultati Chiave EXP-001
+
+### Run 1 (3 dicembre 2025) - Solo Normattiva
+| Metrica | Valore |
+|---------|--------|
+| Articoli | 887/887 (100%) |
+| Nodi Norma | 890 |
+| Relazioni | 892 |
+| Dottrina | 0 |
+| AttoGiudiziario | 0 |
+
+### Run 2 (4 dicembre 2025) - Con Brocardi
+| Metrica | Valore | Delta |
+|---------|--------|-------|
+| Articoli | 887/887 (100%) | - |
+| Nodi totali | **3,346** | +274% |
+| - Norma | 889 | - |
+| - Dottrina | 1,630 | +∞ |
+| - AttoGiudiziario | 827 | +∞ |
+| Relazioni totali | **25,574** | +2,768% |
+| - :interpreta | 23,056 | +∞ |
+| - :commenta | 1,630 | +∞ |
+| - :contiene | 888 | - |
+
+---
+
+*Ultimo aggiornamento: 2025-12-04 02:45*

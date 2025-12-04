@@ -99,3 +99,5 @@ dump.rdb
 *shm
 *wal
 *.piddata/
+*db*
+data/*

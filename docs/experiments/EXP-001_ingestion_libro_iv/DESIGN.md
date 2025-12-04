@@ -4,7 +4,15 @@
 > **Data inizio**: 2025-12-03
 > **Data fine**: 2025-12-04
 > **Autore**: Guglielmo Puzio
-> **Git commit**: 48814f1
+> **Git commits**: 48814f1 (Run 1), e435379 (Run 2 con Brocardi)
+
+## Executive Summary
+
+Questo esperimento ha validato la pipeline di ingestion MERL-T attraverso due esecuzioni:
+- **Run 1** (3 dic): Solo Normattiva → 890 nodi, 892 relazioni
+- **Run 2** (4 dic): Con Brocardi enrichment integrato → 3,346 nodi, 25,574 relazioni
+
+Il Run 2 ha dimostrato un incremento del **+274%** nei nodi e **+2,768%** nelle relazioni grazie all'integrazione di dottrina e giurisprudenza da Brocardi.it.
 
 ---
 
