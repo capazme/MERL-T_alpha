@@ -30,6 +30,12 @@ from .comma_parser import CommaParser, ArticleStructure, parse_article
 from .structural_chunker import StructuralChunker, Chunk, chunk_article
 from .visualex_ingestion import VisualexArticle, NormaMetadata
 
+# Import hierarchical tree extraction for fallback when Brocardi not available
+from backend.external_sources.visualex.tools.treextractor import (
+    NormTree,
+    get_article_position,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -153,6 +159,7 @@ class IngestionPipelineV2:
         self,
         article: VisualexArticle,
         create_graph_nodes: bool = True,
+        norm_tree: Optional[NormTree] = None,
     ) -> IngestionResult:
         """
         Ingest a single article with comma-level chunking.
@@ -160,6 +167,7 @@ class IngestionPipelineV2:
         Args:
             article: VisualexArticle from API
             create_graph_nodes: Whether to create graph nodes (default True)
+            norm_tree: Optional NormTree for hierarchy extraction when Brocardi not available
 
         Returns:
             IngestionResult with chunks, mappings, and graph info
@@ -176,10 +184,16 @@ class IngestionPipelineV2:
         # Step 1: Parse article text into commas
         article_structure = self.parser.parse(article.article_text)
 
-        # Step 2: Get Brocardi position for context
+        # Step 2: Get position for hierarchy (Brocardi first, treextractor fallback)
         brocardi_position = None
         if article.brocardi_info and isinstance(article.brocardi_info, dict):
             brocardi_position = article.brocardi_info.get("Position")
+
+        # Fallback to treextractor if Brocardi not available
+        if not brocardi_position and norm_tree:
+            brocardi_position = get_article_position(norm_tree, meta.numero_articolo)
+            if brocardi_position:
+                logger.info(f"Using treextractor position for {meta.numero_articolo}: {brocardi_position}")
 
         # Step 3: Create chunks (one per comma)
         chunks = self.chunker.chunk_article(
@@ -800,6 +814,7 @@ async def ingest_article_v2(
     article: VisualexArticle,
     falkordb_client=None,
     create_graph: bool = True,
+    norm_tree: Optional[NormTree] = None,
 ) -> IngestionResult:
     """
     Convenience function to ingest an article with v2 pipeline.
@@ -808,12 +823,15 @@ async def ingest_article_v2(
         article: VisualexArticle from API
         falkordb_client: Optional FalkorDB client
         create_graph: Whether to create graph nodes
+        norm_tree: Optional NormTree for hierarchy extraction when Brocardi not available
 
     Returns:
         IngestionResult with chunks and mappings
     """
     pipeline = IngestionPipelineV2(falkordb_client=falkordb_client)
-    return await pipeline.ingest_article(article, create_graph_nodes=create_graph)
+    return await pipeline.ingest_article(
+        article, create_graph_nodes=create_graph, norm_tree=norm_tree
+    )
 
 
 __all__ = [
@@ -821,4 +839,7 @@ __all__ = [
     "IngestionResult",
     "BridgeMapping",
     "ingest_article_v2",
+    # Re-export for convenience
+    "NormTree",
+    "get_article_position",
 ]

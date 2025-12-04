@@ -299,6 +299,62 @@ class TestIngestArticleWithoutGraph:
         # Should still have PRIMARY mappings
         assert len(result.bridge_mappings) >= 1
 
+    async def test_ingest_with_treextractor_fallback(self, sample_article_no_brocardi):
+        """Test that treextractor fallback provides hierarchy when Brocardi not available."""
+        from backend.external_sources.visualex.tools.treextractor import (
+            NormTree, NormNode, NormLevel
+        )
+
+        # Create mock NormTree with hierarchy for art. 1453
+        mock_tree = NormTree(
+            base_urn="urn:test",
+            children=[
+                NormNode(
+                    level=NormLevel.LIBRO,
+                    number="IV",
+                    title="Delle obbligazioni",
+                    children=[
+                        NormNode(
+                            level=NormLevel.TITOLO,
+                            number="II",
+                            title="Dei contratti in generale",
+                            children=[
+                                NormNode(
+                                    level=NormLevel.CAPO,
+                                    number="XIV",
+                                    title="Della risoluzione del contratto",
+                                    children=[
+                                        NormNode(
+                                            level=NormLevel.ARTICOLO,
+                                            number="1453",
+                                            url="https://test/art1453"
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+
+        pipeline = IngestionPipelineV2()
+        result = await pipeline.ingest_article(
+            article=sample_article_no_brocardi,
+            create_graph_nodes=False,
+            norm_tree=mock_tree,
+        )
+
+        # Should have HIERARCHIC mappings from treextractor
+        hierarchic = [m for m in result.bridge_mappings if m.mapping_type == "HIERARCHIC"]
+        assert len(hierarchic) > 0, "Treextractor fallback should provide HIERARCHIC mappings"
+
+        # Check that libro, titolo, capo are in the mappings
+        hierarchic_urns = [m.graph_node_urn for m in hierarchic]
+        assert any("libro4" in urn for urn in hierarchic_urns), "Should have libro mapping"
+        assert any("tit2" in urn for urn in hierarchic_urns), "Should have titolo mapping"
+        assert any("capo14" in urn for urn in hierarchic_urns), "Should have capo mapping"
+
 
 @pytest.mark.asyncio
 class TestIngestArticleWithGraph:
