@@ -37,6 +37,16 @@ class RequestConfig:
     retry_delay: float = RETRY_DELAY
 
 
+@dataclass
+class RelazioneContent:
+    """Contenuto di una Relazione storica (Guardasigilli)."""
+    tipo: str  # "libro_obbligazioni" o "codice_civile"
+    titolo: str
+    numero_paragrafo: Optional[str]
+    testo: str
+    articoli_citati: List[Dict[str, str]]  # [{"numero": "1286", "titolo": "...", "url": "..."}]
+
+
 class BrocardiScraper(BaseScraper):
     def __init__(self) -> None:
         log.info("Initializing BrocardiScraper")
@@ -44,6 +54,92 @@ class BrocardiScraper(BaseScraper):
         self.request_config = RequestConfig()
         # Semaforo per limitare le richieste concorrenti
         self.semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
+    @staticmethod
+    def _clean_text(text: str) -> str:
+        """
+        Pulisce il testo estratto dall'HTML.
+
+        - Normalizza whitespace (newlines, spazi multipli → spazio singolo)
+        - Rimuove spazi iniziali/finali
+        - Gestisce encoding UTF-8
+        """
+        if not text:
+            return ""
+        # Normalizza newlines e whitespace
+        cleaned = re.sub(r'\s+', ' ', text)
+        # Strip e ritorna
+        return cleaned.strip()
+
+    def _parse_massima(self, sentenza_div) -> Optional[Dict[str, Any]]:
+        """
+        Parsa una singola massima giurisprudenziale dalla struttura HTML Brocardi.
+
+        HTML structure:
+        <div class="sentenza corpoDelTesto">
+            <p><strong>Cass. civ. n. 36918/2021</strong></p>
+            <p>Testo della massima...</p>
+        </div>
+
+        Returns:
+            Dict with: autorita, numero, anno, massima (text)
+            or None if parsing fails
+        """
+        try:
+            result = {
+                'autorita': None,
+                'numero': None,
+                'anno': None,
+                'massima': None
+            }
+
+            # Find the header with case number (usually in <strong>)
+            header = sentenza_div.find('strong')
+            if header:
+                header_text = header.get_text(strip=True)
+
+                # Parse "Cass. civ. n. 36918/2021" or "Cass. pen. n. 1234/2020"
+                # Pattern: (Autorita) n. (Numero)/(Anno)
+                match = re.match(
+                    r'^(Cass\.\s*(?:civ|pen|lav|sez\.\s*un)?\.?)\s*n\.\s*(\d+)/(\d{4})',
+                    header_text,
+                    re.IGNORECASE
+                )
+                if match:
+                    result['autorita'] = match.group(1).strip()
+                    result['numero'] = match.group(2)
+                    result['anno'] = match.group(3)
+                else:
+                    # Fallback: try to extract any number/year pattern
+                    num_match = re.search(r'n\.\s*(\d+)/(\d{4})', header_text)
+                    if num_match:
+                        result['numero'] = num_match.group(1)
+                        result['anno'] = num_match.group(2)
+                    # Extract autorita from beginning
+                    auth_match = re.match(r'^(Cass[^\d]*)', header_text)
+                    if auth_match:
+                        result['autorita'] = auth_match.group(1).strip().rstrip('.')
+
+            # Get full text (excluding the header)
+            full_text = self._clean_text(sentenza_div.get_text())
+
+            # Remove the header part from the text to get just the massima
+            if result['numero'] and result['anno']:
+                # Pattern to remove: "Cass. civ. n. 36918/2021"
+                pattern = rf'Cass[^n]*n\.\s*{result["numero"]}/{result["anno"]}\s*'
+                massima_text = re.sub(pattern, '', full_text, count=1).strip()
+                result['massima'] = massima_text if massima_text else full_text
+            else:
+                result['massima'] = full_text
+
+            # Only return if we have at least massima text
+            if result['massima']:
+                return result
+
+        except Exception as e:
+            log.warning(f"Error parsing massima: {e}")
+
+        return None
 
     async def _make_request_with_retry(self, session: aiohttp.ClientSession, url: str, 
                                        config: RequestConfig = None) -> Optional[str]:
@@ -90,10 +186,30 @@ class BrocardiScraper(BaseScraper):
             raise ValueError("Invalid norma format")
 
         search_str = norma_str.lower()
+
+        # Prima prova: ricerca esatta
         for txt, link in self.knowledge[0].items():
             if search_str in txt.lower():
-                log.info(f"Knowledge found for norma: {norma_visitata}")
+                log.info(f"Knowledge found (exact) for norma: {norma_visitata}")
                 return txt, link
+
+        # Seconda prova: ricerca per tipo_atto (es. "codice civile")
+        # Utile quando il formato data non matcha (ISO vs italiano)
+        if hasattr(norma_visitata, 'norma') and norma_visitata.norma:
+            tipo_atto = norma_visitata.norma.tipo_atto_str.lower()
+            for txt, link in self.knowledge[0].items():
+                txt_lower = txt.lower()
+                # Match per tipo_atto + numero_atto
+                if tipo_atto in txt_lower:
+                    # Verifica anche numero_atto se presente
+                    if norma_visitata.norma.numero_atto:
+                        if f"n. {norma_visitata.norma.numero_atto}" in txt_lower:
+                            log.info(f"Knowledge found (fuzzy) for norma: {norma_visitata}")
+                            return txt, link
+                    else:
+                        # Solo tipo_atto (es. "costituzione")
+                        log.info(f"Knowledge found (tipo_atto) for norma: {norma_visitata}")
+                        return txt, link
 
         log.warning(f"No knowledge found for norma: {norma_visitata}")
         return None
@@ -229,6 +345,12 @@ class BrocardiScraper(BaseScraper):
     async def get_info(self, norma_visitata: NormaVisitata) -> Tuple[Optional[str], Dict[str, Any], Optional[str]]:
         """
         Ottiene le informazioni della norma con gestione errori migliorata.
+
+        Returns:
+            Tuple con:
+            - Position (breadcrumb)
+            - Dict con: Brocardi, Ratio, Spiegazione, Massime, Relazioni
+            - URL della pagina Brocardi
         """
         log.info(f"Getting info for norma: {norma_visitata}")
 
@@ -240,20 +362,35 @@ class BrocardiScraper(BaseScraper):
 
             session = await http_client.get_session()
             html_text = await self._make_request_with_retry(session, norma_link)
-            
+
             if not html_text:
                 log.error(f"Failed to retrieve content for norma link: {norma_link}")
                 return None, {}, None
-                
+
             soup = BeautifulSoup(html_text, 'html.parser')
 
             info: Dict[str, Any] = {}
             info['Position'] = self._extract_position(soup)
             self._extract_sections(soup, info)
-            
+
+            # Estrai Relazioni storiche (Guardasigilli)
+            relazioni = await self._extract_relazioni(soup, session)
+            if relazioni:
+                info['Relazioni'] = [
+                    {
+                        'tipo': r.tipo,
+                        'titolo': r.titolo,
+                        'numero_paragrafo': r.numero_paragrafo,
+                        'testo': r.testo,
+                        'articoli_citati': r.articoli_citati
+                    }
+                    for r in relazioni
+                ]
+                log.info(f"Extracted {len(relazioni)} relazioni for {norma_visitata}")
+
             log.info(f"Successfully extracted info for norma: {norma_visitata}")
             return info.get('Position'), info, norma_link
-            
+
         except Exception as e:
             log.error(f"Unexpected error in get_info for {norma_visitata}: {e}")
             return None, {}, None
@@ -263,12 +400,15 @@ class BrocardiScraper(BaseScraper):
         try:
             position_tag = soup.find('div', id='breadcrumb', recursive=True)
             if position_tag:
-                # Mantiene la logica originale di slicing
-                position = position_tag.get_text(strip=False).replace('\n', '').replace('  ', '')[17:]
-                return position if position.strip() else None
+                # Pulisci e normalizza il breadcrumb
+                position = self._clean_text(position_tag.get_text())
+                # Rimuovi prefisso "Brocardi.it > "
+                if position.startswith("Brocardi.it"):
+                    position = position[17:].strip(" >")
+                return position if position else None
         except Exception as e:
             log.warning(f"Error extracting position: {e}")
-        
+
         log.warning("Breadcrumb position not found")
         return None
 
@@ -284,7 +424,10 @@ class BrocardiScraper(BaseScraper):
             try:
                 brocardi_sections = corpo.find_all('div', class_='brocardi-content')
                 if brocardi_sections:
-                    info['Brocardi'] = [section.get_text(strip=False) for section in brocardi_sections]
+                    info['Brocardi'] = [
+                        self._clean_text(section.get_text())
+                        for section in brocardi_sections
+                    ]
             except Exception as e:
                 log.warning(f"Error extracting Brocardi sections: {e}")
 
@@ -294,7 +437,7 @@ class BrocardiScraper(BaseScraper):
                 if ratio_section:
                     ratio_text = ratio_section.find('div', class_='corpoDelTesto')
                     if ratio_text:
-                        info['Ratio'] = ratio_text.get_text(strip=False)
+                        info['Ratio'] = self._clean_text(ratio_text.get_text())
             except Exception as e:
                 log.warning(f"Error extracting Ratio section: {e}")
 
@@ -304,17 +447,24 @@ class BrocardiScraper(BaseScraper):
                 if spiegazione_header:
                     spiegazione_content = spiegazione_header.find_next_sibling('div', class_='text')
                     if spiegazione_content:
-                        info['Spiegazione'] = spiegazione_content.get_text(strip=False)
+                        info['Spiegazione'] = self._clean_text(spiegazione_content.get_text())
             except Exception as e:
                 log.warning(f"Error extracting Spiegazione section: {e}")
 
-            # Estrazione Massime
+            # Estrazione Massime - FIXED: parse structured sentenze
             try:
                 massime_header = corpo.find('h3', string=lambda text: text and "Massime relative all'art" in text)
                 if massime_header:
                     massime_content = massime_header.find_next_sibling('div', class_='text')
                     if massime_content:
-                        info['Massime'] = [massima.get_text(strip=False) for massima in massime_content]
+                        # Find all sentenza divs (not iterate over all children!)
+                        sentenze_divs = massime_content.find_all('div', class_='sentenza')
+                        info['Massime'] = []
+                        for sentenza_div in sentenze_divs:
+                            parsed = self._parse_massima(sentenza_div)
+                            if parsed:
+                                info['Massime'].append(parsed)
+                        log.debug(f"Extracted {len(info['Massime'])} massime")
             except Exception as e:
                 log.warning(f"Error extracting Massime section: {e}")
                 
@@ -337,5 +487,143 @@ class BrocardiScraper(BaseScraper):
                 return norma_visitata.strip()
         except Exception as e:
             log.error(f"Error building norma string: {e}")
-        
+
         return None
+
+    def _extract_object_id(self, soup: BeautifulSoup) -> Optional[str]:
+        """Estrae l'object_id dalla pagina (usato per chiamate AJAX)."""
+        try:
+            # Cerca data-object-id nel button di download PDF
+            button = soup.find('button', class_='button-download-pdf')
+            if button and button.get('data-object-id'):
+                return button.get('data-object-id')
+
+            # Fallback: cerca nel pattern hierarchy-paragraphs
+            html_str = str(soup)
+            match = re.search(r'hierarchy-paragraphs:(\d+):', html_str)
+            if match:
+                return match.group(1)
+
+        except Exception as e:
+            log.warning(f"Error extracting object_id: {e}")
+
+        return None
+
+    async def _fetch_relazione(self, session: aiohttp.ClientSession, object_id: str,
+                               content_type: int) -> Optional[str]:
+        """
+        Recupera il contenuto della Relazione via AJAX.
+
+        Args:
+            object_id: ID dell'articolo su Brocardi
+            content_type: 1 = Relazione al Codice Civile, 3 = Relazione al Libro delle Obbligazioni
+        """
+        url = f"{BASE_URL}/ws.php?action=articolo:hierarchy-paragraphs:{object_id}:{content_type}"
+
+        try:
+            headers = {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Referer': BASE_URL
+            }
+            async with self.semaphore:
+                timeout = aiohttp.ClientTimeout(total=self.request_config.timeout)
+                async with session.get(url, timeout=timeout, headers=headers) as response:
+                    if response.status == 200:
+                        return await response.text()
+        except Exception as e:
+            log.warning(f"Error fetching relazione (type={content_type}): {e}")
+
+        return None
+
+    def _parse_relazione_content(self, html: str, tipo: str) -> Optional[RelazioneContent]:
+        """
+        Parsa il contenuto HTML della Relazione.
+
+        Args:
+            html: HTML restituito dall'endpoint AJAX
+            tipo: "libro_obbligazioni" o "codice_civile"
+        """
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
+            corpo = soup.find('div', class_='corpoDelTesto')
+
+            if not corpo:
+                return None
+
+            # Estrai numero paragrafo
+            numero_span = corpo.find('span', class_='paragrafo-numero')
+            numero_paragrafo = numero_span.get_text(strip=True) if numero_span else None
+
+            # Estrai articoli citati (link interni)
+            articoli_citati = []
+            for link in corpo.find_all('a', href=True):
+                href = link.get('href', '')
+                if '/art' in href and '.html' in href:
+                    # Estrai numero articolo dal link
+                    match = re.search(r'/art(\d+[a-z]*)\.html', href)
+                    if match:
+                        articoli_citati.append({
+                            'numero': match.group(1),
+                            'titolo': link.get('title', ''),
+                            'url': href if href.startswith('http') else f"{BASE_URL}{href}"
+                        })
+
+            # Estrai testo completo (rimuovendo il numero paragrafo)
+            if numero_span:
+                numero_span.decompose()
+            testo = self._clean_text(corpo.get_text())
+
+            # Determina titolo
+            titolo = ("Relazione al Libro delle Obbligazioni (1941)"
+                     if tipo == "libro_obbligazioni"
+                     else "Relazione al Codice Civile (1942)")
+
+            return RelazioneContent(
+                tipo=tipo,
+                titolo=titolo,
+                numero_paragrafo=numero_paragrafo,
+                testo=testo,
+                articoli_citati=articoli_citati
+            )
+
+        except Exception as e:
+            log.warning(f"Error parsing relazione content: {e}")
+
+        return None
+
+    async def _extract_relazioni(self, soup: BeautifulSoup,
+                                  session: aiohttp.ClientSession) -> List[RelazioneContent]:
+        """
+        Estrae le Relazioni storiche (Guardasigilli) dalla pagina.
+
+        Returns:
+            Lista di RelazioneContent con i testi delle relazioni e gli articoli citati
+        """
+        relazioni = []
+
+        try:
+            object_id = self._extract_object_id(soup)
+            if not object_id:
+                log.debug("No object_id found, skipping relazioni extraction")
+                return relazioni
+
+            # Relazione al Libro delle Obbligazioni (content_type=3)
+            html_libro = await self._fetch_relazione(session, object_id, 3)
+            if html_libro:
+                relazione = self._parse_relazione_content(html_libro, "libro_obbligazioni")
+                if relazione and relazione.testo:
+                    relazioni.append(relazione)
+                    log.debug(f"Extracted Relazione Libro Obbligazioni (§{relazione.numero_paragrafo})")
+
+            # Relazione al Codice Civile (content_type=1)
+            html_codice = await self._fetch_relazione(session, object_id, 1)
+            if html_codice:
+                relazione = self._parse_relazione_content(html_codice, "codice_civile")
+                if relazione and relazione.testo:
+                    relazioni.append(relazione)
+                    log.debug(f"Extracted Relazione Codice Civile (§{relazione.numero_paragrafo})")
+
+        except Exception as e:
+            log.warning(f"Error extracting relazioni: {e}")
+
+        return relazioni

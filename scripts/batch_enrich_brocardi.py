@@ -214,6 +214,55 @@ class BrocardiEnrichmentRunner:
             "tipologia": "massima"
         }
 
+    def _parse_massima_dict(self, massima: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Parsa una massima dal nuovo formato dict di BrocardiScraper._parse_massima.
+
+        Input: {'autorita': 'Cass. civ.', 'numero': '36918', 'anno': '2021', 'massima': 'text...'}
+        Output: dict uniforme per creazione nodo AttoGiudiziario
+        """
+        autorita = massima.get("autorita", "")
+        numero = massima.get("numero", "")
+        anno = massima.get("anno", "")
+        testo = massima.get("massima", "")
+
+        if not testo:
+            return None
+
+        # Determina materia da autorita
+        materia = "Diritto civile"
+        materia_code = "civ"
+        if autorita:
+            autorita_lower = autorita.lower()
+            if "pen" in autorita_lower:
+                materia = "Diritto penale"
+                materia_code = "pen"
+            elif "lav" in autorita_lower:
+                materia = "Diritto del lavoro"
+                materia_code = "lav"
+
+        # Genera node_id univoco
+        node_id = f"atto:cass:{materia_code}:{numero}:{anno}" if numero and anno else f"atto:generic:{hash(testo) % 1000000}"
+
+        # Estremi
+        if numero and anno:
+            estremi = f"{autorita} n. {numero}/{anno}".strip()
+        else:
+            estremi = autorita or "Giurisprudenza"
+
+        return {
+            "node_id": node_id,
+            "estremi": estremi,
+            "descrizione": testo[:500] if len(testo) > 500 else testo,
+            "organo_emittente": "Corte di Cassazione" if "cass" in autorita.lower() else "Giurisprudenza",
+            "data": anno,
+            "numero": numero,
+            "anno": anno,
+            "tipologia": "sentenza",
+            "materia": materia,
+            "massima_text": testo
+        }
+
     async def update_norma_properties(
         self,
         urn: str,
@@ -421,8 +470,18 @@ class BrocardiEnrichmentRunner:
         count = 0
         timestamp = datetime.now().isoformat()
 
-        for massima_text in brocardi_info.get("Massime", []):
-            parsed = self._parse_massima(massima_text)
+        for massima in brocardi_info.get("Massime", []):
+            # Handle both old format (string) and new format (dict)
+            if isinstance(massima, dict):
+                # New format from BrocardiScraper._parse_massima
+                # {autorita, numero, anno, massima}
+                parsed = self._parse_massima_dict(massima)
+            elif isinstance(massima, str):
+                # Old format: raw text string
+                parsed = self._parse_massima(massima)
+            else:
+                continue
+
             if not parsed:
                 continue
 
@@ -436,6 +495,9 @@ class BrocardiEnrichmentRunner:
                         a.tipologia = $tipologia,
                         a.materia = $materia,
                         a.data = $data,
+                        a.numero_sentenza = $numero,
+                        a.anno = $anno,
+                        a.massima = $massima_text,
                         a.fonte = 'Brocardi.it',
                         a.created_at = $timestamp
                     WITH a
@@ -453,6 +515,9 @@ class BrocardiEnrichmentRunner:
                     "tipologia": parsed.get("tipologia", "sentenza"),
                     "materia": parsed.get("materia", ""),
                     "data": parsed.get("data"),
+                    "numero": parsed.get("numero", ""),
+                    "anno": parsed.get("anno", ""),
+                    "massima_text": parsed.get("massima_text", ""),
                     "norma_urn": norma_urn,
                     "timestamp": timestamp
                 })

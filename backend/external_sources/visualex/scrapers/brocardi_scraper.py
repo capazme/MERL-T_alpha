@@ -71,6 +71,76 @@ class BrocardiScraper(BaseScraper):
         # Strip e ritorna
         return cleaned.strip()
 
+    def _parse_massima(self, sentenza_div) -> Optional[Dict[str, Any]]:
+        """
+        Parsa una singola massima giurisprudenziale dalla struttura HTML Brocardi.
+
+        HTML structure:
+        <div class="sentenza corpoDelTesto">
+            <p><strong>Cass. civ. n. 36918/2021</strong></p>
+            <p>Testo della massima...</p>
+        </div>
+
+        Returns:
+            Dict with: autorita, numero, anno, massima (text)
+            or None if parsing fails
+        """
+        try:
+            result = {
+                'autorita': None,
+                'numero': None,
+                'anno': None,
+                'massima': None
+            }
+
+            # Find the header with case number (usually in <strong>)
+            header = sentenza_div.find('strong')
+            if header:
+                header_text = header.get_text(strip=True)
+
+                # Parse "Cass. civ. n. 36918/2021" or "Cass. pen. n. 1234/2020"
+                # Pattern: (Autorita) n. (Numero)/(Anno)
+                match = re.match(
+                    r'^(Cass\.\s*(?:civ|pen|lav|sez\.\s*un)?\.?)\s*n\.\s*(\d+)/(\d{4})',
+                    header_text,
+                    re.IGNORECASE
+                )
+                if match:
+                    result['autorita'] = match.group(1).strip()
+                    result['numero'] = match.group(2)
+                    result['anno'] = match.group(3)
+                else:
+                    # Fallback: try to extract any number/year pattern
+                    num_match = re.search(r'n\.\s*(\d+)/(\d{4})', header_text)
+                    if num_match:
+                        result['numero'] = num_match.group(1)
+                        result['anno'] = num_match.group(2)
+                    # Extract autorita from beginning
+                    auth_match = re.match(r'^(Cass[^\d]*)', header_text)
+                    if auth_match:
+                        result['autorita'] = auth_match.group(1).strip().rstrip('.')
+
+            # Get full text (excluding the header)
+            full_text = self._clean_text(sentenza_div.get_text())
+
+            # Remove the header part from the text to get just the massima
+            if result['numero'] and result['anno']:
+                # Pattern to remove: "Cass. civ. n. 36918/2021"
+                pattern = rf'Cass[^n]*n\.\s*{result["numero"]}/{result["anno"]}\s*'
+                massima_text = re.sub(pattern, '', full_text, count=1).strip()
+                result['massima'] = massima_text if massima_text else full_text
+            else:
+                result['massima'] = full_text
+
+            # Only return if we have at least massima text
+            if result['massima']:
+                return result
+
+        except Exception as e:
+            log.warning(f"Error parsing massima: {e}")
+
+        return None
+
     async def _make_request_with_retry(self, session: aiohttp.ClientSession, url: str, 
                                        config: RequestConfig = None) -> Optional[str]:
         """
@@ -381,16 +451,20 @@ class BrocardiScraper(BaseScraper):
             except Exception as e:
                 log.warning(f"Error extracting Spiegazione section: {e}")
 
-            # Estrazione Massime
+            # Estrazione Massime - FIXED: parse structured sentenze
             try:
                 massime_header = corpo.find('h3', string=lambda text: text and "Massime relative all'art" in text)
                 if massime_header:
                     massime_content = massime_header.find_next_sibling('div', class_='text')
                     if massime_content:
-                        info['Massime'] = [
-                            self._clean_text(massima.get_text())
-                            for massima in massime_content
-                        ]
+                        # Find all sentenza divs (not iterate over all children!)
+                        sentenze_divs = massime_content.find_all('div', class_='sentenza')
+                        info['Massime'] = []
+                        for sentenza_div in sentenze_divs:
+                            parsed = self._parse_massima(sentenza_div)
+                            if parsed:
+                                info['Massime'].append(parsed)
+                        log.debug(f"Extracted {len(info['Massime'])} massime")
             except Exception as e:
                 log.warning(f"Error extracting Massime section: {e}")
                 

@@ -17,7 +17,7 @@
 ### Fase 2: Retrieval & Search
 | ID | Nome | Status | Data | RQ | Descrizione |
 |----|------|--------|------|-----|-------------|
-| - | - | - | - | - | - |
+| [EXP-002](./EXP-002_rag_pipeline_test/) | rag_pipeline_test | **COMPLETED** | 2025-12-04 | RQ4-5 | Test end-to-end RAG: semantic search + Bridge Table + graph enrichment |
 
 ### Fase 3: Expert Reasoning
 | ID | Nome | Status | Data | RQ | Descrizione |
@@ -35,8 +35,8 @@
 
 | Metrica | Valore |
 |---------|--------|
-| Esperimenti totali | 1 |
-| Completati | **1** |
+| Esperimenti totali | 2 |
+| Completati | **2** |
 | In corso | 0 |
 | Pianificati | 0 |
 | Falliti | 0 |
@@ -61,7 +61,16 @@
 ├── treextractor.py esteso con gerarchia completa
 ├── Integrazione treextractor fallback in pipeline
 ├── EXP-001 Run 3 avviato (19:05) - aggiornamento gerarchia
-└── EXP-001 Run 3 completato (19:07) - 3,462 nodi, 26,577 relazioni
+├── EXP-001 Run 3 completato (19:07) - 3,462 nodi, 26,577 relazioni
+├── EXP-001 Run 4 (embedding) avviato (19:46)
+├── EXP-001 Run 4 completato (19:55) - 2,546 embeddings in Qdrant
+├── Script test_rag_pipeline.py creato
+├── EXP-002 completato - RAG pipeline testing
+├── Bug discovery: massime con "unknown_NNN" e dati sporchi
+├── Fix BrocardiScraper: _parse_massima() con parsing strutturato
+├── EXP-001 Run 5 avviato (21:42) - re-run sole massime
+├── EXP-001 Run 5 completato (22:52) - 9,775 AttoGiudiziario (+1,082%)
+└── GRAPH_EDA.md generato con analisi esplorativa completa
 ```
 
 ---
@@ -119,6 +128,44 @@
 | **Relazioni totali** | **26,577** | +1,003 |
 | - :contiene | **1,891** | +1,003 |
 
+### Run 4 (4 dicembre 2025, sera) - Embedding Generation
+| Metrica | Valore |
+|---------|--------|
+| Modello | `intfloat/multilingual-e5-large` |
+| Dimensione | 1024 |
+| Device | MPS (Apple Silicon) |
+| Chunks processati | **2,546** |
+| Embeddings generati | **2,546** |
+| Errori | **0** |
+| Success rate | **100%** |
+| Tempo | ~8 minuti |
+| Collection Qdrant | `merl_t_chunks` |
+
+### Run 5 (4 dicembre 2025, notte) - Massime Fix & Re-ingestion
+| Metrica | Pre-Fix | Post-Fix | Delta |
+|---------|---------|----------|-------|
+| AttoGiudiziario | 827 | **9,775** | **+1,082%** |
+| Con numero valido | 0 | 9,771 | +∞ |
+| Con anno | 0 | 9,771 | +∞ |
+| 'unknown' residui | 827 | **0** | -100% |
+| :interpreta | 23,056 | 11,182 | -51% (dedup) |
+
+**Note**: La riduzione delle relazioni :interpreta è dovuta alla corretta deduplicazione. Prima ogni massima con `unknown_NNN` era un nodo separato; ora le stesse sentenze citate da più articoli condividono un singolo nodo.
+
+**Storage Completo dopo Run 5:**
+| Storage | Contenuto |
+|---------|-----------|
+| FalkorDB | **12,410 nodi**, 14,703 relazioni |
+| PostgreSQL | 2,546 bridge mappings |
+| Qdrant | 2,546 vectors (1024 dim) |
+
+**Breakdown Nodi:**
+| Label | Count | % |
+|-------|-------|---|
+| Norma | 1,005 | 8.1% |
+| Dottrina | 1,630 | 13.1% |
+| AttoGiudiziario | 9,775 | 78.8% |
+
 ---
 
-*Ultimo aggiornamento: 2025-12-04 19:30*
+*Ultimo aggiornamento: 2025-12-04 23:10*

@@ -733,10 +733,15 @@ class IngestionPipelineV2:
         massime = brocardi.get("Massime", [])
         if isinstance(massime, list):
             for i, massima in enumerate(massime):
-                # Handle both dict and string formats
+                # Handle various formats from BrocardiScraper
                 if isinstance(massima, str):
+                    # Old format: plain string
                     massima = {"estratto": massima, "corte": "Cassazione", "numero": f"unknown_{i}"}
-                elif not isinstance(massima, dict):
+                elif isinstance(massima, dict):
+                    # New format from _parse_massima: {autorita, numero, anno, massima}
+                    if "massima" in massima and "estratto" not in massima:
+                        massima = self._normalize_massima(massima, i)
+                else:
                     continue  # Skip invalid entries
                 await self._create_atto_giudiziario(
                     massima=massima,
@@ -744,6 +749,45 @@ class IngestionPipelineV2:
                     index=i,
                     result=result,
                 )
+
+    def _normalize_massima(self, massima: Dict[str, Any], index: int) -> Dict[str, Any]:
+        """
+        Normalize massima from new BrocardiScraper format to pipeline format.
+
+        New format (from _parse_massima):
+            {'autorita': 'Cass. civ.', 'numero': '36918', 'anno': '2021', 'massima': 'text...'}
+
+        Pipeline format:
+            {'corte': 'Cassazione', 'numero': '36918/2021', 'estratto': 'text...'}
+        """
+        autorita = massima.get("autorita", "Cassazione")
+        numero = massima.get("numero", f"unknown_{index}")
+        anno = massima.get("anno", "")
+        testo = massima.get("massima", "")
+
+        # Normalize autorita to corte
+        corte = "Cassazione"  # Default
+        if autorita:
+            if "civ" in autorita.lower():
+                corte = "Cassazione civile"
+            elif "pen" in autorita.lower():
+                corte = "Cassazione penale"
+            elif "lav" in autorita.lower():
+                corte = "Cassazione lavoro"
+            elif "sez" in autorita.lower() and "un" in autorita.lower():
+                corte = "Cassazione Sezioni Unite"
+
+        # Combine numero/anno in expected format
+        if anno:
+            numero_full = f"{numero}/{anno}"
+        else:
+            numero_full = numero
+
+        return {
+            "corte": corte,
+            "numero": numero_full,
+            "estratto": testo,
+        }
 
     async def _create_atto_giudiziario(
         self,
