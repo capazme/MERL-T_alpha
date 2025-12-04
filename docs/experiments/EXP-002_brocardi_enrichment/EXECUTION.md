@@ -1,8 +1,32 @@
 # EXP-002: Brocardi Enrichment - Execution Log
 
-> **Status**: IN PROGRESS
-> **Data inizio**: 2025-12-04
-> **Ambiente**: MacOS, Python 3.11, FalkorDB locale
+> **Status**: ABSORBED INTO EXP-001
+> **Data**: 2025-12-04
+> **Nota**: Esecuzione interrotta e integrata in EXP-001 Run 2
+
+---
+
+## NOTA: Esperimento Assorbito
+
+Questo esperimento è stato **avviato ma non completato** come esperimento separato.
+
+### Sequenza Eventi
+
+1. **01:09**: Avviata esecuzione EXP-002 standalone
+2. **~01:30**: Data loss Docker - chiusura accidentale Docker Desktop
+3. **01:45**: Deciso di integrare Brocardi enrichment in EXP-001
+4. **02:17**: Avviato EXP-001 Run 2 con Brocardi integrato
+5. **02:24**: EXP-001 Run 2 completato con successo
+
+### Motivo Integrazione
+
+Dopo il data loss, anziché rieseguire due esperimenti separati (EXP-001 + EXP-002), abbiamo deciso di:
+- Modificare `ingestion_pipeline_v2.py` per includere l'enrichment Brocardi
+- Eseguire un singolo run che produce il risultato finale
+
+### Documentazione Storica
+
+Il resto di questo documento mostra il **tentativo iniziale** di esecuzione separata, mantenuto per riferimento.
 
 ---
 
