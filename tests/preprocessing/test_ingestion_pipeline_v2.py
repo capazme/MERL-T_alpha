@@ -151,42 +151,68 @@ class TestExtractHierarchyURNs:
     def test_full_position(self):
         pipeline = IngestionPipelineV2()
         codice_urn = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2"
-        position = "Libro IV - Delle obbligazioni, Titolo II - Dei contratti in generale"
+        position = "Libro IV - Delle obbligazioni, Titolo II - Dei contratti in generale, Capo XIV - Della risoluzione"
 
-        libro_urn, titolo_urn = pipeline._extract_hierarchy_urns(codice_urn, position)
+        hierarchy = pipeline._extract_hierarchy_urns(codice_urn, position)
 
-        assert libro_urn == f"{codice_urn}~libro4"
-        assert titolo_urn == f"{codice_urn}~libro4~tit2"
+        assert hierarchy.libro == f"{codice_urn}~libro4"
+        assert hierarchy.titolo == f"{codice_urn}~libro4~tit2"
+        assert hierarchy.capo == f"{codice_urn}~libro4~tit2~capo14"
+        assert hierarchy.sezione is None  # Not in position
 
     def test_libro_only(self):
         pipeline = IngestionPipelineV2()
         codice_urn = "urn:...;262:2"
         position = "Libro IV - Delle obbligazioni"
 
-        libro_urn, titolo_urn = pipeline._extract_hierarchy_urns(codice_urn, position)
+        hierarchy = pipeline._extract_hierarchy_urns(codice_urn, position)
 
-        assert libro_urn == f"{codice_urn}~libro4"
-        assert titolo_urn is None
+        assert hierarchy.libro == f"{codice_urn}~libro4"
+        assert hierarchy.titolo is None
+        assert hierarchy.capo is None
+        assert hierarchy.sezione is None
 
     def test_no_position(self):
         pipeline = IngestionPipelineV2()
-        libro_urn, titolo_urn = pipeline._extract_hierarchy_urns("urn:...", None)
-        assert libro_urn is None
-        assert titolo_urn is None
+        hierarchy = pipeline._extract_hierarchy_urns("urn:...", None)
+        assert hierarchy.libro is None
+        assert hierarchy.titolo is None
+        assert hierarchy.capo is None
+        assert hierarchy.sezione is None
+
+    def test_closest_parent(self):
+        """Test closest_parent returns the most specific level available."""
+        pipeline = IngestionPipelineV2()
+        codice_urn = "urn:codice"
+        position = "Libro IV - Obbligazioni, Titolo II - Contratti, Capo XIV - Risoluzione"
+
+        hierarchy = pipeline._extract_hierarchy_urns(codice_urn, position)
+        # Should return capo (most specific available)
+        assert hierarchy.closest_parent(codice_urn) == hierarchy.capo
 
 
 class TestExtractTitles:
     """Test title extraction from Brocardi position."""
 
-    def test_extract_libro_titolo(self):
+    def test_extract_hierarchy_title_libro(self):
         pipeline = IngestionPipelineV2()
         position = "Libro IV - Delle obbligazioni, Titolo II - Dei contratti"
-        assert pipeline._extract_libro_titolo(position) == "Delle obbligazioni"
+        assert pipeline._extract_hierarchy_title(position, 'libro') == "Delle obbligazioni"
 
-    def test_extract_titolo_titolo(self):
+    def test_extract_hierarchy_title_titolo(self):
         pipeline = IngestionPipelineV2()
         position = "Libro IV - Delle obbligazioni, Titolo II - Dei contratti in generale"
-        assert pipeline._extract_titolo_titolo(position) == "Dei contratti in generale"
+        assert pipeline._extract_hierarchy_title(position, 'titolo') == "Dei contratti in generale"
+
+    def test_extract_hierarchy_title_capo(self):
+        pipeline = IngestionPipelineV2()
+        position = "Libro IV - Obbligazioni, Titolo II - Contratti, Capo XIV - Della risoluzione del contratto"
+        assert pipeline._extract_hierarchy_title(position, 'capo') == "Della risoluzione del contratto"
+
+    def test_extract_hierarchy_title_sezione(self):
+        pipeline = IngestionPipelineV2()
+        position = "Libro I - Persone, Titolo V - Famiglia, Capo I - Matrimonio, Sezione II - Dei diritti e doveri"
+        assert pipeline._extract_hierarchy_title(position, 'sezione') == "Dei diritti e doveri"
 
 
 class TestPrepareBridgeMappings:
@@ -222,9 +248,10 @@ class TestPrepareBridgeMappings:
         assert all(m.confidence == 1.0 for m in primary_mappings)
 
         # Check HIERARCHIC mappings exist
+        # Confidence varies by level: libro=0.90, titolo=0.92, capo=0.94, sezione=0.96
         hierarchic_mappings = [m for m in mappings if m.mapping_type == "HIERARCHIC"]
         assert len(hierarchic_mappings) > 0
-        assert all(m.confidence == 0.95 for m in hierarchic_mappings)
+        assert all(0.90 <= m.confidence <= 0.96 for m in hierarchic_mappings)
 
 
 @pytest.mark.asyncio

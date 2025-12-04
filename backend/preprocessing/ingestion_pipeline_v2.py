@@ -34,6 +34,25 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class HierarchyURNs:
+    """
+    URNs for the hierarchical structure of a norm.
+
+    Structure: Codice → Libro → Titolo → Capo → Sezione → Articolo
+
+    Each level may be None if not present in the breadcrumb.
+    """
+    libro: Optional[str] = None
+    titolo: Optional[str] = None
+    capo: Optional[str] = None
+    sezione: Optional[str] = None
+
+    def closest_parent(self, codice_urn: str) -> str:
+        """Return the closest available parent URN."""
+        return self.sezione or self.capo or self.titolo or self.libro or codice_urn
+
+
+@dataclass
 class BridgeMapping:
     """
     Prepared mapping for Bridge Table insertion.
@@ -218,10 +237,8 @@ class IngestionPipelineV2:
         """
         mappings = []
 
-        # Extract libro/titolo URNs from position if available
-        libro_urn, titolo_urn = self._extract_hierarchy_urns(
-            codice_urn, brocardi_position
-        )
+        # Extract hierarchy URNs from position if available
+        hierarchy = self._extract_hierarchy_urns(codice_urn, brocardi_position)
 
         for chunk in chunks:
             # PRIMARY: chunk → article (always 1.0)
@@ -233,23 +250,22 @@ class IngestionPipelineV2:
                 metadata={"comma_numero": chunk.metadata.comma_numero},
             ))
 
-            # HIERARCHIC: chunk → libro (if available)
-            if libro_urn:
-                mappings.append(BridgeMapping(
-                    chunk_id=chunk.chunk_id,
-                    graph_node_urn=libro_urn,
-                    mapping_type="HIERARCHIC",
-                    confidence=0.95,
-                ))
-
-            # HIERARCHIC: chunk → titolo (if available)
-            if titolo_urn:
-                mappings.append(BridgeMapping(
-                    chunk_id=chunk.chunk_id,
-                    graph_node_urn=titolo_urn,
-                    mapping_type="HIERARCHIC",
-                    confidence=0.95,
-                ))
+            # HIERARCHIC mappings for each level (if available)
+            # Confidence decreases with distance from article
+            hierarchy_levels = [
+                (hierarchy.libro, 0.90),
+                (hierarchy.titolo, 0.92),
+                (hierarchy.capo, 0.94),
+                (hierarchy.sezione, 0.96),
+            ]
+            for urn, confidence in hierarchy_levels:
+                if urn:
+                    mappings.append(BridgeMapping(
+                        chunk_id=chunk.chunk_id,
+                        graph_node_urn=urn,
+                        mapping_type="HIERARCHIC",
+                        confidence=confidence,
+                    ))
 
         return mappings
 
@@ -257,37 +273,48 @@ class IngestionPipelineV2:
         self,
         codice_urn: str,
         brocardi_position: Optional[str],
-    ) -> Tuple[Optional[str], Optional[str]]:
+    ) -> HierarchyURNs:
         """
-        Extract libro and titolo URNs from Brocardi position.
+        Extract libro, titolo, capo, sezione URNs from Brocardi position.
+
+        Uses StructuralChunker._parse_position() for consistent parsing.
 
         Example:
-            Position: "Libro IV - Delle obbligazioni, Titolo II - ..."
+            Position: "Libro IV - Delle obbligazioni, Titolo II - ..., Capo XIV - ..., Sezione I - ..."
             codice_urn: "https://...;262:2"
 
-            Returns:
-                libro_urn: "https://...;262:2~libro4"
-                titolo_urn: "https://...;262:2~libro4~tit2"
+            Returns HierarchyURNs with:
+                libro: "https://...;262:2~libro4"
+                titolo: "https://...;262:2~libro4~tit2"
+                capo: "https://...;262:2~libro4~tit2~capo14"
+                sezione: "https://...;262:2~libro4~tit2~capo14~sez1"
         """
+        result = HierarchyURNs()
+
         if not brocardi_position:
-            return None, None
+            return result
 
-        libro_urn = None
-        titolo_urn = None
+        # Use chunker's parser for consistent extraction
+        libro_roman, titolo_roman, capo_roman, sezione_roman = self.chunker._parse_position(brocardi_position)
 
-        # Extract libro number
-        libro_match = re.search(r'Libro\s+([IVX]+)', brocardi_position, re.IGNORECASE)
-        if libro_match:
-            libro_num = self._roman_to_arabic(libro_match.group(1))
-            libro_urn = f"{codice_urn}~libro{libro_num}"
+        # Build URNs hierarchically
+        if libro_roman:
+            libro_num = self._roman_to_arabic(libro_roman)
+            result.libro = f"{codice_urn}~libro{libro_num}"
 
-            # Extract titolo number
-            titolo_match = re.search(r'Titolo\s+([IVX]+)', brocardi_position, re.IGNORECASE)
-            if titolo_match:
-                titolo_num = self._roman_to_arabic(titolo_match.group(1))
-                titolo_urn = f"{libro_urn}~tit{titolo_num}"
+            if titolo_roman:
+                titolo_num = self._roman_to_arabic(titolo_roman)
+                result.titolo = f"{result.libro}~tit{titolo_num}"
 
-        return libro_urn, titolo_urn
+                if capo_roman:
+                    capo_num = self._roman_to_arabic(capo_roman)
+                    result.capo = f"{result.titolo}~capo{capo_num}"
+
+                    if sezione_roman:
+                        sezione_num = self._roman_to_arabic(sezione_roman)
+                        result.sezione = f"{result.capo}~sez{sezione_num}"
+
+        return result
 
     def _roman_to_arabic(self, roman: str) -> int:
         """Convert Roman numeral to Arabic number."""
@@ -390,17 +417,24 @@ class IngestionPipelineV2:
         brocardi_position: Optional[str],
         result: IngestionResult,
     ) -> None:
-        """Create Norma nodes for libro and titolo."""
+        """
+        Create Norma nodes for libro, titolo, capo, sezione.
+
+        Hierarchy: Codice → Libro → Titolo → Capo → Sezione → Articolo
+        """
         if not brocardi_position:
             return
 
-        libro_urn, titolo_urn = self._extract_hierarchy_urns(codice_urn, brocardi_position)
+        hierarchy = self._extract_hierarchy_urns(codice_urn, brocardi_position)
 
-        # Extract titles from position
-        libro_titolo = self._extract_libro_titolo(brocardi_position)
-        titolo_titolo = self._extract_titolo_titolo(brocardi_position)
+        # Extract titles from position using generic method
+        titles = {
+            level: self._extract_hierarchy_title(brocardi_position, level)
+            for level in ('libro', 'titolo', 'capo', 'sezione')
+        }
 
-        if libro_urn:
+        # Create Libro node
+        if hierarchy.libro:
             await self.falkordb.query(
                 """
                 MERGE (libro:Norma {URN: $urn})
@@ -412,9 +446,9 @@ class IngestionPipelineV2:
                     libro.fonte = 'Brocardi',
                     libro.created_at = $timestamp
                 """,
-                {"urn": libro_urn, "titolo": libro_titolo or "", "timestamp": self._timestamp}
+                {"urn": hierarchy.libro, "titolo": titles['libro'] or "", "timestamp": self._timestamp}
             )
-            result.nodes_created.append(f"Norma(libro):{libro_urn}")
+            result.nodes_created.append(f"Norma(libro):{hierarchy.libro}")
 
             # Relation: codice -[contiene]-> libro
             await self.falkordb.query(
@@ -424,11 +458,12 @@ class IngestionPipelineV2:
                 MERGE (codice)-[r:contiene]->(libro)
                 ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
                 """,
-                {"codice_urn": codice_urn, "libro_urn": libro_urn}
+                {"codice_urn": codice_urn, "libro_urn": hierarchy.libro}
             )
-            result.relations_created.append(f"contiene:{codice_urn}->{libro_urn}")
+            result.relations_created.append(f"contiene:{codice_urn}->{hierarchy.libro}")
 
-        if titolo_urn and libro_urn:
+        # Create Titolo node
+        if hierarchy.titolo and hierarchy.libro:
             await self.falkordb.query(
                 """
                 MERGE (titolo:Norma {URN: $urn})
@@ -440,9 +475,9 @@ class IngestionPipelineV2:
                     titolo.fonte = 'Brocardi',
                     titolo.created_at = $timestamp
                 """,
-                {"urn": titolo_urn, "titolo": titolo_titolo or "", "timestamp": self._timestamp}
+                {"urn": hierarchy.titolo, "titolo": titles['titolo'] or "", "timestamp": self._timestamp}
             )
-            result.nodes_created.append(f"Norma(titolo):{titolo_urn}")
+            result.nodes_created.append(f"Norma(titolo):{hierarchy.titolo}")
 
             # Relation: libro -[contiene]-> titolo
             await self.falkordb.query(
@@ -452,18 +487,86 @@ class IngestionPipelineV2:
                 MERGE (libro)-[r:contiene]->(titolo)
                 ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
                 """,
-                {"libro_urn": libro_urn, "titolo_urn": titolo_urn}
+                {"libro_urn": hierarchy.libro, "titolo_urn": hierarchy.titolo}
             )
-            result.relations_created.append(f"contiene:{libro_urn}->{titolo_urn}")
+            result.relations_created.append(f"contiene:{hierarchy.libro}->{hierarchy.titolo}")
 
-    def _extract_libro_titolo(self, position: str) -> Optional[str]:
-        """Extract libro title from Brocardi position."""
-        match = re.search(r'Libro\s+[IVX]+\s*[-–]\s*([^,]+)', position, re.IGNORECASE)
-        return match.group(1).strip() if match else None
+        # Create Capo node
+        if hierarchy.capo and hierarchy.titolo:
+            await self.falkordb.query(
+                """
+                MERGE (capo:Norma {URN: $urn})
+                ON CREATE SET
+                    capo.node_id = $urn,
+                    capo.tipo_documento = 'capo',
+                    capo.titolo = $titolo,
+                    capo.vigenza = 'vigente',
+                    capo.fonte = 'Brocardi',
+                    capo.created_at = $timestamp
+                """,
+                {"urn": hierarchy.capo, "titolo": titles['capo'] or "", "timestamp": self._timestamp}
+            )
+            result.nodes_created.append(f"Norma(capo):{hierarchy.capo}")
 
-    def _extract_titolo_titolo(self, position: str) -> Optional[str]:
-        """Extract titolo title from Brocardi position."""
-        match = re.search(r'Titolo\s+[IVX]+\s*[-–]\s*([^,]+)', position, re.IGNORECASE)
+            # Relation: titolo -[contiene]-> capo
+            await self.falkordb.query(
+                """
+                MATCH (titolo:Norma {URN: $titolo_urn})
+                MATCH (capo:Norma {URN: $capo_urn})
+                MERGE (titolo)-[r:contiene]->(capo)
+                ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
+                """,
+                {"titolo_urn": hierarchy.titolo, "capo_urn": hierarchy.capo}
+            )
+            result.relations_created.append(f"contiene:{hierarchy.titolo}->{hierarchy.capo}")
+
+        # Create Sezione node
+        if hierarchy.sezione and hierarchy.capo:
+            await self.falkordb.query(
+                """
+                MERGE (sezione:Norma {URN: $urn})
+                ON CREATE SET
+                    sezione.node_id = $urn,
+                    sezione.tipo_documento = 'sezione',
+                    sezione.titolo = $titolo,
+                    sezione.vigenza = 'vigente',
+                    sezione.fonte = 'Brocardi',
+                    sezione.created_at = $timestamp
+                """,
+                {"urn": hierarchy.sezione, "titolo": titles['sezione'] or "", "timestamp": self._timestamp}
+            )
+            result.nodes_created.append(f"Norma(sezione):{hierarchy.sezione}")
+
+            # Relation: capo -[contiene]-> sezione
+            await self.falkordb.query(
+                """
+                MATCH (capo:Norma {URN: $capo_urn})
+                MATCH (sezione:Norma {URN: $sezione_urn})
+                MERGE (capo)-[r:contiene]->(sezione)
+                ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
+                """,
+                {"capo_urn": hierarchy.capo, "sezione_urn": hierarchy.sezione}
+            )
+            result.relations_created.append(f"contiene:{hierarchy.capo}->{hierarchy.sezione}")
+
+    def _extract_hierarchy_title(self, position: str, level: str) -> Optional[str]:
+        """
+        Extract title for a hierarchy level from Brocardi position.
+
+        Args:
+            position: Brocardi position string
+            level: One of 'libro', 'titolo', 'capo', 'sezione'
+
+        Returns:
+            The title text after the Roman numeral, or None if not found.
+
+        Example:
+            position = "Libro IV - Delle obbligazioni, Titolo II - Dei contratti"
+            _extract_hierarchy_title(position, 'libro') -> "Delle obbligazioni"
+        """
+        # Match pattern: "Libro IV - Delle obbligazioni" captures "Delle obbligazioni"
+        pattern = rf'{level}\s+[IVX]+\s*[-–]\s*([^,]+)'
+        match = re.search(pattern, position, re.IGNORECASE)
         return match.group(1).strip() if match else None
 
     async def _create_norma_articolo(
@@ -511,15 +614,15 @@ class IngestionPipelineV2:
         )
         result.nodes_created.append(f"Norma(articolo):{result.article_urn}")
 
-        # Relation: titolo/libro/codice -[contiene]-> articolo
-        # Find closest parent (titolo > libro > codice)
+        # Relation: closest_parent -[contiene]-> articolo
+        # Find closest parent (sezione > capo > titolo > libro > codice)
         codice_urn = meta.to_codice_urn()
         brocardi_pos = None
         if article.brocardi_info and isinstance(article.brocardi_info, dict):
             brocardi_pos = article.brocardi_info.get("Position")
-        libro_urn, titolo_urn = self._extract_hierarchy_urns(codice_urn, brocardi_pos)
+        hierarchy = self._extract_hierarchy_urns(codice_urn, brocardi_pos)
 
-        parent_urn = titolo_urn or libro_urn or codice_urn
+        parent_urn = hierarchy.closest_parent(codice_urn)
         await self.falkordb.query(
             """
             MATCH (parent:Norma {URN: $parent_urn})
