@@ -12,7 +12,7 @@
 |----|------|--------|------|-----|-------------|
 | [EXP-001](./EXP-001_ingestion_libro_iv/) | ingestion_libro_iv | **COMPLETED** | 2025-12-03/04 | RQ1-4 | Ingestion completa 887 articoli Libro IV CC con Brocardi enrichment |
 
-> **Nota**: EXP-002 (Brocardi Enrichment) è stato integrato direttamente in EXP-001 durante il re-run del 4 dicembre 2025. La documentazione in `EXP-002_brocardi_enrichment/` è mantenuta per riferimento storico.
+> **Nota**: EXP-002 (Brocardi Enrichment) è stato integrato direttamente in EXP-001 durante il re-run del 4 dicembre 2025.
 
 ### Fase 2: Retrieval & Search
 | ID | Nome | Status | Data | RQ | Descrizione |
@@ -57,7 +57,11 @@
 ├── Data loss Docker → fix persistenza locale (./data/)
 ├── Bug fix pipeline (isinstance checks, massime conversion)
 ├── EXP-001 Run 2 avviato (02:17) - con Brocardi integrato
-└── EXP-001 Run 2 completato (02:24) - 3,346 nodi, 25,574 relazioni
+├── EXP-001 Run 2 completato (02:24) - 3,346 nodi, 25,574 relazioni
+├── treextractor.py esteso con gerarchia completa
+├── Integrazione treextractor fallback in pipeline
+├── EXP-001 Run 3 avviato (19:05) - aggiornamento gerarchia
+└── EXP-001 Run 3 completato (19:07) - 3,462 nodi, 26,577 relazioni
 ```
 
 ---
@@ -99,6 +103,22 @@
 | - :commenta | 1,630 | +∞ |
 | - :contiene | 888 | - |
 
+### Run 3 (4 dicembre 2025, sera) - Gerarchia Completa
+| Metrica | Valore | Delta |
+|---------|--------|-------|
+| **Nodi totali** | **3,462** | +116 |
+| - Norma | **1,005** | +116 |
+|   - codice | 1 | - |
+|   - libro | 1 | - |
+|   - titolo | 9 | +9 |
+|   - capo | 51 | +51 |
+|   - sezione | 56 | +56 |
+|   - articolo | 887 | - |
+| - Dottrina | 1,630 | - |
+| - AttoGiudiziario | 827 | - |
+| **Relazioni totali** | **26,577** | +1,003 |
+| - :contiene | **1,891** | +1,003 |
+
 ---
 
-*Ultimo aggiornamento: 2025-12-04 02:45*
+*Ultimo aggiornamento: 2025-12-04 19:30*

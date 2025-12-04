@@ -10,7 +10,7 @@
 
 L'esperimento EXP-001 è stato rieseguito con l'enrichment Brocardi integrato direttamente nella pipeline di ingestion. Questo ha permesso di popolare il Knowledge Graph con dati molto più ricchi in un'unica esecuzione.
 
-**Risultato chiave**: 100% success rate, 0 errori, 3,346 nodi totali con dottrina e giurisprudenza.
+**Risultato chiave**: 100% success rate, 0 errori, 3,462 nodi totali con gerarchia completa, dottrina e giurisprudenza.
 
 ---
 
@@ -29,17 +29,23 @@ L'esperimento EXP-001 è stato rieseguito con l'enrichment Brocardi integrato di
 
 | Tipo Nodo | Quantità | Note |
 |-----------|----------|------|
-| **Norma** | 889 | codice + libro + articoli |
+| **Norma** | **1,005** | codice + libro + titoli + capi + sezioni + articoli |
+| - codice | 1 | Codice Civile |
+| - libro | 1 | Libro IV |
+| - titolo | 9 | Titoli del Libro IV |
+| - capo | 51 | Capi |
+| - sezione | 56 | Sezioni |
+| - articolo | 887 | Articoli |
 | **Dottrina** | 1,630 | Ratio, Spiegazione, Brocardi |
 | **AttoGiudiziario** | 827 | Massime giurisprudenziali |
-| **TOTALE NODI** | **3,346** | |
+| **TOTALE NODI** | **3,462** | +116 nodi gerarchia |
 
 | Tipo Relazione | Quantità | Note |
 |----------------|----------|------|
 | **:interpreta** | 23,056 | AttoGiudiziario → Norma |
 | **:commenta** | 1,630 | Dottrina → Norma |
-| **:contiene** | 888 | Libro → articoli |
-| **TOTALE RELAZIONI** | **25,574** | |
+| **:contiene** | 1,891 | Gerarchia completa (codice→libro→titolo→capo→sezione→articolo) |
+| **TOTALE RELAZIONI** | **26,577** | |
 
 ### Storage Metrics - PostgreSQL Bridge Table
 
@@ -89,10 +95,13 @@ L'esperimento EXP-001 è stato rieseguito con l'enrichment Brocardi integrato di
 ### FalkorDB Graph
 
 ```
-Nodi totali: 3,346
-├── Norma: 889
+Nodi totali: 3,462
+├── Norma: 1,005
 │   ├── tipo_documento: codice (1)
 │   ├── tipo_documento: libro (1)
+│   ├── tipo_documento: titolo (9)
+│   ├── tipo_documento: capo (51)
+│   ├── tipo_documento: sezione (56)
 │   └── tipo_documento: articolo (887)
 ├── Dottrina: 1,630
 │   ├── tipo_dottrina: ratio (~700)
@@ -101,10 +110,16 @@ Nodi totali: 3,346
 └── AttoGiudiziario: 827
     └── tipo_atto: sentenza (Cassazione, etc.)
 
-Relazioni totali: 25,574
+Relazioni totali: 26,577
 ├── :interpreta (23,056) - massime → articoli
 ├── :commenta (1,630) - dottrina → articoli
-└── :contiene (888) - gerarchia codice
+└── :contiene (1,891) - gerarchia completa codice→libro→titolo→capo→sezione→articolo
+
+Esempio gerarchia Art. 1453:
+codice → libro4 → titolo (DEI CONTRATTI IN GENERALE)
+       → capo (Della risoluzione del contratto)
+       → sezione (Della risoluzione per inadempimento)
+       → articolo 1453
 ```
 
 ### PostgreSQL Bridge Table
@@ -139,18 +154,20 @@ GROUP BY node_type;
 
 ## Conclusioni
 
-L'esperimento EXP-001 con Brocardi Enrichment integrato ha **superato tutte le aspettative**:
+L'esperimento EXP-001 con Brocardi Enrichment e Gerarchia Completa ha **superato tutte le aspettative**:
 
-1. **Knowledge Graph Ricco**: 3,346 nodi vs 894 originali (+274%)
-2. **Giurisprudenza Completa**: 23,056 relazioni :interpreta
-3. **Dottrina Integrata**: 1,630 nodi Dottrina con Ratio e Spiegazioni
-4. **Zero Errori**: Pipeline robusta con error handling
+1. **Knowledge Graph Ricco**: 3,462 nodi totali
+2. **Gerarchia Completa**: 1,005 nodi Norma (codice→libro→titolo→capo→sezione→articolo)
+3. **Giurisprudenza Completa**: 23,056 relazioni :interpreta
+4. **Dottrina Integrata**: 1,630 nodi Dottrina con Ratio e Spiegazioni
+5. **Zero Errori**: Pipeline robusta con error handling
 
 **Il sistema è pronto per**:
 - Query semantiche multi-fonte (norma + dottrina + giurisprudenza)
+- Graph traversal per navigare la gerarchia del codice
 - Retrieval Augmented Generation (RAG) con contesto legale
 - Analisi delle interpretazioni giurisprudenziali
 
 ---
 
-*Documento aggiornato: 2025-12-04 02:30*
+*Documento aggiornato: 2025-12-04 19:30*

@@ -311,4 +311,94 @@ Il Run 2 è stato significativamente più veloce (7 min vs 41 min) grazie alla *
 
 ---
 
-*Log aggiornato: 2025-12-04 02:45*
+## Run 3: Aggiornamento Gerarchia (4 dicembre 2025, sera)
+
+### Contesto
+
+Il grafo dopo Run 2 conteneva solo 1 nodo `libro` (Libro IV). Mancavano:
+- Nodi `titolo` (9)
+- Nodi `capo` (51)
+- Nodi `sezione` (56)
+
+È stato sviluppato `treextractor.py` per estrarre la gerarchia completa da Normattiva.
+
+### Esecuzione
+
+**Inizio**: 2025-12-04 19:05
+**Fine**: 2025-12-04 19:07
+**Durata**: ~2 minuti
+
+```bash
+# Comando eseguito:
+source .venv/bin/activate && python scripts/update_graph_hierarchy.py
+```
+
+### Output
+
+```
+============================================================
+Update Graph Hierarchy
+============================================================
+
+[1/5] Connecting to FalkorDB...
+  ✓ Connected
+
+[2/5] Loading NormTree from Normattiva...
+  ✓ Loaded tree with 3263 articles
+
+[3/5] Getting articles from graph...
+  ✓ Found 887 articles in graph
+
+[4/5] Creating hierarchy nodes...
+  Existing hierarchy nodes: 1
+  Processing article 1/887...
+  ...
+  Processing article 801/887...
+
+[5/5] Results
+============================================================
+  Titoli created:    9
+  Capi created:      51
+  Sezioni created:   56
+  Relations created: 887
+  Articles updated:  887
+============================================================
+
+Final hierarchy node counts:
+  sezione: 56
+  capo: 51
+  titolo: 9
+  libro: 1
+
+✓ Done!
+```
+
+### Metriche Finali Run 3
+
+| Metrica | Run 2 | Run 3 | Delta |
+|---------|-------|-------|-------|
+| **Nodi Norma** | 889 | **1,005** | +116 |
+| - codice | 1 | 1 | - |
+| - libro | 1 | 1 | - |
+| - titolo | 0 | 9 | +9 |
+| - capo | 0 | 51 | +51 |
+| - sezione | 0 | 56 | +56 |
+| - articolo | 887 | 887 | - |
+| **Relazioni :contiene** | 888 | **1,891** | +1,003 |
+| **Nodi totali** | 3,346 | **3,462** | +116 |
+| **Relazioni totali** | 25,574 | **26,577** | +1,003 |
+
+### Validazione Run 3
+
+```cypher
+-- Gerarchia Art. 1453
+MATCH path = (codice:Norma {tipo_documento: 'codice'})-[:contiene*]->(art:Norma {numero_articolo: '1453'})
+RETURN [n in nodes(path) | n.tipo_documento] as hierarchy
+
+-- Output:
+-- codice → libro → titolo → capo → sezione → articolo
+```
+
+---
+
+*Log aggiornato: 2025-12-04 19:30*
