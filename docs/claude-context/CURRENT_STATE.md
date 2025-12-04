@@ -9,9 +9,9 @@
 
 | Campo | Valore |
 |-------|--------|
-| **Data ultimo aggiornamento** | 3 Dicembre 2025 (notte) |
-| **Fase progetto** | Ingestion Pipeline v2 COMPLETA ✅ - Ready per batch 887 articoli |
-| **Prossimo obiettivo** | Batch ingestion Libro IV + embedding generation |
+| **Data ultimo aggiornamento** | 4 Dicembre 2025 (02:30) |
+| **Fase progetto** | **EXP-001 COMPLETATO con Brocardi** - 887 articoli + 3,346 nodi totali |
+| **Prossimo obiettivo** | Embedding generation + Query testing |
 | **Blocchi attivi** | Nessuno |
 
 ---
@@ -39,7 +39,42 @@
 
 ---
 
-## Cosa Abbiamo Fatto (Sessione Corrente - 3 Dic 2025, Notte)
+## Cosa Abbiamo Fatto (Sessione Corrente - 4 Dic 2025, Notte Tarda)
+
+### EXP-001 Re-run con Brocardi Enrichment Integrato - COMPLETATO ✅
+
+- [x] **Fix persistenza dati Docker** ✅:
+  - Data loss dopo chiusura Docker Desktop (tutti i dati persi)
+  - Cambiato da Docker volumes a local bind mounts (`./data/`)
+  - FalkorDB: fix mount path `/var/lib/falkordb/data`
+  - Persistence: `--save 10 1 --appendonly yes`
+
+- [x] **Bug fix pipeline** ✅:
+  - `'str' object has no attribute 'get'` → isinstance checks in ingestion_pipeline_v2.py
+  - Massime come stringhe → conversione automatica str → dict
+  - Bridge Table non esistente → schema.sql applicato
+
+- [x] **Re-run EXP-001 con Brocardi** ✅ (02:17 - 02:24):
+  - Articoli: **887/887** (100% success)
+  - Errori: **0**
+  - **Nodi totali: 3,346** (+274% vs run precedente)
+    - Norma: 889 (codice + libro + articoli)
+    - Dottrina: 1,630 (Ratio, Spiegazione, Brocardi)
+    - AttoGiudiziario: 827 (Massime)
+  - **Relazioni totali: 25,574** (+2768% vs run precedente)
+    - :interpreta: 23,056
+    - :commenta: 1,630
+    - :contiene: 888
+  - Bridge mappings: 2,546
+
+### Note Importanti:
+- EXP-002 (Brocardi Enrichment) ora integrato in EXP-001
+- Knowledge Graph completo con dottrina e giurisprudenza
+- Sistema pronto per embedding generation e RAG queries
+
+---
+
+## Cosa Abbiamo Fatto (Sessione Precedente - 3 Dic 2025, Notte)
 
 - [x] **CommaParser** ✅:
   - File: `backend/preprocessing/comma_parser.py` (350+ lines)
@@ -166,10 +201,15 @@
 - [x] **IngestionPipelineV2** con Brocardi enrichment ✅
 - [x] **BridgeBuilder** con mappings e confidence scoring ✅
 
-### Priorita 1.5: Batch Ingestion (Prossima sessione)
-- [ ] Script batch ingestion per 887 articoli Libro IV
+### Priorita 1.5: Batch Ingestion - COMPLETATA ✅
+- [x] Script batch ingestion per 887 articoli Libro IV
+- [x] Monitoring e progress tracking
 - [ ] Embedding generation con E5-large (HuggingFace)
-- [ ] Monitoring e progress tracking
+
+### Priorita 1.6: Brocardi Enrichment - COMPLETATO ✅
+- [x] Brocardi integrato direttamente in EXP-001
+- [x] Enrichment con massime giurisprudenziali (827 AttoGiudiziario)
+- [x] Dottrina completa (1,630 nodi: Ratio + Spiegazione)
 
 ### Priorita 2: Expert con Tools (Settimana 3-4)
 - [ ] Implementare classe `ExpertWithTools`

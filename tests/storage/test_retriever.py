@@ -232,11 +232,11 @@ class TestGraphAwareRetriever:
 
         initial_alpha = retriever.config.alpha  # 0.7
 
-        # Positive feedback ’ decrease alpha (more graph weight)
+        # Positive feedback ï¿½ decrease alpha (more graph weight)
         retriever.update_alpha(feedback_correlation=0.8, authority=1.0)
         assert retriever.config.alpha < initial_alpha
 
-        # Negative feedback ’ increase alpha (more similarity weight)
+        # Negative feedback ï¿½ increase alpha (more similarity weight)
         retriever.update_alpha(feedback_correlation=0.2, authority=1.0)
         assert retriever.config.alpha > (initial_alpha - 0.01)
 

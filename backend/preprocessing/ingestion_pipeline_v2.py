@@ -159,7 +159,7 @@ class IngestionPipelineV2:
 
         # Step 2: Get Brocardi position for context
         brocardi_position = None
-        if article.brocardi_info:
+        if article.brocardi_info and isinstance(article.brocardi_info, dict):
             brocardi_position = article.brocardi_info.get("Position")
 
         # Step 3: Create chunks (one per comma)
@@ -321,11 +321,14 @@ class IngestionPipelineV2:
         article_urn = result.article_urn
         codice_urn = meta.to_codice_urn()
 
+        # Timestamp for all graph operations (FalkorDB doesn't have datetime())
+        self._timestamp = datetime.now(timezone.utc).isoformat()
+
         # Create Norma (codice) - root document
         await self._create_norma_codice(meta, codice_urn, result)
 
         # Create hierarchy nodes (libro, titolo) if Brocardi available
-        if article.brocardi_info:
+        if article.brocardi_info and isinstance(article.brocardi_info, dict):
             await self._create_hierarchy_nodes(
                 codice_urn=codice_urn,
                 brocardi_position=article.brocardi_info.get("Position"),
@@ -340,7 +343,7 @@ class IngestionPipelineV2:
         )
 
         # Create Brocardi enrichment nodes
-        if article.brocardi_info:
+        if article.brocardi_info and isinstance(article.brocardi_info, dict):
             await self._create_brocardi_enrichment(
                 article=article,
                 article_urn=article_urn,
@@ -368,7 +371,7 @@ class IngestionPipelineV2:
                 codice.efficacia = 'permanente',
                 codice.ambito_territoriale = 'nazionale',
                 codice.fonte = 'VisualexAPI',
-                codice.created_at = datetime()
+                codice.created_at = $timestamp
             """,
             {
                 "urn": codice_urn,
@@ -376,6 +379,7 @@ class IngestionPipelineV2:
                 "titolo": meta.tipo_atto.title(),
                 "autorita": "Regio Decreto" if "regio" in codice_urn.lower() else "Parlamento",
                 "data": meta.data,
+                "timestamp": self._timestamp,
             }
         )
         result.nodes_created.append(f"Norma(codice):{codice_urn}")
@@ -406,9 +410,9 @@ class IngestionPipelineV2:
                     libro.titolo = $titolo,
                     libro.vigenza = 'vigente',
                     libro.fonte = 'Brocardi',
-                    libro.created_at = datetime()
+                    libro.created_at = $timestamp
                 """,
-                {"urn": libro_urn, "titolo": libro_titolo or ""}
+                {"urn": libro_urn, "titolo": libro_titolo or "", "timestamp": self._timestamp}
             )
             result.nodes_created.append(f"Norma(libro):{libro_urn}")
 
@@ -434,9 +438,9 @@ class IngestionPipelineV2:
                     titolo.titolo = $titolo,
                     titolo.vigenza = 'vigente',
                     titolo.fonte = 'Brocardi',
-                    titolo.created_at = datetime()
+                    titolo.created_at = $timestamp
                 """,
-                {"urn": titolo_urn, "titolo": titolo_titolo or ""}
+                {"urn": titolo_urn, "titolo": titolo_titolo or "", "timestamp": self._timestamp}
             )
             result.nodes_created.append(f"Norma(titolo):{titolo_urn}")
 
@@ -490,8 +494,8 @@ class IngestionPipelineV2:
                 art.stato = 'vigente',
                 art.efficacia = 'permanente',
                 art.ambito_territoriale = 'nazionale',
-                art.created_at = datetime(),
-                art.updated_at = datetime()
+                art.created_at = $timestamp,
+                art.updated_at = $timestamp
             """,
             {
                 "urn": result.article_urn,
@@ -502,6 +506,7 @@ class IngestionPipelineV2:
                 "testo": article.article_text,
                 "autorita": "Regio Decreto" if "regio" in result.article_urn.lower() else "Parlamento",
                 "data": meta.data,
+                "timestamp": self._timestamp,
             }
         )
         result.nodes_created.append(f"Norma(articolo):{result.article_urn}")
@@ -509,10 +514,10 @@ class IngestionPipelineV2:
         # Relation: titolo/libro/codice -[contiene]-> articolo
         # Find closest parent (titolo > libro > codice)
         codice_urn = meta.to_codice_urn()
-        libro_urn, titolo_urn = self._extract_hierarchy_urns(
-            codice_urn,
-            article.brocardi_info.get("Position") if article.brocardi_info else None
-        )
+        brocardi_pos = None
+        if article.brocardi_info and isinstance(article.brocardi_info, dict):
+            brocardi_pos = article.brocardi_info.get("Position")
+        libro_urn, titolo_urn = self._extract_hierarchy_urns(codice_urn, brocardi_pos)
 
         parent_urn = titolo_urn or libro_urn or codice_urn
         await self.falkordb.query(
@@ -549,12 +554,13 @@ class IngestionPipelineV2:
                     d.fonte = 'Brocardi.it',
                     d.autore = 'Brocardi.it',
                     d.confidence = 0.9,
-                    d.created_at = datetime()
+                    d.created_at = $timestamp
                 """,
                 {
                     "id": dottrina_id,
                     "titolo": f"Ratio {estremi}",
                     "descrizione": brocardi["Ratio"],
+                    "timestamp": self._timestamp,
                 }
             )
             result.nodes_created.append(f"Dottrina:{dottrina_id}")
@@ -584,12 +590,13 @@ class IngestionPipelineV2:
                     d.fonte = 'Brocardi.it',
                     d.autore = 'Brocardi.it',
                     d.confidence = 0.9,
-                    d.created_at = datetime()
+                    d.created_at = $timestamp
                 """,
                 {
                     "id": dottrina_id,
                     "titolo": f"Spiegazione {estremi}",
                     "descrizione": brocardi["Spiegazione"],
+                    "timestamp": self._timestamp,
                 }
             )
             result.nodes_created.append(f"Dottrina:{dottrina_id}")
@@ -609,6 +616,11 @@ class IngestionPipelineV2:
         massime = brocardi.get("Massime", [])
         if isinstance(massime, list):
             for i, massima in enumerate(massime):
+                # Handle both dict and string formats
+                if isinstance(massima, str):
+                    massima = {"estratto": massima, "corte": "Cassazione", "numero": f"unknown_{i}"}
+                elif not isinstance(massima, dict):
+                    continue  # Skip invalid entries
                 await self._create_atto_giudiziario(
                     massima=massima,
                     article_urn=article_urn,
@@ -650,7 +662,7 @@ class IngestionPipelineV2:
                 a.tipo_atto = 'sentenza',
                 a.fonte = 'Brocardi.it',
                 a.confidence = 0.9,
-                a.created_at = datetime()
+                a.created_at = $timestamp
             """,
             {
                 "id": atto_id,
@@ -659,6 +671,7 @@ class IngestionPipelineV2:
                 "numero": numero_sentenza,
                 "anno": anno,
                 "massima": estratto,
+                "timestamp": self._timestamp,
             }
         )
         result.nodes_created.append(f"AttoGiudiziario:{atto_id}")

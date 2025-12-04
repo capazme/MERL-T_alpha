@@ -98,4 +98,4 @@ dump.rdb
 #Other
 *shm
 *wal
-*.pid
+*.piddata/

@@ -5,6 +5,62 @@
 
 ---
 
+## 2025-12-04 (Notte Tarda) - EXP-001 Re-run con Brocardi COMPLETO ✅
+
+**Durata**: ~3 ore
+**Obiettivo**: Rieseguire EXP-001 con Brocardi enrichment integrato dopo data loss
+**Risultato**: ✓ Knowledge Graph completo con 3,346 nodi e 25,574 relazioni
+
+### Problema Risolto
+
+1. **Data Loss Docker**: Chiusura accidentale Docker Desktop ha causato perdita di tutti i dati
+   - Fix: Local bind mounts invece di Docker volumes (`./data/`)
+   - Fix: FalkorDB persistence con `--save 10 1 --appendonly yes`
+   - Fix: Mount path corretto `/var/lib/falkordb/data`
+
+### Bug Fix Pipeline
+
+1. **`'str' object has no attribute 'get'`**:
+   - Causa: `brocardi_info` a volte stringa invece di dict
+   - Fix: `isinstance(article.brocardi_info, dict)` checks in `ingestion_pipeline_v2.py`
+
+2. **Massime come stringhe**:
+   - Causa: BrocardiScraper estrae massime come liste di stringhe
+   - Fix: Conversione automatica `str → {"estratto": str, ...}` (linea 618-623)
+
+3. **Bridge Table non esistente**:
+   - Fix: `psql -f backend/storage/bridge/schema.sql`
+
+### Risultati EXP-001 (Re-run)
+
+| Metrica | Valore |
+|---------|--------|
+| Articoli processati | 887/887 (100%) |
+| Errori | **0** |
+| **Nodi FalkorDB** | **3,346** |
+| - Norma | 889 |
+| - Dottrina | 1,630 |
+| - AttoGiudiziario | 827 |
+| **Relazioni** | **25,574** |
+| - :interpreta | 23,056 |
+| - :commenta | 1,630 |
+| - :contiene | 888 |
+| Bridge Table | 2,546 mappings |
+
+### Confronto Run 1 vs Run 2
+
+| Metrica | Run 1 (senza Brocardi) | Run 2 (con Brocardi) | Delta |
+|---------|------------------------|----------------------|-------|
+| Nodi totali | 894 | **3,346** | +274% |
+| Relazioni totali | 892 | **25,574** | +2768% |
+
+### Note
+
+- EXP-002 (Brocardi Enrichment) è stato assorbito in EXP-001
+- Sistema pronto per embedding generation e RAG queries
+
+---
+
 ## 2025-12-03 (Notte) - Ingestion Pipeline v2 COMPLETA ✅
 
 **Durata**: ~4 ore

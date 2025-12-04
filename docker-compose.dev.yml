@@ -7,6 +7,8 @@
 # - FalkorDB: Legal knowledge graph (replaces Neo4j)
 # - Qdrant: Vector embeddings
 # - Redis: Caching layer
+#
+# NOTE: Data is persisted to ./data/ directory for visibility and easy backup
 services:
   # PostgreSQL: Bridge Table + RLCF authority/feedback
   postgres:
@@ -19,7 +21,7 @@ services:
     ports:
       - "5433:5432"  # Host:5433 to avoid conflict with native PostgreSQL
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dev"]
       interval: 10s
@@ -32,10 +34,12 @@ services:
     container_name: merl-t-falkordb-dev
     ports:
       - "6380:6379"  # FalkorDB protocol (Redis-compatible)
+      - "3000:3000"  # FalkorDB Browser UI
     volumes:
-      - falkordb_data:/data
+      - ./data/falkordb:/var/lib/falkordb/data  # Mount to actual FalkorDB data dir
     environment:
-      FALKORDB_ARGS: "--save 60 1 --loglevel warning"
+      # Persistence: save every 10 seconds if 1+ writes, AND use appendonly
+      FALKORDB_ARGS: "--save 10 1 --appendonly yes --appendfsync everysec --loglevel warning"
     healthcheck:
       test: ["CMD", "redis-cli", "-p", "6379", "ping"]
       interval: 10s
@@ -50,7 +54,8 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - ./data/redis:/data
+    command: ["redis-server", "--save", "10", "1", "--appendonly", "yes"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -65,7 +70,7 @@ services:
       - "6333:6333"  # HTTP API
       - "6334:6334"  # gRPC API
     volumes:
-      - qdrant_data:/qdrant/storage
+      - ./data/qdrant:/qdrant/storage
     environment:
       QDRANT__SERVICE__GRPC_PORT: 6334
     healthcheck:
@@ -74,8 +79,4 @@ services:
       timeout: 5s
       retries: 5
 
-volumes:
-  postgres_data:
-  falkordb_data:  # v2: Replaced neo4j_data
-  redis_data:
-  qdrant_data:
+# No more Docker volumes - all data in ./data/ directory

@@ -1,9 +1,10 @@
 # EXP-001: Ingestion Libro IV - Delle Obbligazioni
 
-> **Status**: PLANNED
+> **Status**: COMPLETED
 > **Data inizio**: 2025-12-03
-> **Data fine**: -
-> **Autore**: Giovanni Puzio
+> **Data fine**: 2025-12-04
+> **Autore**: Guglielmo Puzio
+> **Git commit**: 48814f1
 
 ---
 

@@ -63,7 +63,8 @@ GRAPH.QUERY merl_t_legal "MATCH (c:Norma)-[r1:contiene]->(a:Norma)-[r2:disciplin
 
 ```redis
 # Tutti gli articoli con titolo
-GRAPH.QUERY merl_t_legal "MATCH (n:Norma) WHERE n.tipo_documento = 'articolo' RETURN n.estremi, n.titolo, n.stato ORDER BY n.estremi"
+
+"
 
 # Articoli di un codice specifico
 GRAPH.QUERY merl_t_legal "MATCH (c:Norma)-[:contiene]->(a:Norma) WHERE c.tipo_documento = 'codice' AND c.estremi = 'Codice Civile' RETURN a.estremi, a.titolo ORDER BY a.estremi"
