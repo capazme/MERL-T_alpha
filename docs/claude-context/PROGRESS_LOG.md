@@ -5,11 +5,11 @@
 
 ---
 
-## 2025-12-04 (Pomeriggio) - Hierarchical Tree Extraction ✅
+## 2025-12-04 (Pomeriggio) - Hierarchical Tree Extraction + Pipeline Integration ✅
 
-**Durata**: ~2 ore
-**Obiettivo**: Estendere treextractor.py per estrarre gerarchia completa da Normattiva
-**Risultato**: ✓ API gerarchica funzionante con test su Codice Civile
+**Durata**: ~3 ore
+**Obiettivo**: Estendere treextractor.py e integrarlo nella pipeline di ingestion
+**Risultato**: ✓ API gerarchica + fallback automatico in pipeline
 
 ### Completato
 
@@ -25,9 +25,14 @@
    - `HierarchyURNs` dataclass con `closest_parent()` method
    - Estrazione Capo e Sezione (prima solo Libro/Titolo)
    - Refactoring: 4 funzioni `_extract_*_titolo` → singola `_extract_hierarchy_title(position, level)`
-   - 24/24 test passano
 
-3. **Sincronizzazione**:
+3. **Integrazione treextractor in pipeline**:
+   - `ingest_article()` accetta `norm_tree` opzionale
+   - Fallback automatico: Brocardi → treextractor per position
+   - Re-export `NormTree`, `get_article_position` per comodità
+   - Nuovo test `test_ingest_with_treextractor_fallback`
+
+4. **Sincronizzazione**:
    - Copia automatica su `backend/external_sources/visualex/tools/treextractor.py`
 
 ### Test Results
@@ -37,7 +42,18 @@
 | Codice Civile articoli | 3,263 |
 | Libri identificati | 6 |
 | Art. 1453 position | "Libro IV - DELLE OBBLIGAZIONI, Titolo II - DEI CONTRATTI IN GENERALE, Capo XIV - Della risoluzione del contratto, Sezione I - Della risoluzione per inadempimento" |
-| ingestion_pipeline_v2 tests | 24/24 ✓ |
+| ingestion_pipeline_v2 tests | **25/25 ✓** |
+
+### Usage Example
+
+```python
+# Pre-load tree per evitare chiamate HTTP ripetute
+tree, _ = await get_hierarchical_tree(codice_civile_url)
+
+# Pipeline usa automaticamente treextractor come fallback
+for article in articles:
+    result = await pipeline.ingest_article(article, norm_tree=tree)
+```
 
 ### Note
 

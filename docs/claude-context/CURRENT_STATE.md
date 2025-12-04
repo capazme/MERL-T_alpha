@@ -9,8 +9,8 @@
 
 | Campo | Valore |
 |-------|--------|
-| **Data ultimo aggiornamento** | 4 Dicembre 2025 (15:30) |
-| **Fase progetto** | **Hierarchical Tree Extraction** - treextractor.py + pipeline estesa |
+| **Data ultimo aggiornamento** | 4 Dicembre 2025 (16:00) |
+| **Fase progetto** | **Treextractor integrato in Pipeline** - fallback automatico per gerarchia |
 | **Prossimo obiettivo** | Embedding generation + Query testing |
 | **Blocchi attivi** | Nessuno |
 
@@ -59,6 +59,12 @@
 
 - [x] **Sincronizzazione backend** ✅:
   - Copia su `backend/external_sources/visualex/tools/treextractor.py`
+
+- [x] **Integrazione treextractor in pipeline** ✅:
+  - `ingest_article()` accetta `norm_tree` opzionale
+  - Fallback automatico: Brocardi → treextractor per position
+  - Re-export `NormTree`, `get_article_position` per comodità
+  - 25/25 test passano (nuovo test per fallback)
 
 ### Note:
 - L'estrazione gerarchica da Normattiva serve come fallback quando Brocardi non è disponibile
