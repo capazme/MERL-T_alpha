@@ -9,8 +9,8 @@
 
 | Campo | Valore |
 |-------|--------|
-| **Data ultimo aggiornamento** | 4 Dicembre 2025 (16:00) |
-| **Fase progetto** | **Treextractor integrato in Pipeline** - fallback automatico per gerarchia |
+| **Data ultimo aggiornamento** | 4 Dicembre 2025 (19:15) |
+| **Fase progetto** | **Grafo aggiornato con gerarchia completa** - 1005 nodi Norma |
 | **Prossimo obiettivo** | Embedding generation + Query testing |
 | **Blocchi attivi** | Nessuno |
 
@@ -39,7 +39,39 @@
 
 ---
 
-## Cosa Abbiamo Fatto (Sessione Corrente - 4 Dic 2025, Pomeriggio)
+## Cosa Abbiamo Fatto (Sessione Corrente - 4 Dic 2025, Pomeriggio/Sera)
+
+### Aggiornamento Grafo con Gerarchia Completa - COMPLETATO ✅
+
+- [x] **Script `scripts/update_graph_hierarchy.py`** ✅:
+  - Carica NormTree da Normattiva
+  - Crea nodi Titolo, Capo, Sezione mancanti
+  - Crea relazioni :contiene dalla gerarchia agli articoli
+
+- [x] **Risultati aggiornamento grafo** ✅:
+  | Tipo | Creati |
+  |------|--------|
+  | Titoli | 9 |
+  | Capi | 51 |
+  | Sezioni | 56 |
+  | Relazioni :contiene | 887 |
+
+- [x] **Stato finale grafo** ✅:
+  | Nodi | Quantità |
+  |------|----------|
+  | Norma totali | **1005** |
+  | - articolo | 887 |
+  | - sezione | 56 |
+  | - capo | 51 |
+  | - titolo | 9 |
+  | - libro | 1 |
+  | - codice | 1 |
+  | Dottrina | 1630 |
+  | AttoGiudiziario | 827 |
+  | **Relazioni** | |
+  | - :contiene | 1891 |
+  | - :interpreta | 23056 |
+  | - :commenta | 1630 |
 
 ### Hierarchical Tree Extraction - COMPLETATO ✅
 
