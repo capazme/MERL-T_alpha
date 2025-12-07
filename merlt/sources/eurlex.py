@@ -1,9 +1,10 @@
+import logging
 import structlog
 import os
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
-from ..tools.map import EURLEX
-from ..tools.sys_op import BaseScraper
+from merlt.sources.utils.map import EURLEX
+from merlt.sources.base import BaseScraper
 
 # Configure logging
 log = structlog.get_logger()
