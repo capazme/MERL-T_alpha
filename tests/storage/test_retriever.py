@@ -10,15 +10,15 @@ import pytest_asyncio
 from uuid import uuid4, UUID
 from unittest.mock import Mock, AsyncMock, MagicMock
 
-from backend.storage.retriever import (
+from merlt.storage.retriever import (
     GraphAwareRetriever,
     RetrievalResult,
     RetrieverConfig,
     VectorSearchResult,
     GraphPath
 )
-from backend.storage.bridge import BridgeTable, BridgeTableConfig
-from backend.storage.falkordb import FalkorDBClient, FalkorDBConfig
+from merlt.storage.bridge import BridgeTable, BridgeTableConfig
+from merlt.storage.falkordb import FalkorDBClient, FalkorDBConfig
 
 
 @pytest.fixture

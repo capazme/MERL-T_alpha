@@ -25,37 +25,37 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import selectinload
 
 # Project imports
-from backend.orchestration.pipeline_orchestrator import (
+from merlt.orchestration.pipeline_orchestrator import (
     PipelineOrchestrator,
     PipelineContext,
     PipelineStage,
     PipelineExecutionStatus,
     create_pipeline_orchestrator
 )
-from backend.orchestration.intent_classifier import (
+from merlt.orchestration.intent_classifier import (
     IntentResult,
     IntentType
 )
-from backend.preprocessing.kg_enrichment_service import (
+from merlt.preprocessing.kg_enrichment_service import (
     KGEnrichmentService,
     EnrichedContext,
     NormaContext,
     SentenzaContext
 )
-from backend.rlcf_framework.rlcf_feedback_processor import (
+from merlt.rlcf_framework.rlcf_feedback_processor import (
     RLCFFeedbackProcessor,
     ExpertVote,
     FeedbackType,
     FeedbackDecision,
     create_feedback_processor
 )
-from backend.preprocessing.ner_feedback_loop import (
+from merlt.preprocessing.ner_feedback_loop import (
     NERFeedbackLoopManager,
     CorrectionType,
     TrainingExample,
     create_ner_feedback_manager
 )
-from backend.preprocessing.models_kg import Base
+from merlt.preprocessing.models_kg import Base
 
 
 # ==========================================
@@ -353,7 +353,7 @@ class TestRLCFIntegration:
     @pytest.mark.asyncio
     async def test_rlcf_processes_expert_votes(self, rlcf_processor):
         """Test RLCF processor processes expert votes."""
-        from backend.preprocessing.models_kg import EntityTypeEnum
+        from merlt.preprocessing.models_kg import EntityTypeEnum
 
         votes = [
             ExpertVote(
@@ -388,7 +388,7 @@ class TestRLCFIntegration:
     @pytest.mark.asyncio
     async def test_rlcf_detects_controversy(self, rlcf_processor):
         """Test RLCF detects controversies."""
-        from backend.preprocessing.models_kg import EntityTypeEnum
+        from merlt.preprocessing.models_kg import EntityTypeEnum
 
         # Polarized votes (1 and -1)
         votes = [
@@ -409,7 +409,7 @@ class TestRLCFIntegration:
     @pytest.mark.asyncio
     async def test_rlcf_weights_by_authority(self, rlcf_processor):
         """Test RLCF weights votes by expert authority."""
-        from backend.preprocessing.models_kg import EntityTypeEnum
+        from merlt.preprocessing.models_kg import EntityTypeEnum
 
         votes = [
             ExpertVote("high_authority_expert", "ent1", FeedbackType.ENTITY_VALIDATION, 1.0, 0.95),

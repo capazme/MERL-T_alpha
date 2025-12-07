@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.rlcf_framework import authority_module
+from merlt.rlcf_framework import authority_module
 
 
 class TestCalculateBaselineCredentials:
@@ -218,7 +218,7 @@ class TestEvaluatorSafety:
 
     def test_evaluator_initialization(self):
         """Test that the evaluator is properly initialized with safe functions."""
-        from backend.rlcf_framework.authority_module import _get_evaluator
+        from merlt.rlcf_framework.authority_module import _get_evaluator
 
         evaluator = _get_evaluator()
 
@@ -234,7 +234,7 @@ class TestEvaluatorSafety:
 
     def test_evaluator_reuse(self):
         """Test that the evaluator instance is reused."""
-        from backend.rlcf_framework.authority_module import _get_evaluator
+        from merlt.rlcf_framework.authority_module import _get_evaluator
 
         evaluator1 = _get_evaluator()
         evaluator2 = _get_evaluator()

@@ -22,8 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from backend.rlcf_framework import models
-from backend.rlcf_framework.models import TaskType, TaskStatus
+from merlt.rlcf_framework import models
+from merlt.rlcf_framework.models import TaskType, TaskStatus
 
 
 class TestUserModel:

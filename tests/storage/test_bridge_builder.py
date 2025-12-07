@@ -12,9 +12,9 @@ import pytest
 import pytest_asyncio
 from uuid import uuid4, UUID
 
-from backend.storage.bridge import BridgeTable, BridgeTableConfig
-from backend.storage.bridge.bridge_builder import BridgeBuilder, insert_ingestion_result
-from backend.preprocessing.ingestion_pipeline_v2 import BridgeMapping
+from merlt.storage.bridge import BridgeTable, BridgeTableConfig
+from merlt.storage.bridge.bridge_builder import BridgeBuilder, insert_ingestion_result
+from merlt.preprocessing.ingestion_pipeline_v2 import BridgeMapping
 
 
 @pytest_asyncio.fixture(scope="function")

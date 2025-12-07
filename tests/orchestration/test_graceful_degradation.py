@@ -22,12 +22,12 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from datetime import datetime
 
-from backend.preprocessing.kg_enrichment_service import KGEnrichmentService
-from backend.preprocessing.query_understanding import (
+from merlt.preprocessing.kg_enrichment_service import KGEnrichmentService
+from merlt.preprocessing.query_understanding import (
     QueryUnderstandingResult,
     QueryIntentType
 )
-from backend.orchestration.langgraph_workflow import preprocessing_node
+from merlt.orchestration.langgraph_workflow import preprocessing_node
 
 
 # ============================================================================
@@ -225,7 +225,7 @@ async def test_kg_enrichment_redis_connection_error(sample_qu_result):
 async def test_query_understanding_llm_fallback(sample_query):
     """Test query understanding falls back to heuristic when LLM fails."""
 
-    from backend.preprocessing import query_understanding
+    from merlt.preprocessing import query_understanding
 
     # Mock OpenRouter to fail
     with patch('backend.preprocessing.query_understanding.openrouter_service') as mock_openrouter:

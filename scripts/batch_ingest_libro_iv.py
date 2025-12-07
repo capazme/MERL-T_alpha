@@ -33,14 +33,14 @@ from typing import List, Dict, Any, Optional, Tuple
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.storage.falkordb import FalkorDBClient, FalkorDBConfig
-from backend.storage.bridge import BridgeTable, BridgeTableConfig, BridgeBuilder
-from backend.preprocessing.ingestion_pipeline_v2 import IngestionPipelineV2, IngestionResult
-from backend.preprocessing.visualex_ingestion import VisualexArticle, NormaMetadata
-from backend.external_sources.visualex.scrapers.normattiva_scraper import NormattivaScraper
-from backend.external_sources.visualex.scrapers.brocardi_scraper import BrocardiScraper
-from backend.external_sources.visualex.tools.norma import Norma, NormaVisitata
-from backend.external_sources.visualex.tools import urngenerator
+from merlt.storage.falkordb import FalkorDBClient, FalkorDBConfig
+from merlt.storage.bridge import BridgeTable, BridgeTableConfig, BridgeBuilder
+from merlt.preprocessing.ingestion_pipeline_v2 import IngestionPipelineV2, IngestionResult
+from merlt.preprocessing.visualex_ingestion import VisualexArticle, NormaMetadata
+from merlt.external_sources.visualex.scrapers.normattiva_scraper import NormattivaScraper
+from merlt.external_sources.visualex.scrapers.brocardi_scraper import BrocardiScraper
+from merlt.external_sources.visualex.tools.norma import Norma, NormaVisitata
+from merlt.external_sources.visualex.tools import urngenerator
 
 # Configure logging
 logging.basicConfig(

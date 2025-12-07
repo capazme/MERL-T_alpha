@@ -18,8 +18,8 @@ import asyncio
 import pytest
 import pytest_asyncio
 import structlog
-from backend.storage.falkordb.client import FalkorDBClient, FalkorDBConfig
-from backend.external_sources.visualex.tools import urngenerator
+from merlt.storage.falkordb.client import FalkorDBClient, FalkorDBConfig
+from merlt.external_sources.visualex.tools import urngenerator
 
 # Configure logging
 structlog.configure(

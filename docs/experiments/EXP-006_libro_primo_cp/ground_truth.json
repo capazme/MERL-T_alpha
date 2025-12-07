@@ -1,0 +1,1654 @@
+{
+  "metadata": {
+    "source": "Normattiva",
+    "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398",
+    "atto": "Regio Decreto 19 ottobre 1930, n. 1398",
+    "nome": "Codice Penale",
+    "libro": "Primo - Dei reati in generale",
+    "timestamp": "2025-12-06T23:57:40.983861",
+    "note": "Il R.D. contiene: (1) articoli del decreto di promulgazione, (2) articoli del Codice Penale"
+  },
+  "statistics": {
+    "total_articles_rd": 979,
+    "articles_decreto_promulgazione": 3,
+    "articles_libro_primo_cp": 263,
+    "articles_bis_ter": 23
+  },
+  "structure": {
+    "libri": [
+      {
+        "number": "I",
+        "title": "DEI REATI IN GENERALE",
+        "n_children": 21
+      }
+    ],
+    "titoli": {},
+    "capi": {},
+    "sezioni": {}
+  },
+  "articles": [
+    {
+      "number": "1",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art1",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "2",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art2",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "3",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art3",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "3 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art3bis",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "4",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art4",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "5",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art5",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "6",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art6",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "7",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art7",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "8",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art8",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "9",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art9",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "10",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art10",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "11",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art11",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "12",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art12",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "13",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art13",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "14",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art14",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "15",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art15",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "16",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art16",
+      "position": "Libro I - DEI REATI IN GENERALE",
+      "attachment": null
+    },
+    {
+      "number": "17",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art17",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "18",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art18",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "19",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art19",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "20",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art20",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "20 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art20bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "39",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art39",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "40",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art40",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "41",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art41",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "42",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art42",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "43",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art43",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "44",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art44",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "45",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art45",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "46",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art46",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "47",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art47",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "48",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art48",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "49",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art49",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "50",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art50",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "51",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art51",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "52",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art52",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "53",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art53",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "54",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art54",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "55",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art55",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "56",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art56",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "57",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art57",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "57 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art57bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "58",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art58",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "58 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art58bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "85",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art85",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "86",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art86",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "87",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art87",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "88",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art88",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "89",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art89",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "90",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art90",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "91",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art91",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "92",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art92",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "93",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art93",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "94",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art94",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "95",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art95",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "96",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art96",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "97",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art97",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "98",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art98",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "131 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art131bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "132",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art132",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "133",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art133",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "133 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art133bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "133 ter",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art133ter",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "134",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art134",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "135",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art135",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "136",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art136",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "137",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art137",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "138",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art138",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "139",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art139",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "140",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art140",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "150",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art150",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "151",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art151",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "152",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art152",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "153",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art153",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "154",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art154",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "155",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art155",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "156",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art156",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "157",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art157",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "158",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art158",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "159",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art159",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "160",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art160",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "161",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art161",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "161 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art161bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "162",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art162",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "162 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art162bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "162 ter",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art162ter",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "163",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art163",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "164",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art164",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "165",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art165",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "166",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art166",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "167",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art167",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "168",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art168",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "168 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art168bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "168 ter",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art168ter",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "168 quater",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art168quater",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "169",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art169",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "170",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art170",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale",
+      "attachment": null
+    },
+    {
+      "number": "199",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art199",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "200",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art200",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "201",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art201",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "202",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art202",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "203",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art203",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "204",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art204",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "205",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art205",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "206",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art206",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "207",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art207",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "208",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art208",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "209",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art209",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "210",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art210",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "211",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art211",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "211 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art211bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "212",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art212",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "213",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art213",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "214",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art214",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione I - Disposizioni generali",
+      "attachment": null
+    },
+    {
+      "number": "215",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art215",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "216",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art216",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "217",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art217",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "218",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art218",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "219",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art219",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "220",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art220",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "221",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art221",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "222",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art222",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "223",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art223",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "224",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art224",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "225",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art225",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "226",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art226",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "227",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art227",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "228",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art228",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "229",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art229",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "230",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art230",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "231",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art231",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "232",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art232",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "233",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art233",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "234",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art234",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "235",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art235",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo I - Delle specie di pene, in generale, Sezione II - Disposizioni speciali",
+      "attachment": null
+    },
+    {
+      "number": "21",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art21",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "22",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art22",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "23",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art23",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "24",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art24",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "25",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art25",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "26",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art26",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "27",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art27",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "59",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art59",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "60",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art60",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "61",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art61",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "61 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art61bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "62",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art62",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "62 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art62bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "63",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art63",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "64",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art64",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "65",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art65",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "66",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art66",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "67",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art67",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "68",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art68",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "69",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art69",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "69 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art69bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "70",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art70",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "99",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art99",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "100",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art100",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "101",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art101",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "102",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art102",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "103",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art103",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "104",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art104",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "105",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art105",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "106",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art106",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "107",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art107",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "108",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art108",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "109",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art109",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "141",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art141",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "142",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art142",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "143",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art143",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "144",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art144",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "145",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art145",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "146",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art146",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "147",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art147",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "148",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art148",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "149",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art149",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "171",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art171",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "172",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art172",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "173",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art173",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "174",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art174",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "175",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art175",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "176",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art176",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "177",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art177",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "178",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art178",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "179",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art179",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "180",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art180",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "181",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art181",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "236",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art236",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "237",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art237",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "238",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art238",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "239",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art239",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "240",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art240",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "240 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art240bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo II - Delle pene principali, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "28",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art28",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "29",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art29",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "30",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art30",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "31",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art31",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "32",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art32",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "32 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art32bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "32 ter",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art32ter",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "32 quater",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art32quater",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "32 quinquies",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art32quinquies",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "33",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art33",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "34",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art34",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "35",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art35",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "35 bis",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art35bis",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "36",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art36",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "37",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art37",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "38",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art38",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "71",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art71",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "72",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art72",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "73",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art73",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "74",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art74",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "75",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art75",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "76",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art76",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "77",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art77",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "78",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art78",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "79",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art79",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "80",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art80",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "81",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art81",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "82",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art82",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "83",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art83",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "84",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art84",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "110",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art110",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "111",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art111",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "112",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art112",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "113",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art113",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "114",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art114",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "115",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art115",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "116",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art116",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "117",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art117",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "118",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art118",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "119",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art119",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "182",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art182",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "183",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art183",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "184",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art184",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "185",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art185",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "186",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art186",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "187",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art187",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "188",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art188",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "189",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art189",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "190",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art190",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "191",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art191",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "192",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art192",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "193",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art193",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "194",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art194",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "195",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art195",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "196",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art196",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "197",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art197",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "198",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art198",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo III - Delle pene accessorie, in particolare",
+      "attachment": null
+    },
+    {
+      "number": "120",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art120",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo IV - Della persona offesa dal reato",
+      "attachment": null
+    },
+    {
+      "number": "121",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art121",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo IV - Della persona offesa dal reato",
+      "attachment": null
+    },
+    {
+      "number": "122",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art122",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo IV - Della persona offesa dal reato",
+      "attachment": null
+    },
+    {
+      "number": "123",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art123",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo IV - Della persona offesa dal reato",
+      "attachment": null
+    },
+    {
+      "number": "124",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art124",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo IV - Della persona offesa dal reato",
+      "attachment": null
+    },
+    {
+      "number": "125",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art125",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo IV - Della persona offesa dal reato",
+      "attachment": null
+    },
+    {
+      "number": "126",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art126",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo IV - Della persona offesa dal reato",
+      "attachment": null
+    },
+    {
+      "number": "127",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art127",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo IV - Della persona offesa dal reato",
+      "attachment": null
+    },
+    {
+      "number": "128",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art128",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo IV - Della persona offesa dal reato",
+      "attachment": null
+    },
+    {
+      "number": "129",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art129",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo IV - Della persona offesa dal reato",
+      "attachment": null
+    },
+    {
+      "number": "130",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art130",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo IV - Della persona offesa dal reato",
+      "attachment": null
+    },
+    {
+      "number": "131",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art131",
+      "position": "Libro I - DEI REATI IN GENERALE, Capo IV - Della persona offesa dal reato",
+      "attachment": null
+    }
+  ],
+  "decreto_promulgazione": [
+    {
+      "number": "1",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art1",
+      "position": null,
+      "attachment": null
+    },
+    {
+      "number": "2",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art2",
+      "position": null,
+      "attachment": null
+    },
+    {
+      "number": "3",
+      "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398~art3",
+      "position": null,
+      "attachment": null
+    }
+  ],
+  "bis_ter_articles": [
+    "3 bis",
+    "20 bis",
+    "57 bis",
+    "58 bis",
+    "131 bis",
+    "133 bis",
+    "133 ter",
+    "161 bis",
+    "162 bis",
+    "162 ter",
+    "168 bis",
+    "168 ter",
+    "168 quater",
+    "211 bis",
+    "61 bis",
+    "62 bis",
+    "69 bis",
+    "240 bis",
+    "32 bis",
+    "32 ter",
+    "32 quater",
+    "32 quinquies",
+    "35 bis"
+  ]
+}

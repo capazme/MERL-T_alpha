@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.rlcf_framework import aggregation_engine
+from merlt.rlcf_framework import aggregation_engine
 
 
 class TestCalculateDisagreement:

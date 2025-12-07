@@ -27,16 +27,16 @@ class SilentLogger:
     def exception(self, *args, **kwargs): pass
     def bind(self, *args, **kwargs): return self
 
-import backend.external_sources.visualex.tools.treextractor as treextractor
+import merlt.external_sources.visualex.tools.treextractor as treextractor
 treextractor.log = SilentLogger()
 
-from backend.external_sources.visualex.tools.treextractor import (
+from merlt.external_sources.visualex.tools.treextractor import (
     get_hierarchical_tree,
     get_article_position,
     NormTree,
 )
-from backend.storage.falkordb.client import FalkorDBClient
-from backend.preprocessing.ingestion_pipeline_v2 import IngestionPipelineV2
+from merlt.storage.falkordb.client import FalkorDBClient
+from merlt.preprocessing.ingestion_pipeline_v2 import IngestionPipelineV2
 
 
 @dataclass

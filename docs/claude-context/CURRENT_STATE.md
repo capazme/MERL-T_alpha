@@ -9,37 +9,221 @@
 
 | Campo | Valore |
 |-------|--------|
-| **Data ultimo aggiornamento** | 4 Dicembre 2025 (19:15) |
-| **Fase progetto** | **Grafo aggiornato con gerarchia completa** - 1005 nodi Norma |
-| **Prossimo obiettivo** | Embedding generation + Query testing |
+| **Data ultimo aggiornamento** | 7 Dicembre 2025 (02:30) |
+| **Fase progetto** | **Refactoring Completato** - `merlt/` package |
+| **Prossimo obiettivo** | Testing CI/CD, stabilizzazione |
 | **Blocchi attivi** | Nessuno |
 
 ---
 
-## Architettura v2 - Cambiamenti Principali
+## REFACTORING COMPLETATO: backend/ → merlt/
 
-### Da v1 a v2:
-| Aspetto | v1 | v2 |
-|---------|----|----|
-| Expert | Passivi | Autonomi con tools |
-| Graph DB | Neo4j | FalkorDB (496x piu veloce) |
-| Vector-Graph | Separati | Bridge Table integrata |
-| RLCF | Scalare | Multilivello |
-| Pesi | Statici | Apprendibili (theta_*) |
+### Struttura Nuova
+```
+merlt/                           # Package principale
+├── __init__.py                  # from merlt import LegalKnowledgeGraph
+├── config/                      # TEST_ENV, PROD_ENV
+├── core/                        # LegalKnowledgeGraph, MerltConfig
+├── sources/                     # NormattivaScraper, BrocardiScraper
+│   └── utils/                   # norma, urn, tree, text, http
+├── storage/                     # graph/, vectors/, bridge/, retriever/
+├── pipeline/                    # ingestion, parsing, chunking, multivigenza
+├── rlcf/                        # authority, aggregation
+└── utils/                       # Shared utilities
+```
 
-### Documenti v2 Creati:
-- `docs/03-architecture/02-orchestration-layer.md` (v2)
-- `docs/03-architecture/03-reasoning-layer.md` (v2)
-- `docs/03-architecture/04-storage-layer.md` (v2)
-- `docs/03-architecture/05-learning-layer.md` (v2)
-- `docs/SYSTEM_ARCHITECTURE.md` (v2)
+### Imports Aggiornati
+```python
+# Prima
+from backend.core import LegalKnowledgeGraph
+from backend.external_sources.visualex.scrapers.normattiva_scraper import NormattivaScraper
 
-### Archivio v1:
-- `docs/03-architecture/archive/v1-*.md`
+# Dopo
+from merlt import LegalKnowledgeGraph
+from merlt.sources import NormattivaScraper, BrocardiScraper
+from merlt.storage.graph import FalkorDBClient
+from merlt.pipeline import IngestionPipelineV2
+```
+
+### File CI/CD Aggiornati
+- `.github/workflows/ci.yml` - Aggiornato per `merlt/`
+- `pyproject.toml` - Creato per package installabile
+
+### Legacy Code Archiviato
+- `_archive/` - Tutto il codice vecchio spostato qui
 
 ---
 
-## Cosa Abbiamo Fatto (Sessione Corrente - 4 Dic 2025, Pomeriggio/Sera)
+## Cosa Abbiamo Fatto (Sessione Corrente - 7 Dic 2025)
+
+### Refactoring backend/ → merlt/ - COMPLETATO ✅
+
+- [x] **Step 1**: Rinominato `backend/` → `merlt/`
+- [x] **Step 2-3**: Creata nuova struttura directories e spostati file
+- [x] **Step 4-5**: Aggiornati tutti gli imports e creati `__init__.py`
+- [x] **Step 6**: Archiviato codice legacy in `_archive/`
+- [x] **Step 7-9**: Aggiornati scripts, tests, docs
+- [x] **Verifica**: Tutti gli imports funzionano ✅
+
+### CI/CD Setup
+- [x] `pyproject.toml` creato con dependencies e tool config
+- [x] `.github/workflows/ci.yml` aggiornato per `merlt/`
+- [x] `tests/conftest.py` creato con fixtures base
+
+### Core Library Implementata - COMPLETATO ✅
+
+- [x] **`merlt/core/legal_knowledge_graph.py`** ✅:
+  - Classe `LegalKnowledgeGraph` che coordina tutti i componenti
+  - Classe `MerltConfig` per configurazione unificata
+  - Metodo `ingest_norm()` con integrazione completa
+  - Metodo `search()` per ricerca ibrida
+
+### EXP-006: Ingestion Libro Primo CP - COMPLETATO ✅
+
+- [x] **Ingestion 263 articoli** ✅:
+  - 263/263 processati (100%)
+  - 262/263 con Brocardi (99.6%)
+  - 6,195 massime totali
+
+- [x] **RAG Test** ✅:
+  - 12 query di test
+  - Precision@5: 0.200
+  - Recall: 0.528
+  - MRR: 0.562
+  - Verdict: ACCEPTABLE
+
+---
+
+## Cosa Abbiamo Fatto (Sessione Precedente - 6 Dic 2025)
+
+### EXP-005: Fix Multivigenza e Validazione - COMPLETATO ✅
+
+- [x] **Bug Fix 1: Filtering articolo** ✅:
+  - Problema: `startswith()` matchava Art. 14 cercando Art. 1
+  - Fix: Confronto numeri base esatti (`nv_base != target_base`)
+
+- [x] **Bug Fix 2: is_abrogato troppo permissivo** ✅:
+  - Problema: Articolo marcato "abrogato" anche se solo un comma era abrogato
+  - Fix: Nuovo metodo `is_article_level_abrogation(for_article=X)`
+
+- [x] **Bug Fix 3: Parsing destinazione** ✅:
+  - Problema: Regex non catturava "del comma 2 dell'art. 2-bis"
+  - Fix: Pattern esteso per entrambi i formati (articolo-prima e comma-prima)
+
+- [x] **Validazione Ground Truth Normattiva** ✅:
+  | Articolo | Sistema | Normattiva | Status |
+  |----------|---------|------------|--------|
+  | Art. 1 | Vigente | Vigente | ✅ |
+  | Art. 2 | Vigente | Vigente | ✅ |
+  | Art. 2-bis | Vigente | Vigente (comma 2 abrogato) | ✅ |
+  | Art. 3 | Vigente | Vigente | ✅ |
+  | Art. 3-bis | Vigente | Vigente | ✅ |
+
+### File Modificati:
+- `merlt/external_sources/visualex/tools/norma.py`: Campo `destinazione`, metodo `is_article_level_abrogation()`
+- `merlt/external_sources/visualex/scrapers/normattiva_scraper.py`: Parsing migliorato
+- `merlt/preprocessing/multivigenza_pipeline.py`: Logica is_abrogato corretta
+
+---
+
+## Cosa Abbiamo Fatto (Sessione Precedente - 5 Dic 2025, Pomeriggio)
+
+### EXP-004: Ingestion Costituzione Italiana - COMPLETATO ✅
+
+- [x] **Design document** ✅:
+  - Creato `docs/experiments/EXP-004_ingestion_costituzione/DESIGN.md`
+  - 139 articoli target (Principi Fondamentali + Parte I + Parte II)
+
+- [x] **Script ingestion** ✅:
+  - Riutilizzato `BrocardiScraper` esistente (no duplicazione codice)
+  - Fix: collection Qdrant `merl_t_chunks` (non `legal_chunks`)
+  - Fix: porta FalkorDB 6380 (non 6379)
+  - Fix: `Norma(tipo_atto=...)` (non `tipo_atto_str`)
+
+- [x] **Risultati FalkorDB** ✅:
+  | Metrica | Valore |
+  |---------|--------|
+  | Nodi Norma (articoli) | 139 |
+  | Nodi Dottrina (spiegazioni) | 133 |
+  | Nodi AttoGiudiziario (massime) | 14 |
+
+- [x] **Risultati Qdrant** ✅:
+  | Metrica | Valore |
+  |---------|--------|
+  | Embeddings articoli | 138 |
+  | Embeddings massime | 14 |
+  | Totale collection | **10,814** |
+
+- [x] **Storage totale aggiornato** ✅:
+  | Fonte | Articoli | Massime | Embeddings |
+  |-------|----------|---------|------------|
+  | Libro IV CC | 887 | 9,775 | 10,662 |
+  | Costituzione | 139 | 14 | 152 |
+  | **Totale** | **1,026** | **9,789** | **10,814** |
+
+---
+
+## Cosa Abbiamo Fatto (Sessione Precedente - 5 Dic 2025, Mattina)
+
+### Pulizia Duplicati e Re-Embedding Article-Level - COMPLETATO ✅
+
+- [x] **Problema identificato** ✅:
+  - Art. 1284 aveva **46 chunks identici** (bug ingestion, non chunking)
+  - Bridge Table: 2,546 righe, solo **881 URN unici** (65% duplicati!)
+  - Ogni articolo aveva ~3 copie dello stesso embedding troncato
+
+- [x] **Step 1: Pulizia Bridge Table** ✅:
+  - Query con ROW_NUMBER() OVER (PARTITION BY graph_node_urn, chunk_text)
+  - Righe prima: 2,546 → dopo: **881** (-1,665 duplicati)
+
+- [x] **Step 2: Pulizia Qdrant Norma** ✅:
+  - Scroll + group by URN + keep first
+  - Punti prima: 2,546 → dopo: **881** (-1,665 duplicati)
+
+- [x] **Step 3: Re-Embedding Article-Level** ✅:
+  - Strategia: 1 embedding per articolo (testo completo) invece di comma-level
+  - Script: `scripts/reembed_articles.py`
+  - Articoli letti da FalkorDB: **887** (source of truth)
+  - Nuovi embeddings generati: **887** (vs 881 precedenti, +6 mancanti)
+  - Art. 1284: da 500 chars (preview) a **7,523 chars** (testo completo)
+
+- [x] **Step 4: Verifica** ✅:
+  - Test ricerca "tasso interesse legale": Art. 1284 = #1 (score 0.8517)
+  - Test duplicati: **NESSUN DUPLICATO** nei top-10 risultati ✅
+  - Massime invariate: 9,775
+
+- [x] **Stato finale storage** ✅:
+  | Storage | Prima | Dopo |
+  |---------|-------|------|
+  | **Qdrant Norma** | 2,546 | **887** |
+  | **Qdrant Massime** | 9,775 | 9,775 |
+  | **Qdrant Totale** | 12,321 | **10,662** |
+  | **Bridge Table** | 2,546 | **887** |
+  | **Art. 1284 text** | 500 chars | **7,523 chars** |
+
+---
+
+## Cosa Abbiamo Fatto (Sessione Precedente - 5 Dic 2025, Notte)
+
+### Massime Embedding Completo - COMPLETATO ✅
+
+- [x] **Pulizia duplicati Qdrant** ✅:
+  - Due script embed_massime.py eseguiti in parallelo avevano creato duplicati
+  - Duplicati trovati: **4,832** (ogni massima aveva 2 copie)
+  - Duplicati rimossi: **4,832**
+  - Massime uniche residue: **6,592**
+
+- [x] **Embedding massime mancanti** ✅:
+  - Grafo corretto identificato: `merl_t_legal` (non `legal_graph`)
+  - Massime in FalkorDB: **9,775**
+  - Massime già embeddate: **6,592**
+  - Massime mancanti: **3,183**
+  - Script: `scripts/embed_massime.py --batch-size 64`
+  - Tempo: ~6 minuti
+
+---
+
+## Cosa Abbiamo Fatto (Sessione Precedente - 4 Dic 2025, Pomeriggio/Sera)
 
 ### Aggiornamento Grafo con Gerarchia Completa - COMPLETATO ✅
 
@@ -90,7 +274,7 @@
   - 24/24 test passano
 
 - [x] **Sincronizzazione backend** ✅:
-  - Copia su `backend/external_sources/visualex/tools/treextractor.py`
+  - Copia su `merlt/external_sources/visualex/tools/treextractor.py`
 
 - [x] **Integrazione treextractor in pipeline** ✅:
   - `ingest_article()` accetta `norm_tree` opzionale
@@ -101,6 +285,32 @@
 ### Note:
 - L'estrazione gerarchica da Normattiva serve come fallback quando Brocardi non è disponibile
 - Gli articoli senza gerarchia (es. Art. 1-2 CC, Disposizioni sulla legge) restano senza position
+
+### Embedding Generation - COMPLETATO ✅
+
+- [x] **Script `scripts/generate_embeddings.py`** ✅:
+  - Connette a PostgreSQL, FalkorDB, Qdrant
+  - Carica modello `intfloat/multilingual-e5-large` su MPS (Apple Silicon)
+  - Genera embeddings per tutti i chunks della Bridge Table
+  - Salva in Qdrant con payload (URN, node_type, text_preview)
+
+- [x] **Risultati embedding generation** ✅:
+  | Metrica | Valore |
+  |---------|--------|
+  | Chunks processati | **2,546** |
+  | Embeddings generati | **2,546** |
+  | Errori | **0** |
+  | Tempo totale | ~8 minuti |
+  | Modello | `intfloat/multilingual-e5-large` |
+  | Dimensione | 1024 |
+  | Device | MPS (Apple Silicon) |
+
+- [x] **Stato Storage Completo** ✅:
+  | Storage | Contenuto |
+  |---------|-----------|
+  | FalkorDB | 3,462 nodi, 26,577 relazioni |
+  | PostgreSQL | 2,546 bridge mappings |
+  | Qdrant | 2,546 vectors (1024 dim) |
 
 ---
 
@@ -142,18 +352,18 @@
 ## Cosa Abbiamo Fatto (Sessione Precedente - 3 Dic 2025, Notte)
 
 - [x] **CommaParser** ✅:
-  - File: `backend/preprocessing/comma_parser.py` (350+ lines)
+  - File: `merlt/preprocessing/comma_parser.py` (350+ lines)
   - Parsa article_text → ArticleStructure(numero_articolo, rubrica, List<Comma>)
   - Regex per bis/ter/quater, rubrica, comma parsing
   - Token counting con tiktoken (cl100k_base)
   - 39/39 test passano
 - [x] **StructuralChunker** ✅:
-  - File: `backend/preprocessing/structural_chunker.py` (300+ lines)
+  - File: `merlt/preprocessing/structural_chunker.py` (300+ lines)
   - Crea Chunk con URN interno (con comma) e URL esterno (senza comma)
   - Metadata: libro, titolo, capo, sezione da Brocardi position
   - 17/17 test passano
 - [x] **IngestionPipelineV2** ✅:
-  - File: `backend/preprocessing/ingestion_pipeline_v2.py` (500+ lines)
+  - File: `merlt/preprocessing/ingestion_pipeline_v2.py` (500+ lines)
   - USA (non modifica) urngenerator e visualex_client esistenti
   - Integra CommaParser + StructuralChunker
   - Crea nodi grafo con 21 properties per Norma
@@ -161,7 +371,7 @@
   - Prepara BridgeMapping objects per Bridge Table
   - 21/21 test passano
 - [x] **BridgeBuilder** ✅:
-  - File: `backend/storage/bridge/bridge_builder.py` (175 lines)
+  - File: `merlt/storage/bridge/bridge_builder.py` (175 lines)
   - Converte BridgeMapping → Bridge Table format
   - Mapping types: PRIMARY, HIERARCHIC, CONCEPT, DOCTRINE, JURISPRUDENCE
   - Batch insertion support
@@ -193,13 +403,13 @@
 
 ## Cosa Abbiamo Fatto (Sessione Precedente - 3 Dic 2025, Pomeriggio)
 
-- [x] **Archiviato codice v1** in `backend/archive_v1/`
+- [x] **Archiviato codice v1** in `merlt/archive_v1/`
 - [x] **Struttura modulare v2**:
-  - `backend/interfaces/` - IStorageService, IExpert, IRLCFService
-  - `backend/services/` - ServiceRegistry (monolith/distributed)
-  - `backend/storage/` - FalkorDB, Bridge, Retriever
-  - `backend/orchestration/gating/` - ExpertGatingNetwork
-  - `backend/external_sources/visualex/` - Scrapers + tools integrati
+  - `merlt/interfaces/` - IStorageService, IExpert, IRLCFService
+  - `merlt/services/` - ServiceRegistry (monolith/distributed)
+  - `merlt/storage/` - FalkorDB, Bridge, Retriever
+  - `merlt/orchestration/gating/` - ExpertGatingNetwork
+  - `merlt/external_sources/visualex/` - Scrapers + tools integrati
 - [x] **FalkorDBClient reale**:
   - Implementato con falkordb-py
   - Async wrapper con executor (library è sync)
@@ -242,7 +452,7 @@
   - Hybrid scoring: `final_score = α * similarity + (1-α) * graph_score`
   - Alpha learnable da RLCF feedback (bounds [0.3, 0.9])
   - Shortest path calculation con expert-specific traversal weights
-  - Parametri esternalizzati in `backend/config/retriever_weights.yaml`
+  - Parametri esternalizzati in `merlt/config/retriever_weights.yaml`
   - 4 expert types: LiteralExpert, SystemicExpert, PrinciplesExpert, PrecedentExpert
   - ✓ 11/12 test passano (1 skipped per mancanza dati)
   - 510 LOC totali (models.py + retriever.py)
@@ -269,7 +479,7 @@
 ### Priorita 1.5: Batch Ingestion - COMPLETATA ✅
 - [x] Script batch ingestion per 887 articoli Libro IV
 - [x] Monitoring e progress tracking
-- [ ] Embedding generation con E5-large (HuggingFace)
+- [x] Embedding generation con E5-large (HuggingFace) ✅
 
 ### Priorita 1.6: Brocardi Enrichment - COMPLETATO ✅
 - [x] Brocardi integrato direttamente in EXP-001

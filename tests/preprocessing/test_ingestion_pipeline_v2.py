@@ -10,13 +10,13 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
-from backend.preprocessing.ingestion_pipeline_v2 import (
+from merlt.preprocessing.ingestion_pipeline_v2 import (
     IngestionPipelineV2,
     IngestionResult,
     BridgeMapping,
     ingest_article_v2,
 )
-from backend.preprocessing.visualex_ingestion import VisualexArticle, NormaMetadata
+from merlt.preprocessing.visualex_ingestion import VisualexArticle, NormaMetadata
 
 
 # Test fixtures
@@ -222,8 +222,8 @@ class TestPrepareBridgeMappings:
         pipeline = IngestionPipelineV2()
 
         # Parse and chunk
-        from backend.preprocessing.comma_parser import parse_article
-        from backend.preprocessing.structural_chunker import chunk_article
+        from merlt.preprocessing.comma_parser import parse_article
+        from merlt.preprocessing.structural_chunker import chunk_article
 
         article_structure = parse_article(sample_article.article_text)
         chunks = chunk_article(
@@ -301,7 +301,7 @@ class TestIngestArticleWithoutGraph:
 
     async def test_ingest_with_treextractor_fallback(self, sample_article_no_brocardi):
         """Test that treextractor fallback provides hierarchy when Brocardi not available."""
-        from backend.external_sources.visualex.tools.treextractor import (
+        from merlt.external_sources.visualex.tools.treextractor import (
             NormTree, NormNode, NormLevel
         )
 

@@ -9,8 +9,8 @@ from parsed articles.
 import pytest
 from uuid import UUID
 
-from backend.preprocessing.comma_parser import ArticleStructure, Comma, parse_article
-from backend.preprocessing.structural_chunker import (
+from merlt.preprocessing.comma_parser import ArticleStructure, Comma, parse_article
+from merlt.preprocessing.structural_chunker import (
     StructuralChunker,
     Chunk,
     ChunkMetadata,

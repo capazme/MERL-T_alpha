@@ -11,7 +11,7 @@ Tests:
 import pytest
 from datetime import datetime
 
-from backend.orchestration.api.main import app
+from merlt.orchestration.api.main import app
 from fastapi.testclient import TestClient
 
 # Test client

@@ -25,7 +25,7 @@ import json
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.orchestration.intent_classifier import (
+from merlt.orchestration.intent_classifier import (
     IntentType,
     IntentResult,
     IntentConfigLoader,

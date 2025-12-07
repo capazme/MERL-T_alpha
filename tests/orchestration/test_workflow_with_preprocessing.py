@@ -23,11 +23,11 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 
-from backend.orchestration.langgraph_workflow import (
+from merlt.orchestration.langgraph_workflow import (
     create_merlt_workflow,
     MEGLTState
 )
-from backend.preprocessing.query_understanding import (
+from merlt.preprocessing.query_understanding import (
     QueryUnderstandingResult,
     QueryIntentType
 )

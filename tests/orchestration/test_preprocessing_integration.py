@@ -26,14 +26,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 
 # Import preprocessing modules
-from backend.preprocessing import query_understanding
-from backend.preprocessing.query_understanding import (
+from merlt.preprocessing import query_understanding
+from merlt.preprocessing.query_understanding import (
     QueryUnderstandingResult,
     QueryIntentType,
     LegalEntity,
     LegalEntityType
 )
-from backend.preprocessing.kg_enrichment_service import (
+from merlt.preprocessing.kg_enrichment_service import (
     KGEnrichmentService,
     EnrichedContext,
     NormaContext,
@@ -41,7 +41,7 @@ from backend.preprocessing.kg_enrichment_service import (
 )
 
 # Import LangGraph workflow
-from backend.orchestration.langgraph_workflow import (
+from merlt.orchestration.langgraph_workflow import (
     preprocessing_node,
     MEGLTState
 )

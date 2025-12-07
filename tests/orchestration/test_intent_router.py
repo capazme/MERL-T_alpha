@@ -18,8 +18,8 @@ from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 
-from backend.rlcf_framework.main import app
-from backend.orchestration.intent_classifier import IntentType
+from merlt.rlcf_framework.main import app
+from merlt.orchestration.intent_classifier import IntentType
 
 # Create test client
 client = TestClient(app)

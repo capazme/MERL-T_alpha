@@ -18,7 +18,7 @@ Test coverage:
 """
 
 import pytest
-from backend.preprocessing.label_mapping import (
+from merlt.preprocessing.label_mapping import (
     LabelMappingManager,
     LabelCategory,
     LabelMetadata,

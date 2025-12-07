@@ -1,42 +1,194 @@
 # CLAUDE.md
 
-> **Versione**: 3.1 | **Ultimo aggiornamento**: 3 Dicembre 2025
-
-Questo file contiene le istruzioni operative per Claude Code. Per i dettagli tecnici, consulta `docs/`.
+> **Versione**: 4.0 | **Ultimo aggiornamento**: 7 Dicembre 2025
 
 ---
 
-## Quick Start
+## MISSIONE PRINCIPALE
 
-**Prima di iniziare ogni sessione, leggi:**
-1. `docs/claude-context/CURRENT_STATE.md` - Stato attuale e prossimi passi
-2. `docs/claude-context/PROGRESS_LOG.md` - Cosa è stato fatto
-3. `docs/experiments/INDEX.md` - Esperimenti in corso (se rilevanti)
+**Stai costruendo `merlt`**: la libreria Python di riferimento per l'informatica giuridica italiana.
 
-**Reference tecnico:**
-- `docs/SYSTEM_ARCHITECTURE.md` - Mappa completa del sistema
-- `docs/02-methodology/rlcf/RLCF.md` - Paper teorico RLCF
-- `docs/08-iteration/NEXT_STEPS.md` - Piano dettagliato
-
-**Per esperimenti:**
-- `docs/experiments/` - Documentazione esperimenti per tesi
-- `docs/experiments/TEMPLATE.md` - Template per nuovi esperimenti
+Ogni riga di codice che scrivi sarà usata da giuristi-programmatori per costruire il codice civile digitale del futuro. Scrivi come se stessi creando `pandas` o `requests` - API chiare, documentazione eccellente, zero duplicazioni.
 
 ---
 
-## Il Progetto in 30 Secondi
+## Prima di Ogni Sessione
 
-**MERL-T** = Sistema AI per ricerca giuridica con validazione comunitaria (RLCF)
+**Leggi in ordine:**
+1. `docs/claude-context/LIBRARY_VISION.md` - **Principi guida della libreria**
+2. `docs/claude-context/CURRENT_STATE.md` - Stato attuale
+3. `docs/claude-context/PROGRESS_LOG.md` - Contesto recente
+
+---
+
+## API Target della Libreria
+
+```python
+# Questo è ciò che l'utente finale deve poter fare:
+from merlt import LegalKnowledgeGraph
+
+kg = LegalKnowledgeGraph()
+await kg.connect()
+
+# Una riga per ingestion
+article = await kg.ingest("codice penale", "52")
+
+# Una riga per ricerca
+results = await kg.search("legittima difesa")
+
+# Tutto il resto (grafo, vettori, bridge, multivigenza) è automatico
+```
+
+Se un'operazione comune richiede più di 3 righe, **ripensa l'API**.
+
+---
+
+## Principi di Sviluppo
+
+### 1. ZERO DUPLICAZIONI
+
+```python
+# PRIMA di scrivere qualsiasi funzione:
+# 1. Cerca se esiste già in merlt/
+# 2. Se esiste, riutilizzala
+# 3. Se non esiste, creala nel posto giusto (non negli scripts)
+
+# MAI così:
+def my_custom_scraper():  # ❌ Duplica NormattivaScraper
+    ...
+
+# SEMPRE così:
+from merlt.sources import NormattivaScraper  # ✅ Riusa
+```
+
+### 2. COMPOSABILITÀ
+
+```python
+# Ogni componente DEVE funzionare da solo:
+from merlt.sources import NormattivaScraper
+scraper = NormattivaScraper()
+text = await scraper.fetch("codice civile", "1453")  # ✅ Funziona isolato
+
+# Ma anche insieme:
+from merlt import LegalKnowledgeGraph  # ✅ Orchestrazione automatica
+```
+
+### 3. MAI LOGICA NEGLI SCRIPTS
+
+```python
+# scripts/ sono SOLO entry points:
+
+# scripts/ingest_cp.py - CORRETTO
+from merlt import LegalKnowledgeGraph
+
+async def main():
+    kg = LegalKnowledgeGraph()
+    await kg.ingest_batch("codice penale", libro="I")
+
+# scripts/ingest_cp.py - SBAGLIATO
+async def main():
+    # 200 righe di logica custom ❌
+    for article in articles:
+        text = await scraper.fetch(...)
+        parsed = parse_article(text)
+        # ... altro codice che dovrebbe essere in merlt/
+```
+
+### 4. DOCUMENTAZIONE ITALIANA
+
+```python
+async def cerca(query: str, top_k: int = 5) -> List[Risultato]:
+    """
+    Cerca nel knowledge graph giuridico.
+
+    Args:
+        query: Domanda in linguaggio naturale
+               (es. "Cos'è la legittima difesa?")
+        top_k: Numero massimo di risultati
+
+    Returns:
+        Lista di Risultato con articoli e contesto
+
+    Example:
+        >>> risultati = await kg.cerca("responsabilità del debitore")
+        >>> print(risultati[0].articolo)
+        "Art. 1218 c.c."
+    """
+```
+
+---
+
+## Struttura Package
 
 ```
-Query → [Preprocessing] → [Router LLM] → [3 Agents] → [4 Experts] → [Synthesis] → Answer
-                              │                │              │
-                              ▼                ▼              ▼
-                          OpenRouter      FalkorDB/Qdrant  Claude/Gemini
-                          (API key)       (in popolamento) (API key)
+merlt/                           # Package principale
+├── __init__.py                  # API pubblica: LegalKnowledgeGraph, MerltConfig
+├── config/                      # ⚙️ Configurazione
+│   └── environments.py          # TEST_ENV, PROD_ENV
+│
+├── core/                        # 🎯 Orchestrazione (entry point)
+│   └── legal_knowledge_graph.py # LegalKnowledgeGraph, MerltConfig
+│
+├── sources/                     # 📥 Fonti dati
+│   ├── base.py                  # BaseScraper (interfaccia)
+│   ├── normattiva.py            # NormattivaScraper
+│   ├── brocardi.py              # BrocardiScraper
+│   └── utils/                   # Utilities (norma, urn, tree, text, http)
+│
+├── storage/                     # 🗄️ Persistence
+│   ├── graph/                   # FalkorDB client
+│   ├── vectors/                 # EmbeddingService
+│   ├── bridge/                  # Bridge Table (chunk ↔ nodo)
+│   └── retriever/               # GraphAwareRetriever
+│
+├── pipeline/                    # ⚙️ Processing
+│   ├── ingestion.py             # IngestionPipelineV2
+│   ├── parsing.py               # CommaParser
+│   ├── chunking.py              # StructuralChunker
+│   └── multivigenza.py          # MultivigenzaPipeline
+│
+├── rlcf/                        # 🧠 RLCF Framework
+│   ├── authority.py             # AuthorityModule
+│   └── aggregation.py           # AggregationEngine
+│
+├── models/                      # 📦 Data models
+└── utils/                       # 🔧 Utilities
 ```
 
-**Stato**: Pipeline ingestion v2 completa. Pronto per batch 887 articoli Libro IV.
+---
+
+## Pattern di Codice
+
+### Async First
+
+```python
+# Tutte le operazioni I/O sono async
+async def ingest(self, tipo_atto: str, articolo: str) -> IngestionResult:
+    ...
+```
+
+### Type Hints Sempre
+
+```python
+from typing import List, Optional, Dict, Any
+from dataclasses import dataclass
+
+@dataclass
+class IngestionResult:
+    article_urn: str
+    nodes_created: List[str]
+    errors: List[str]
+```
+
+### Error Handling Graceful
+
+```python
+# Mai fallire completamente, degradare gracefully
+result = await kg.ingest("codice penale", "52")
+if result.errors:
+    logger.warning(f"Completato con warning: {result.errors}")
+# L'operazione continua per il resto
+```
 
 ---
 
@@ -46,195 +198,59 @@ Query → [Preprocessing] → [Router LLM] → [3 Agents] → [4 Experts] → [S
 |---------|--------|
 | **Chi** | Studente di giurisprudenza (non programmatore) |
 | **Cosa** | Tesi su "sociologia computazionale del diritto" |
-| **Timeline** | 6 mesi full-time, estendibili a 1 anno |
-| **Budget** | Limitato (~€200-500 totali per API) |
-| **Stile coding** | "Vibe coder" con LLM |
-| **Lingua** | Italiano per comunicazioni, inglese per codice |
+| **Obiettivo** | Creare libreria di riferimento per informatica giuridica IT |
+| **Lingua** | Italiano per documentazione, inglese per codice |
 
 ---
 
-## Metodologia di Lavoro
+## Checklist Pre-Commit
 
-### 1. Inizio Sessione
-```
-1. Leggi CURRENT_STATE.md per capire dove siamo
-2. Leggi PROGRESS_LOG.md per contesto recente
-3. Chiedi conferma dell'obiettivo della sessione
-```
-
-### 2. Durante la Sessione
-```
-- Reality-check frequenti (non andare nel teorico)
-- Documentare ogni passo significativo
-- Test incrementali, mai big bang
-- Se qualcosa non funziona: fermarsi, capire, documentare
-```
-
-### 3. Fine Sessione
-```
-1. Aggiorna CURRENT_STATE.md con nuovo stato
-2. Aggiungi entry in PROGRESS_LOG.md
-3. Se esperimento: aggiorna docs/experiments/EXP-NNN/
-4. Commit con messaggio semantico (feat:, fix:, docs:)
-```
-
-### 4. Comunicazione
-```
-- Sii diretto e pratico, evita over-engineering
-- Se vedi che vado nel teorico: fermami
-- Proponi soluzioni concrete con effort stimato
-- Domanda se qualcosa non è chiaro
-```
-
-### 5. Documentazione Esperimenti (per Tesi)
-```
-Per ogni esperimento significativo (ingestion, training, evaluation):
-1. Crea cartella EXP-NNN in docs/experiments/
-2. Compila DESIGN.md PRIMA di eseguire (ipotesi, metodologia)
-3. Documenta EXECUTION.md DURANTE l'esecuzione (comandi, errori)
-4. Registra RESULTS.md con metriche oggettive
-5. Analizza in ANALYSIS.md per la tesi (interpretazione, conclusioni)
-
-Naming: EXP-001_nome_descrittivo (snake_case, max 30 char)
-Status: PLANNED → RUNNING → COMPLETED/FAILED/ABANDONED
-```
-
----
-
-## Pattern di Codice
-
-### Import (CRITICI)
-```python
-# Dentro un package (backend/orchestration/)
-from .models import QueryState      # RELATIVO
-
-# Da tests/ o cross-package
-from backend.orchestration.llm_router import RouterService  # ASSOLUTO
-```
-
-### Configurazione
-```python
-# MAI hardcodare
-llm_model = config.router_model     # ✅ Da config
-
-# MAI
-llm_model = "gemini-2.5-flash"      # ❌ Hardcoded
-```
-
-### Test
-```python
-# Ogni feature deve avere test
-def test_feature_basic_case():
-    ...
-def test_feature_edge_case():
-    ...
-```
-
----
-
-## Formule RLCF (Non Modificare)
-
-Queste formule sono il cuore accademico del progetto:
-
-```
-Authority Score:
-A_u(t) = α·B_u + β·T_u(t-1) + γ·P_u(t)
-dove α=0.3, β=0.5, γ=0.2
-
-Shannon Entropy (disagreement):
-H(X) = -Σ p(x) log p(x)
-```
-
-**File**: `backend/rlcf_framework/authority_module.py`, `aggregation_engine.py`
+- [ ] Nessuna duplicazione di codice
+- [ ] Logica nel package, non negli scripts
+- [ ] Type hints completi
+- [ ] Docstring in italiano
+- [ ] Test per funzioni pubbliche
+- [ ] CURRENT_STATE.md aggiornato
 
 ---
 
 ## Comandi Utili
 
 ```bash
-# Setup
-python3.11 -m venv venv && source venv/bin/activate
-pip install -e .
-cp .env.template .env
+# Ambiente
+source .venv/bin/activate
 
 # Database
 docker-compose -f docker-compose.dev.yml up -d
 
-# Backend
-uvicorn backend.orchestration.api.main:app --reload --port 8000
-
 # Test
 pytest tests/ -v
-pytest tests/orchestration/ -v --cov=backend/orchestration
+
+# Importa libreria
+python -c "from merlt import LegalKnowledgeGraph; print('OK')"
 ```
 
 ---
 
-## Struttura docs/ (Single Source of Truth)
+## File Chiave
 
-```
-docs/
-├── claude-context/          # 🤖 Per Claude
-│   ├── CURRENT_STATE.md     # Stato attuale sessione
-│   └── PROGRESS_LOG.md      # Log cronologico
-│
-├── experiments/             # 🧪 Esperimenti per tesi
-│   ├── INDEX.md             # Indice esperimenti
-│   ├── TEMPLATE.md          # Template nuovo esperimento
-│   └── EXP-NNN_nome/        # Cartella per esperimento
-│       ├── DESIGN.md        # Ipotesi, metodologia
-│       ├── EXECUTION.md     # Log esecuzione
-│       ├── RESULTS.md       # Metriche, output
-│       └── ANALYSIS.md      # Interpretazione
-│
-├── 01-introduction/         # Vision e problem statement
-├── 02-methodology/          # RLCF framework (paper teorico)
-├── 03-architecture/         # 5 layer del sistema
-├── 04-implementation/       # Dettagli implementativi
-├── 05-governance/           # AI Act, GDPR, ALIS
-├── 06-resources/            # Bibliografia, dataset
-├── 07-guides/               # Setup locale, contributing
-├── 08-iteration/            # Next steps, testing strategy
-├── api/                     # API documentation
-│
-├── SYSTEM_ARCHITECTURE.md   # Mappa tecnica (reference)
-├── IMPLEMENTATION_ROADMAP.md
-└── TECHNOLOGY_RECOMMENDATIONS.md
-```
+| File | Scopo |
+|------|-------|
+| `docs/claude-context/LIBRARY_VISION.md` | Principi guida libreria |
+| `docs/claude-context/CURRENT_STATE.md` | Stato attuale |
+| `docs/claude-context/LIBRARY_ARCHITECTURE.md` | Architettura componenti |
+| `merlt/core/legal_knowledge_graph.py` | Entry point principale |
 
 ---
 
 ## Cosa NON Fare
 
-1. **Non duplicare info** - Se è in docs/, punta lì
-2. **Non modificare formule RLCF** - Sono per pubblicazione accademica
-3. **Non cambiare esempi legali** - Contesto italiano (Codice Civile, Cassazione)
-4. **Non ridurre test coverage** - Mantenere 85%+
-5. **Non fare big bang** - Sempre incrementale
+1. **MAI duplicare codice** - Cerca prima, riusa sempre
+2. **MAI logica negli scripts** - Solo entry points
+3. **MAI hardcodare valori** - Usa config
+4. **MAI ignorare errori** - Gestisci gracefully
+5. **MAI dimenticare type hints** - Sempre
 
 ---
 
-## Checklist Pre-Commit
-
-- [ ] Test passano (`pytest tests/ -v`)
-- [ ] Nessun import rotto
-- [ ] CURRENT_STATE.md aggiornato
-- [ ] PROGRESS_LOG.md aggiornato (se sessione significativa)
-- [ ] Esperimento documentato (se applicabile: docs/experiments/EXP-NNN/)
-- [ ] Commit message semantico
-
----
-
-## Contatti e Risorse
-
-- **Repo**: MERL-T_alpha (locale)
-- **Documentazione RLCF**: `docs/02-methodology/rlcf/RLCF.md`
-- **API Examples**: `docs/api/API_EXAMPLES.md`
-- **Esperimenti**: `docs/experiments/INDEX.md`
-
----
-
-## Note Operative
-
-- Facciamo test solidi, quando possibile evita di mockare (preferisci integration test)
-- Documenta ogni esperimento significativo in `docs/experiments/`
+*Questa è la libreria dell'informatica giuridica italiana. Ogni riga conta.*

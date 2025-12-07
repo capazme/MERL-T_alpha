@@ -17,7 +17,7 @@ Test coverage:
 
 import pytest
 from datetime import datetime
-from backend.orchestration.model_manager import (
+from merlt.orchestration.model_manager import (
     ModelManager,
     ModelMetrics,
     TrainedModelInfo,

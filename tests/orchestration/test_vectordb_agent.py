@@ -20,10 +20,10 @@ import pytest
 import asyncio
 from typing import List, Dict, Any
 
-from backend.orchestration.agents.vectordb_agent import VectorDBAgent
-from backend.orchestration.agents.base import AgentTask, AgentResult
-from backend.orchestration.services.embedding_service import EmbeddingService
-from backend.orchestration.services.qdrant_service import QdrantService
+from merlt.orchestration.agents.vectordb_agent import VectorDBAgent
+from merlt.orchestration.agents.base import AgentTask, AgentResult
+from merlt.orchestration.services.embedding_service import EmbeddingService
+from merlt.orchestration.services.qdrant_service import QdrantService
 
 # ============================================================================
 # Test Configuration

@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException, status, Request, Response
 
-from backend.orchestration.api.middleware.rate_limit import (
+from merlt.orchestration.api.middleware.rate_limit import (
     get_rate_limit_quota,
     check_rate_limit_redis,
     add_rate_limit_headers,
@@ -31,7 +31,7 @@ from backend.orchestration.api.middleware.rate_limit import (
     RATE_LIMIT_QUOTAS,
     RATE_LIMIT_WINDOW,
 )
-from backend.orchestration.api.models import ApiKey
+from merlt.orchestration.api.models import ApiKey
 
 
 # ============================================================================

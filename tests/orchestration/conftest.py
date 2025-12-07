@@ -18,8 +18,8 @@ os.environ["REDIS_HOST"] = "localhost"
 os.environ["REDIS_PORT"] = "6379"
 os.environ["RATE_LIMITING_ENABLED"] = "false"  # Disable rate limiting for most tests
 
-from backend.orchestration.api.database import Base
-from backend.orchestration.api.models import ApiKey, ApiUsage
+from merlt.orchestration.api.database import Base
+from merlt.orchestration.api.models import ApiKey, ApiUsage
 
 
 @pytest.fixture(scope="session")

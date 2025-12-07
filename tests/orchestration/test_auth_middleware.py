@@ -22,14 +22,14 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException, status, Request
 
-from backend.orchestration.api.middleware.auth import (
+from merlt.orchestration.api.middleware.auth import (
     hash_api_key,
     verify_api_key,
     get_current_api_key,
     require_role,
     optional_api_key,
 )
-from backend.orchestration.api.models import ApiKey
+from merlt.orchestration.api.models import ApiKey
 
 
 # ============================================================================

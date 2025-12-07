@@ -13,8 +13,8 @@ from pathlib import Path
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.storage.falkordb.client import FalkorDBClient, FalkorDBConfig
-from backend.external_sources.visualex.tools import urngenerator
+from merlt.storage.falkordb.client import FalkorDBClient, FalkorDBConfig
+from merlt.external_sources.visualex.tools import urngenerator
 
 print("🚀 Starting ingestion of Art. 1453-1456 c.c.")
 

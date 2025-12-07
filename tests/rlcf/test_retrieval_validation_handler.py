@@ -14,8 +14,8 @@ import pytest_asyncio
 from unittest.mock import MagicMock, AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.rlcf_framework import models
-from backend.rlcf_framework.task_handlers.retrieval_validation_handler import RetrievalValidationHandler
+from merlt.rlcf_framework import models
+from merlt.rlcf_framework.task_handlers.retrieval_validation_handler import RetrievalValidationHandler
 
 
 @pytest.fixture

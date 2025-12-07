@@ -7,7 +7,7 @@ from VisualexAPI article text.
 """
 
 import pytest
-from backend.preprocessing.comma_parser import (
+from merlt.preprocessing.comma_parser import (
     CommaParser,
     ArticleStructure,
     Comma,

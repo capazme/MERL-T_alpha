@@ -31,9 +31,9 @@ from typing import List, Dict, Any, Optional
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.storage.falkordb import FalkorDBClient, FalkorDBConfig
-from backend.external_sources.visualex.scrapers.brocardi_scraper import BrocardiScraper
-from backend.external_sources.visualex.tools.norma import Norma, NormaVisitata
+from merlt.storage.falkordb import FalkorDBClient, FalkorDBConfig
+from merlt.external_sources.visualex.scrapers.brocardi_scraper import BrocardiScraper
+from merlt.external_sources.visualex.tools.norma import Norma, NormaVisitata
 
 # Configure logging
 Path("logs").mkdir(exist_ok=True)

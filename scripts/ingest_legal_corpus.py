@@ -45,8 +45,8 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.orchestration.services.embedding_service import EmbeddingService
-from backend.orchestration.services.qdrant_service import QdrantService
+from merlt.orchestration.services.embedding_service import EmbeddingService
+from merlt.orchestration.services.qdrant_service import QdrantService
 
 # Neo4j and PostgreSQL imports (optional)
 try:

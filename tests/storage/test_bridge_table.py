@@ -9,7 +9,7 @@ import pytest
 import pytest_asyncio
 from uuid import uuid4
 
-from backend.storage.bridge import BridgeTable, BridgeTableConfig
+from merlt.storage.bridge import BridgeTable, BridgeTableConfig
 
 
 @pytest_asyncio.fixture(scope="function")

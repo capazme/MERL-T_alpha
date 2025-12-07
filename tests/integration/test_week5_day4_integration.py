@@ -22,19 +22,19 @@ from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime
 
 # Backend imports
-from backend.orchestration.pipeline_orchestrator import (
+from merlt.orchestration.pipeline_orchestrator import (
     PipelineOrchestrator,
     PipelineContext,
     PipelineExecutionStatus
 )
-from backend.orchestration.intent_classifier import IntentClassifier, IntentResult, IntentType
-from backend.preprocessing.kg_enrichment_service import KGEnrichmentService, EnrichedContext
-from backend.preprocessing.intent_mapping import (
+from merlt.orchestration.intent_classifier import IntentClassifier, IntentResult, IntentType
+from merlt.preprocessing.kg_enrichment_service import KGEnrichmentService, EnrichedContext
+from merlt.preprocessing.intent_mapping import (
     convert_query_intent_to_intent_type,
     prepare_query_understanding_for_kg_enrichment,
     QUERY_INTENT_TO_INTENT_TYPE
 )
-from backend.preprocessing.query_understanding import QueryIntentType
+from merlt.preprocessing.query_understanding import QueryIntentType
 
 
 # ===========================================

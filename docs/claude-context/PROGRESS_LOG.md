@@ -5,6 +5,271 @@
 
 ---
 
+## 2025-12-07 - Core Library + EXP-006 Completato ✅
+
+**Durata**: ~3 ore
+**Obiettivo**: Ingestion Codice Penale e creazione Core Library
+**Risultato**: ✓ 263 articoli ingested, Core Library implementata
+
+### Risultati Principali
+
+1. **EXP-006: Ingestion Libro Primo Codice Penale**
+   - Articoli processati: 263/263 (100%)
+   - Brocardi enrichment: 262/263 (99.6%)
+   - Massime totali: 6,195
+   - Tempo: ~17 minuti
+
+2. **RAG Testing**
+   - Query testate: 12
+   - Precision@5: 0.200
+   - Recall: 0.528
+   - MRR: 0.562
+   - Verdict: ACCEPTABLE
+
+3. **Core Library Creata**
+   - `merlt/core/legal_knowledge_graph.py` (~600 LOC)
+   - Classe `LegalKnowledgeGraph` che coordina:
+     - FalkorDB (graph storage)
+     - Qdrant (vector storage)
+     - Bridge Table (chunk <-> node mapping)
+     - MultivigenzaPipeline (amendments)
+     - EmbeddingService (E5-large)
+
+### API Nuova
+
+```python
+from backend.core import LegalKnowledgeGraph, MerltConfig
+
+kg = LegalKnowledgeGraph()
+await kg.connect()
+
+result = await kg.ingest_norm(
+    tipo_atto="codice penale",
+    articolo="1",
+    include_brocardi=True,
+    include_embeddings=True,
+    include_bridge=True,
+    include_multivigenza=True,
+)
+```
+
+### File Creati/Modificati
+
+- `merlt/core/__init__.py` (nuovo)
+- `merlt/core/legal_knowledge_graph.py` (nuovo)
+- `docs/claude-context/LIBRARY_ARCHITECTURE.md` (aggiornato)
+- `docs/experiments/EXP-006_libro_primo_cp/RESULTS.md` (aggiornato)
+
+---
+
+## 2025-12-05 (Pomeriggio) - Test Core Libro IV Completati ✅
+
+**Durata**: ~90 minuti
+**Obiettivo**: Validare completamente il sistema RAG con dati reali Libro IV
+**Risultato**: ✓ Tutti i test passati, sistema pronto per ingestion completa
+
+### Test Eseguiti
+
+1. **Test Suite Automatica**: 111/112 passati
+   - Preprocessing v2: 81/81 ✅
+   - Storage: 30/31 ✅ (1 skipped)
+
+2. **Test End-to-End con Dati Reali**: 5/5 query ✅
+   - Ricerca semantica: articoli pertinenti trovati
+   - Bridge Table lookup: 100% mappings
+   - Graph enrichment: dottrina + massime recuperate
+   - Latenza media: 309ms
+
+3. **Test Pipeline RAG Completa**: 3 query ✅
+   - "Cosa succede se il debitore non paga?" → Art. 1206, 1190, 1269
+   - "Posso recedere da un contratto?" → Art. 1833, 1671, 1845
+   - "Calcolo degli interessi di mora" → Art. 1207, 1224, 1217
+   - Tempo medio: 679ms (incluso embedding)
+
+4. **Test Edge Cases**: tutti gestiti
+   - Articoli abrogati: ✅ presenti, senza dottrina
+   - Massime numero troncato: ⚠️ problema fonte Brocardi
+   - Articoli corti: ✅ ricercabili
+   - Query fuori dominio: ⚠️ score ~0.79 (embedding multilingue)
+   - Bridge Table consistency: ✅ 100%
+
+5. **Test Coerenza Cross-Storage**: ✅
+   - FalkorDB = Qdrant = PostgreSQL (887 Norma)
+   - FalkorDB = Qdrant (9,775 Massime)
+   - Zero discrepanze URN
+
+### Audit Qualità Dati
+
+| Aspetto | Stato | Note |
+|---------|-------|------|
+| Articoli completi | 887/887 ✅ | Tutti con testo |
+| Dottrina | 1,630/1,630 ✅ | Tutte con descrizione |
+| Massime | 9,771/9,775 ✅ | 4 con numero troncato (fonte) |
+| Copertura dottrina | 99% | 882/887 articoli |
+| Copertura massime | 77% | 690/887 articoli |
+
+### Conclusione
+
+Sistema **PRONTO** per ingestion Codice Civile completo:
+- Pipeline v2 testata e robusta
+- Storage coerenti al 100%
+- Problemi identificati sono nella fonte (Brocardi), non nel codice
+
+---
+
+## 2025-12-05 (Mattina) - Pulizia Duplicati e Article-Level Embeddings ✅
+
+**Durata**: ~60 minuti
+**Obiettivo**: Eliminare duplicati Norma e migrare a strategia article-level
+**Risultato**: ✓ 10,662 vectors ottimizzati (887 Norma + 9,775 Massime)
+
+### Problema Identificato
+
+Durante EXP-003 (RAG testing) sono emersi duplicati nei risultati:
+- Art. 1284 aveva **46 chunks identici** (stesso testo)
+- Bridge Table: 2,546 righe, solo 881 URN unici (65% duplicati!)
+- Causa: bug nell'ingestion pipeline, non nel chunking
+
+### Pulizia Eseguita
+
+1. **Bridge Table**:
+   - Query: `ROW_NUMBER() OVER (PARTITION BY graph_node_urn, chunk_text)`
+   - Prima: 2,546 → Dopo: **881** (-1,665 duplicati)
+
+2. **Qdrant Norma**:
+   - Metodo: scroll + group by URN + keep first + delete rest
+   - Prima: 2,546 → Dopo: **881** (-1,665 duplicati)
+
+3. **Re-Embedding Article-Level**:
+   - Script: `scripts/reembed_articles.py`
+   - Fonte: FalkorDB (source of truth) - 887 articoli
+   - Strategia: 1 embedding per articolo (testo completo vs preview 500 chars)
+   - Risultato: 887 embeddings (vs 881 precedenti, +6 articoli mancanti)
+
+### Metriche Finali
+
+| Metrica | Prima | Dopo |
+|---------|-------|------|
+| Qdrant Norma | 2,546 | **887** |
+| Qdrant Massime | 9,775 | 9,775 |
+| Qdrant Totale | 12,321 | **10,662** |
+| Bridge Table | 2,546 | **887** |
+| Art. 1284 text | 500 chars | **7,523 chars** |
+
+### Verifica
+
+- Query "tasso interesse legale": Art. 1284 = #1 (score 0.8517) ✅
+- Test duplicati: **NESSUN DUPLICATO** nei top-10 ✅
+
+### Note
+
+- Decisione strategica: article-level embedding migliore per articoli con temi unitari
+- Il grafo mantiene la granularità comma-level per navigazione precisa
+- FalkorDB rimane source of truth per tutti i dati
+
+---
+
+## 2025-12-05 (Notte) - Massime Embedding Completo ✅
+
+**Durata**: ~30 minuti
+**Obiettivo**: Pulire duplicati e completare embedding delle massime giurisprudenziali
+**Risultato**: ✓ 12,321 vectors totali in Qdrant (Norma + Massime)
+
+### Completato
+
+1. **Pulizia duplicati Qdrant**:
+   - Due script `embed_massime.py` eseguiti in parallelo avevano creato duplicati
+   - Duplicati identificati: 4,832 (ogni massima aveva 2 copie)
+   - Metodo: scroll + groupby node_id + delete con PointIdsList
+   - Risultato: 6,592 massime uniche
+
+2. **Identificazione massime mancanti**:
+   - Problema iniziale: query su grafo sbagliato (`legal_graph` vuoto)
+   - Fix: uso grafo corretto `merl_t_legal`
+   - Massime in FalkorDB: 9,775
+   - Massime in Qdrant: 6,592
+   - Mancanti: 3,183
+
+3. **Embedding massime mancanti**:
+   - Script: `scripts/embed_massime.py --batch-size 64`
+   - Device: MPS (Apple Silicon)
+   - Tempo: ~6 minuti
+   - Errori: 0
+
+### Metriche Finali
+
+| Storage | Contenuto |
+|---------|-----------|
+| **FalkorDB (merl_t_legal)** | |
+| - Norma | 1,005 |
+| - Dottrina | 1,630 |
+| - AttoGiudiziario | 9,775 |
+| **Qdrant (merl_t_chunks)** | |
+| - Norma chunks | 2,546 |
+| - Massime | 9,775 |
+| - **Totale vectors** | **12,321** |
+
+### Note
+
+- Sistema ora ha embeddings completi per retrieval RAG
+- Massime includono estremi + testo massima per migliore retrieval semantico
+- Payload include: node_id, node_type, estremi, numero_sentenza, anno, organo, materia, related_norma_urns, text_preview
+
+---
+
+## 2025-12-04 (Sera) - Embedding Generation COMPLETA ✅
+
+**Durata**: ~30 minuti
+**Obiettivo**: Generare embeddings locali per tutti i chunks e salvarli in Qdrant
+**Risultato**: ✓ 2,546 embeddings generati con 0 errori, Qdrant operativo
+
+### Completato
+
+1. **Script `scripts/generate_embeddings.py`** (370 LOC):
+   - Connessione a PostgreSQL, FalkorDB, Qdrant
+   - Caricamento modello `intfloat/multilingual-e5-large` su MPS
+   - Batch processing con progress tracking
+   - Upsert in Qdrant con payload (URN, node_type, text_preview)
+
+2. **Fix modello embedding**:
+   - Nome corretto: `intfloat/multilingual-e5-large` (non `sentence-transformers/...`)
+   - Aggiornato in `embedding_service.py`
+
+3. **Fix nome grafo**:
+   - Grafo corretto: `merl_t_legal` (non `legal_kg`)
+
+### Metriche
+
+| Metrica | Valore |
+|---------|--------|
+| Chunks processati | **2,546** |
+| Embeddings generati | **2,546** |
+| Errori | **0** |
+| Success rate | **100%** |
+| Tempo totale | ~8 minuti |
+| Modello | `intfloat/multilingual-e5-large` |
+| Dimensione | 1024 |
+| Device | MPS (Apple Silicon) |
+| Batch size | 32 |
+| Throughput | ~7 chunks/secondo |
+
+### Storage Finale
+
+| Storage | Contenuto |
+|---------|-----------|
+| FalkorDB | 3,462 nodi, 26,577 relazioni |
+| PostgreSQL | 2,546 bridge mappings |
+| Qdrant | 2,546 vectors (1024 dim) |
+
+### Note
+
+- Il sistema è ora **operativo end-to-end** per RAG:
+  - Query → Qdrant (semantic search) → Bridge Table → FalkorDB (graph traversal)
+- Embedding con prefisso E5 "passage: " per documenti
+- Collection Qdrant: `merl_t_chunks` con cosine distance
+
+---
+
 ## 2025-12-04 (Pomeriggio) - Hierarchical Tree Extraction + Pipeline Integration ✅
 
 **Durata**: ~3 ore
@@ -33,7 +298,7 @@
    - Nuovo test `test_ingest_with_treextractor_fallback`
 
 4. **Sincronizzazione**:
-   - Copia automatica su `backend/external_sources/visualex/tools/treextractor.py`
+   - Copia automatica su `merlt/external_sources/visualex/tools/treextractor.py`
 
 ### Test Results
 
@@ -87,7 +352,7 @@ for article in articles:
    - Fix: Conversione automatica `str → {"estratto": str, ...}` (linea 618-623)
 
 3. **Bridge Table non esistente**:
-   - Fix: `psql -f backend/storage/bridge/schema.sql`
+   - Fix: `psql -f merlt/storage/bridge/schema.sql`
 
 ### Risultati EXP-001 (Re-run)
 
@@ -127,19 +392,19 @@ for article in articles:
 
 ### Completato
 
-1. **CommaParser** (`backend/preprocessing/comma_parser.py` - 350 LOC):
+1. **CommaParser** (`merlt/preprocessing/comma_parser.py` - 350 LOC):
    - Parse `article_text` → `ArticleStructure(numero_articolo, rubrica, List<Comma>)`
    - Regex per: bis/ter/quater articles, rubrica extraction, comma splitting
    - Token counting con tiktoken (cl100k_base encoding)
    - 39/39 test passano
 
-2. **StructuralChunker** (`backend/preprocessing/structural_chunker.py` - 300 LOC):
+2. **StructuralChunker** (`merlt/preprocessing/structural_chunker.py` - 300 LOC):
    - Crea `Chunk` objects con URN interno (con `~comma{N}`) e URL esterno (senza comma)
    - Preserva article URL per frontend linking
    - Estrae libro/titolo/capo/sezione da Brocardi position
    - 17/17 test passano
 
-3. **IngestionPipelineV2** (`backend/preprocessing/ingestion_pipeline_v2.py` - 500 LOC):
+3. **IngestionPipelineV2** (`merlt/preprocessing/ingestion_pipeline_v2.py` - 500 LOC):
    - USA (non modifica) urngenerator e visualex_client esistenti
    - Integra CommaParser + StructuralChunker
    - Crea nodi grafo con 21 properties per Norma (conforme schema locked)
@@ -147,7 +412,7 @@ for article in articles:
    - Prepara BridgeMapping objects per Bridge Table
    - 21/21 test passano
 
-4. **BridgeBuilder** (`backend/storage/bridge/bridge_builder.py` - 175 LOC):
+4. **BridgeBuilder** (`merlt/storage/bridge/bridge_builder.py` - 175 LOC):
    - Converte `BridgeMapping` → Bridge Table format
    - Mapping types: PRIMARY, HIERARCHIC, CONCEPT, DOCTRINE, JURISPRUDENCE
    - Batch insertion con configurable batch_size
@@ -216,7 +481,7 @@ for article in articles:
    - RetrieverConfig: alpha, over_retrieve_factor, max_graph_hops, default_graph_score
 
 3. **Configurazione Esternalizzata**:
-   - `backend/config/retriever_weights.yaml` (140 linee)
+   - `merlt/config/retriever_weights.yaml` (140 linee)
    - Parametri retrieval (alpha=0.7, over_retrieve_factor=3, max_graph_hops=3)
    - Expert traversal weights per 4 expert types
    - ~140 relation weights totali (contiene, disciplina, interpreta, applica, etc.)
@@ -374,21 +639,21 @@ for article in articles:
 
 #### Completato
 - **Archiviazione v1**:
-  - Spostato codice v1 in `backend/archive_v1/`
+  - Spostato codice v1 in `merlt/archive_v1/`
   - Rimossi agents centrali, expert passivi, codice Neo4j
 
 - **Struttura Storage Layer**:
-  - `backend/storage/falkordb/` - FalkorDBClient (placeholder)
-  - `backend/storage/bridge/` - BridgeTable (placeholder)
-  - `backend/storage/retriever/` - GraphAwareRetriever (placeholder)
+  - `merlt/storage/falkordb/` - FalkorDBClient (placeholder)
+  - `merlt/storage/bridge/` - BridgeTable (placeholder)
+  - `merlt/storage/retriever/` - GraphAwareRetriever (placeholder)
 
-- **Interfacce Astratte** (backend/interfaces/):
+- **Interfacce Astratte** (merlt/interfaces/):
   - `storage.py` - IStorageService, IGraphDB, IVectorDB, IBridgeTable
   - `experts.py` - IExpert, IExpertGating, ISynthesizer
   - `rlcf.py` - IRLCFService, IAuthorityCalculator
   - Supporto per deploy monolith/distributed via DI
 
-- **Service Layer** (backend/services/):
+- **Service Layer** (merlt/services/):
   - `registry.py` - ServiceRegistry con supporto monolith/distributed
   - `storage_service.py` - StorageServiceImpl (placeholder)
   - `rlcf_service.py` - RLCFServiceImpl (placeholder)
@@ -417,7 +682,7 @@ for article in articles:
 
 #### Struttura v2 Finale
 ```
-backend/
+merlt/
 ├── interfaces/                  # ✓ Contratti astratti
 ├── services/                    # ✓ Impl + DI
 ├── storage/                     # ✓ FalkorDB, Bridge, Retriever
@@ -636,7 +901,9 @@ Codice Civile -[contiene]-> Art. 1456 c.c. -[disciplina]-> "Clausola risolutiva 
 | 2025-12-02 | Architettura v2 documentata | 5 documenti aggiornati |
 | 2025-12-03 | Struttura codice v2 completata | Placeholder pronti |
 | 2025-12-03 | Primo batch ingestion completato | 4 articoli con dati reali in FalkorDB |
-| - | - | - |
+| 2025-12-04 | **EXP-001 COMPLETO** | 887 articoli, 3,462 nodi, 26,577 relazioni |
+| 2025-12-04 | **Embedding Generation COMPLETO** | 2,546 vectors in Qdrant (1024 dim) |
+| 2025-12-04 | **Sistema RAG Operativo** | Graph + Vector + Bridge integrati |
 
 ---
 
@@ -644,15 +911,14 @@ Codice Civile -[contiene]-> Art. 1456 c.c. -[disciplina]-> "Clausola risolutiva 
 
 | Metrica | Valore |
 |---------|--------|
-| Sessioni totali | 3 (+ 1 continuazione) |
-| Ore totali | ~13 |
-| LOC scritte | ~4500 (interfaces + services + FalkorDBClient + VisualexAPI + tests) |
-| LOC documentazione | ~3000 (docs + docker + README) |
-| LOC test | ~400 (test_batch_ingestion.py + script standalone) |
+| Sessioni totali | 6 |
+| Ore totali | ~20 |
+| LOC scritte | ~5500 |
+| LOC documentazione | ~4000 |
 | Container attivi | 4 (FalkorDB, PostgreSQL, Qdrant, Redis) |
-| Test eseguiti | 4 (URN gen, Norma nodes, ConcettoGiuridico, batch ingestion) - tutti passano ✓ |
-| Bug risolti | 9 (+ pytest fixture, datetime(), test isolation) |
-| Dipendenze installate | 9 (+ pytest, pytest-asyncio) |
-| Articoli ingested | 4 (Art. 1453-1456 c.c.) |
-| Nodi FalkorDB | 10 (6 Norma + 4 ConcettoGiuridico) |
-| Relazioni FalkorDB | 8 (4 contiene + 4 disciplina) |
+| Test passano | 91+ |
+| Articoli ingested | **887** (Libro IV completo) |
+| Nodi FalkorDB | **3,462** |
+| Relazioni FalkorDB | **26,577** |
+| Bridge mappings | **2,546** |
+| **Embeddings Qdrant** | **2,546** (1024 dim) |

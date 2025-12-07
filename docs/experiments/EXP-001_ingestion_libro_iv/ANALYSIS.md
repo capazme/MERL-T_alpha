@@ -166,11 +166,11 @@ Questo esperimento valida empiricamente tre pilastri della tesi MERL-T:
 - `docs/SYSTEM_ARCHITECTURE.md` - Architettura sistema
 
 ### 6.2 Codice Sorgente
-- `backend/preprocessing/comma_parser.py` - Parser commi
-- `backend/preprocessing/structural_chunker.py` - Chunker strutturale
-- `backend/preprocessing/ingestion_pipeline_v2.py` - Pipeline principale
-- `backend/storage/bridge/bridge_builder.py` - Builder Bridge Table
-- `backend/external_sources/visualex/scrapers/brocardi_scraper.py` - Scraper Brocardi
+- `merlt/preprocessing/comma_parser.py` - Parser commi
+- `merlt/preprocessing/structural_chunker.py` - Chunker strutturale
+- `merlt/preprocessing/ingestion_pipeline_v2.py` - Pipeline principale
+- `merlt/storage/bridge/bridge_builder.py` - Builder Bridge Table
+- `merlt/external_sources/visualex/scrapers/brocardi_scraper.py` - Scraper Brocardi
 
 ### 6.3 Log e Output
 - `logs/exp001.log` - Log esecuzione completo

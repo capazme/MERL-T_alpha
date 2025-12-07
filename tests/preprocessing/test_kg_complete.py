@@ -30,7 +30,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select, func
 
 # Project imports
-from backend.preprocessing.kg_enrichment_service import (
+from merlt.preprocessing.kg_enrichment_service import (
     KGEnrichmentService,
     EnrichedContext,
     NormaContext,
@@ -39,8 +39,8 @@ from backend.preprocessing.kg_enrichment_service import (
     ContributionContext,
     ControversyFlag
 )
-from backend.preprocessing.cypher_queries import KGCypherQueries
-from backend.preprocessing.models_kg import (
+from merlt.preprocessing.cypher_queries import KGCypherQueries
+from merlt.preprocessing.models_kg import (
     StagingEntity,
     KGEdgeAudit,
     KGQualityMetrics,
@@ -53,16 +53,16 @@ from backend.preprocessing.models_kg import (
     RelationshipTypeEnum,
     Base
 )
-from backend.preprocessing.contribution_processor import (
+from merlt.preprocessing.contribution_processor import (
     ContributionProcessor,
     ContributionStatus
 )
-from backend.preprocessing.normattiva_sync_job import (
+from merlt.preprocessing.normattiva_sync_job import (
     NormattivaSyncJob,
     SyncStatus
 )
-from backend.preprocessing.config.kg_config import KGConfig
-from backend.orchestration.intent_classifier import IntentResult, IntentType
+from merlt.preprocessing.config.kg_config import KGConfig
+from merlt.orchestration.intent_classifier import IntentResult, IntentType
 
 
 # ==========================================
@@ -1299,7 +1299,7 @@ class TestVersioningAndArchive:
     @pytest.mark.asyncio
     async def test_norm_version_creation(self, mock_neo4j_driver):
         """Test new version created when norm modified."""
-        from backend.preprocessing.normattiva_sync_job import NormattivaSyncJob
+        from merlt.preprocessing.normattiva_sync_job import NormattivaSyncJob
 
         session_mock = mock_neo4j_driver.session.return_value.__aenter__.return_value
         session_mock.run.return_value = AsyncMock()
@@ -1401,7 +1401,7 @@ class TestVersioningAndArchive:
     @pytest.mark.asyncio
     async def test_hash_based_delta_detection(self):
         """Test SHA-256 hash used for change detection."""
-        from backend.preprocessing.normattiva_sync_job import NormattivaSyncJob
+        from merlt.preprocessing.normattiva_sync_job import NormattivaSyncJob
 
         sync_job = MagicMock()
         sync_job._compute_hash = lambda content: hashlib.sha256(content.encode()).hexdigest()
@@ -1540,7 +1540,7 @@ class TestCommunityVoting:
     @pytest.mark.asyncio
     async def test_vote_processing_upvote(self, async_db_session, mock_neo4j_driver, kg_config):
         """Test processing upvote on contribution."""
-        from backend.preprocessing.contribution_processor import ContributionProcessor
+        from merlt.preprocessing.contribution_processor import ContributionProcessor
 
         contribution = Contribution(
             id="contrib_vote_test",
@@ -1581,7 +1581,7 @@ class TestCommunityVoting:
     @pytest.mark.asyncio
     async def test_auto_approval_triggered(self, async_db_session, mock_neo4j_driver, kg_config):
         """Test contribution auto-approved at threshold."""
-        from backend.preprocessing.contribution_processor import ContributionProcessor
+        from merlt.preprocessing.contribution_processor import ContributionProcessor
 
         contribution = Contribution(
             id="contrib_auto_approve",
@@ -1605,7 +1605,7 @@ class TestCommunityVoting:
         )
 
         # Check auto-decision
-        from backend.preprocessing.contribution_processor import Contribution as ContribModel
+        from merlt.preprocessing.contribution_processor import Contribution as ContribModel
         result = await async_db_session.execute(
             select(ContribModel).where(ContribModel.id == "contrib_auto_approve")
         )
@@ -1618,7 +1618,7 @@ class TestCommunityVoting:
     @pytest.mark.asyncio
     async def test_auto_rejection_negative_votes(self, async_db_session, mock_neo4j_driver, kg_config):
         """Test auto-rejection when net votes < 0."""
-        from backend.preprocessing.contribution_processor import ContributionProcessor
+        from merlt.preprocessing.contribution_processor import ContributionProcessor
 
         contribution = Contribution(
             id="contrib_reject",
@@ -1641,7 +1641,7 @@ class TestCommunityVoting:
             config=kg_config
         )
 
-        from backend.preprocessing.contribution_processor import Contribution as ContribModel
+        from merlt.preprocessing.contribution_processor import Contribution as ContribModel
         result = await async_db_session.execute(
             select(ContribModel).where(ContribModel.id == "contrib_reject")
         )
@@ -1654,7 +1654,7 @@ class TestCommunityVoting:
     @pytest.mark.asyncio
     async def test_expert_review_escalation(self, async_db_session, mock_neo4j_driver, kg_config):
         """Test expert review escalation for ambiguous votes."""
-        from backend.preprocessing.contribution_processor import ContributionProcessor
+        from merlt.preprocessing.contribution_processor import ContributionProcessor
 
         contribution = Contribution(
             id="contrib_ambiguous",
@@ -1677,7 +1677,7 @@ class TestCommunityVoting:
             config=kg_config
         )
 
-        from backend.preprocessing.contribution_processor import Contribution as ContribModel
+        from merlt.preprocessing.contribution_processor import Contribution as ContribModel
         result = await async_db_session.execute(
             select(ContribModel).where(ContribModel.id == "contrib_ambiguous")
         )
@@ -1690,7 +1690,7 @@ class TestCommunityVoting:
     @pytest.mark.asyncio
     async def test_contribution_validation_min_length(self, kg_config):
         """Test contribution minimum content length validation."""
-        from backend.preprocessing.contribution_processor import ContributionProcessor
+        from merlt.preprocessing.contribution_processor import ContributionProcessor
 
         processor_mock = MagicMock()
         processor_mock.config = kg_config
@@ -1712,7 +1712,7 @@ class TestCommunityVoting:
     @pytest.mark.asyncio
     async def test_contribution_neo4j_ingestion(self, async_db_session, mock_neo4j_driver, kg_config):
         """Test approved contribution ingested to Neo4j."""
-        from backend.preprocessing.contribution_processor import ContributionProcessor
+        from merlt.preprocessing.contribution_processor import ContributionProcessor
 
         contribution = Contribution(
             id="contrib_ingest",
@@ -1744,7 +1744,7 @@ class TestCommunityVoting:
     @pytest.mark.asyncio
     async def test_voting_window_closure_processing(self, async_db_session, mock_neo4j_driver, kg_config):
         """Test batch processing of closed voting windows."""
-        from backend.preprocessing.contribution_processor import ContributionProcessor
+        from merlt.preprocessing.contribution_processor import ContributionProcessor
 
         # Create multiple contributions with expired voting
         contributions = [
@@ -1788,7 +1788,7 @@ class TestNormattivaSyncJob:
     @pytest.mark.asyncio
     async def test_sync_job_initialization(self, mock_neo4j_driver, async_db_session, kg_config):
         """Test sync job initializes correctly."""
-        from backend.preprocessing.normattiva_sync_job import NormattivaSyncJob
+        from merlt.preprocessing.normattiva_sync_job import NormattivaSyncJob
 
         job = NormattivaSyncJob(
             neo4j_driver=mock_neo4j_driver,
@@ -1803,7 +1803,7 @@ class TestNormattivaSyncJob:
     @pytest.mark.asyncio
     async def test_api_fetch_with_retry(self, mock_neo4j_driver, async_db_session, kg_config):
         """Test API fetch with retry logic."""
-        from backend.preprocessing.normattiva_sync_job import NormattivaSyncJob
+        from merlt.preprocessing.normattiva_sync_job import NormattivaSyncJob
 
         job = NormattivaSyncJob(
             neo4j_driver=mock_neo4j_driver,
@@ -1825,7 +1825,7 @@ class TestNormattivaSyncJob:
     @pytest.mark.asyncio
     async def test_hash_based_change_detection(self, mock_neo4j_driver, async_db_session, kg_config):
         """Test hash-based delta detection."""
-        from backend.preprocessing.normattiva_sync_job import NormattivaSyncJob
+        from merlt.preprocessing.normattiva_sync_job import NormattivaSyncJob
 
         job = NormattivaSyncJob(
             neo4j_driver=mock_neo4j_driver,
@@ -1846,7 +1846,7 @@ class TestNormattivaSyncJob:
     @pytest.mark.asyncio
     async def test_new_norm_creation(self, mock_neo4j_driver, async_db_session, kg_config):
         """Test creating new norm in Neo4j."""
-        from backend.preprocessing.normattiva_sync_job import NormattivaSyncJob
+        from merlt.preprocessing.normattiva_sync_job import NormattivaSyncJob
 
         job = NormattivaSyncJob(
             neo4j_driver=mock_neo4j_driver,
@@ -1873,7 +1873,7 @@ class TestNormattivaSyncJob:
     @pytest.mark.asyncio
     async def test_version_creation_on_modification(self, mock_neo4j_driver, async_db_session, kg_config):
         """Test version creation when norm modified."""
-        from backend.preprocessing.normattiva_sync_job import NormattivaSyncJob
+        from merlt.preprocessing.normattiva_sync_job import NormattivaSyncJob
 
         job = NormattivaSyncJob(
             neo4j_driver=mock_neo4j_driver,
@@ -1896,7 +1896,7 @@ class TestNormattivaSyncJob:
     @pytest.mark.asyncio
     async def test_cache_invalidation_after_sync(self, mock_neo4j_driver, async_db_session, kg_config):
         """Test cache invalidated after sync completes."""
-        from backend.preprocessing.normattiva_sync_job import NormattivaSyncJob
+        from merlt.preprocessing.normattiva_sync_job import NormattivaSyncJob
 
         job = NormattivaSyncJob(
             neo4j_driver=mock_neo4j_driver,

@@ -21,9 +21,9 @@ from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
 
-from backend.orchestration.api.main import app
-from backend.orchestration.api.models import ApiKey, ApiUsage
-from backend.orchestration.api.database import Base, engine
+from merlt.orchestration.api.main import app
+from merlt.orchestration.api.models import ApiKey, ApiUsage
+from merlt.orchestration.api.database import Base, engine
 
 
 # ============================================================================
@@ -313,7 +313,7 @@ async def test_premium_tier_higher_quota():
 
     # This test requires database setup
     # For now, just verify quota values
-    from backend.orchestration.api.middleware.rate_limit import get_rate_limit_quota
+    from merlt.orchestration.api.middleware.rate_limit import get_rate_limit_quota
 
     assert get_rate_limit_quota("premium") == 1000
     assert get_rate_limit_quota("standard") == 100
@@ -323,7 +323,7 @@ async def test_premium_tier_higher_quota():
 @pytest.mark.asyncio
 async def test_unlimited_tier_no_rate_limit():
     """Test unlimited tier has very high quota."""
-    from backend.orchestration.api.middleware.rate_limit import get_rate_limit_quota
+    from merlt.orchestration.api.middleware.rate_limit import get_rate_limit_quota
 
     assert get_rate_limit_quota("unlimited") == 999999
 

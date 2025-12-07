@@ -264,10 +264,10 @@ ORDER BY count DESC;
 - `docs/08-iteration/INGESTION_PLAN_LIBRO_IV.md` - Piano originale
 
 ### 6.2 Codice Sorgente
-- `backend/preprocessing/comma_parser.py` - Parser commi
-- `backend/preprocessing/structural_chunker.py` - Chunker strutturale
-- `backend/preprocessing/ingestion_pipeline_v2.py` - Pipeline principale
-- `backend/storage/bridge/bridge_builder.py` - Builder Bridge Table
+- `merlt/preprocessing/comma_parser.py` - Parser commi
+- `merlt/preprocessing/structural_chunker.py` - Chunker strutturale
+- `merlt/preprocessing/ingestion_pipeline_v2.py` - Pipeline principale
+- `merlt/storage/bridge/bridge_builder.py` - Builder Bridge Table
 
 ### 6.3 Papers di Riferimento
 - Semantic chunking: [da inserire]

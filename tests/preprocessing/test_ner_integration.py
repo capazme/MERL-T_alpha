@@ -17,7 +17,7 @@ Reference: docs/02-methodology/query-understanding.md
 
 import pytest
 import asyncio
-from backend.preprocessing.ner_module import (
+from merlt.preprocessing.ner_module import (
     LegalSourceExtractionPipeline,
     EntityDetector,
     LegalClassifier,
@@ -25,7 +25,7 @@ from backend.preprocessing.ner_module import (
     ReferenceResolver,
     StructureBuilder
 )
-from backend.preprocessing.label_mapping import get_label_manager
+from merlt.preprocessing.label_mapping import get_label_manager
 
 import logging
 
@@ -287,7 +287,7 @@ def test_entity_detector_stage_output(ner_config):
 def test_legal_classifier_stage_output(ner_config):
     """Verify LegalClassifier stage produces correct output."""
     try:
-        from backend.preprocessing.ner_module import TextSpan, LegalClassifier
+        from merlt.preprocessing.ner_module import TextSpan, LegalClassifier
         classifier = LegalClassifier(ner_config)
     except:
         pytest.skip("LegalClassifier not available")
