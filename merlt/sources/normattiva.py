@@ -16,8 +16,9 @@ from merlt.sources.utils.text import normalize_act_type
 log = structlog.get_logger()
 
 
-# Cache LLM service instance
+# Cache LLM service instance and availability flag
 _llm_service = None
+_llm_service_checked = False  # Track if we've already checked availability
 
 
 async def parse_destinazione_with_llm(
@@ -37,20 +38,25 @@ async def parse_destinazione_with_llm(
     Returns:
         Dict con target_article, comma, lettera, destinazione normalizzata, o None
     """
-    global _llm_service
+    global _llm_service, _llm_service_checked
 
     if not use_llm:
         return None
 
-    # Lazy import and singleton pattern
-    if _llm_service is None:
+    # Lazy import and singleton pattern - only try once
+    if not _llm_service_checked:
+        _llm_service_checked = True
         try:
             from merlt.rlcf.ai_service import OpenRouterService
             _llm_service = OpenRouterService()
-            log.debug("LLM service initialized for destinazione parsing")
-        except ImportError:
-            log.warning("LLM service not available for destinazione parsing")
-            return None
+            log.info("LLM service initialized for destinazione parsing")
+        except (ImportError, Exception) as e:
+            log.info(f"LLM service not available for destinazione parsing: {e.__class__.__name__}")
+            _llm_service = None
+
+    # If service is not available after check, return silently
+    if _llm_service is None:
+        return None
 
     prompt = f"""Estrai la destinazione di questa modifica normativa italiana.
 
@@ -315,7 +321,7 @@ class NormattivaScraper(BaseScraper):
         log.info(f"Fetching amendment history for: {normavisitata}")
 
         # 1. Prima carico la pagina articolo per stabilire sessione e estrarre parametri
-        from ..tools.http_client import http_client
+        from .utils.http import http_client
         session = await http_client.get_session()
 
         try:

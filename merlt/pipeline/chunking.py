@@ -7,12 +7,12 @@ Each chunk maintains legal context and generates unique URNs.
 
 Design principles:
 - Comma-level chunking (no token threshold - all articles split by comma)
-- URN generation with ~comma{N} extension for internal granularity
+- URN generation with -com{N} extension for internal granularity (NIR-like format)
 - Preserves hierarchical context (libro, titolo, articolo)
 - Zero-LLM approach for reproducibility
 
 Chunk URN format:
-    Internal: urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453~comma1
+    Internal: urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453-com1
     External: https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453
 
 Usage:
@@ -66,7 +66,7 @@ class Chunk:
 
     Attributes:
         chunk_id: Unique UUID for this chunk (for Qdrant)
-        urn: Internal URN with comma extension (e.g., ~art1453~comma1)
+        urn: Internal URN with comma extension (e.g., ~art1453-com1)
         url: External URL for linking (no comma, article-level)
         text: The chunk text content
         token_count: Number of tokens in this chunk
@@ -75,7 +75,7 @@ class Chunk:
         created_at: Timestamp of chunk creation
     """
     chunk_id: UUID
-    urn: str  # Internal URN with comma: ~art1453~comma1
+    urn: str  # Internal URN with comma: ~art1453-com1
     url: str  # External URL without comma: ~art1453
     text: str
     token_count: int
@@ -113,7 +113,7 @@ class StructuralChunker:
 
     Features:
     - Comma-level chunking for all articles (no threshold)
-    - URN generation with comma extension
+    - URN generation with -com{N} extension
     - Metadata preservation for graph linking
     - Context enrichment from Brocardi position
 
@@ -150,7 +150,7 @@ class StructuralChunker:
 
         Each comma becomes a separate chunk with:
         - Unique chunk_id (UUID for Qdrant)
-        - Internal URN with ~comma{N} extension
+        - Internal URN with -com{N} extension
         - External URL (article-level, for frontend linking)
         - Metadata for graph context
 
@@ -209,14 +209,17 @@ class StructuralChunker:
         """
         Generate chunk URN by appending comma extension to article URN.
 
+        Uses NIR-like format (-com{N}) consistent with multivigenza.py
+        and other structural elements (-let{X}, -num{N}).
+
         Args:
             article_urn: Base article URN (e.g., urn:...~art1453)
             comma_numero: Comma number (1-indexed)
 
         Returns:
-            Chunk URN with comma extension (e.g., urn:...~art1453~comma1)
+            Chunk URN with comma extension (e.g., urn:...~art1453-com1)
         """
-        return f"{article_urn}~comma{comma_numero}"
+        return f"{article_urn}-com{comma_numero}"
 
     def _parse_position(
         self, position: Optional[str]

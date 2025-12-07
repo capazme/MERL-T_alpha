@@ -9,8 +9,8 @@ from parsed articles.
 import pytest
 from uuid import UUID
 
-from merlt.preprocessing.comma_parser import ArticleStructure, Comma, parse_article
-from merlt.preprocessing.structural_chunker import (
+from merlt.pipeline.parsing import ArticleStructure, Comma, parse_article
+from merlt.pipeline.chunking import (
     StructuralChunker,
     Chunk,
     ChunkMetadata,
@@ -47,7 +47,7 @@ class TestChunk:
         meta = ChunkMetadata(articolo="1453", comma_numero=1)
         chunk = Chunk(
             chunk_id=UUID("12345678-1234-1234-1234-123456789abc"),
-            urn="urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453~comma1",
+            urn="urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453-com1",
             url="https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453",
             text="Nei contratti con prestazioni corrispettive...",
             token_count=45,
@@ -55,14 +55,14 @@ class TestChunk:
             metadata=meta,
         )
         assert chunk.chunk_id == UUID("12345678-1234-1234-1234-123456789abc")
-        assert "~comma1" in chunk.urn
-        assert "~comma" not in chunk.url  # URL should be article-level
+        assert "-com1" in chunk.urn
+        assert "-com" not in chunk.url  # URL should be article-level
 
     def test_to_dict(self):
         meta = ChunkMetadata(articolo="1453", comma_numero=1, libro="IV")
         chunk = Chunk(
             chunk_id=UUID("12345678-1234-1234-1234-123456789abc"),
-            urn="urn:...~art1453~comma1",
+            urn="urn:...~art1453-com1",
             url="https://normattiva.it/...",
             text="Test text",
             token_count=5,
@@ -122,14 +122,14 @@ class TestStructuralChunkerGenerateURN:
         chunker = StructuralChunker()
         article_urn = "urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453"
         chunk_urn = chunker._generate_chunk_urn(article_urn, 1)
-        assert chunk_urn == "urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453~comma1"
+        assert chunk_urn == "urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453-com1"
 
     def test_multiple_commas(self):
         chunker = StructuralChunker()
         base = "urn:nir:stato:regio.decreto:1942-03-16;262:2~art1454"
-        assert chunker._generate_chunk_urn(base, 1).endswith("~comma1")
-        assert chunker._generate_chunk_urn(base, 2).endswith("~comma2")
-        assert chunker._generate_chunk_urn(base, 3).endswith("~comma3")
+        assert chunker._generate_chunk_urn(base, 1).endswith("-com1")
+        assert chunker._generate_chunk_urn(base, 2).endswith("-com2")
+        assert chunker._generate_chunk_urn(base, 3).endswith("-com3")
 
 
 class TestStructuralChunkerChunkArticle:
@@ -161,7 +161,7 @@ La risoluzione può essere domandata anche quando il giudizio è stato promosso 
         # Check first chunk
         chunk1 = chunks[0]
         assert isinstance(chunk1.chunk_id, UUID)
-        assert chunk1.urn == f"{article_urn}~comma1"
+        assert chunk1.urn == f"{article_urn}-com1"
         assert chunk1.url == article_url  # URL is article-level
         assert "contratti con prestazioni corrispettive" in chunk1.text
         assert chunk1.article_urn == article_urn
@@ -174,7 +174,7 @@ La risoluzione può essere domandata anche quando il giudizio è stato promosso 
 
         # Check second chunk
         chunk2 = chunks[1]
-        assert chunk2.urn == f"{article_urn}~comma2"
+        assert chunk2.urn == f"{article_urn}-com2"
         assert chunk2.metadata.comma_numero == 2
         assert "risoluzione può essere domandata" in chunk2.text
 

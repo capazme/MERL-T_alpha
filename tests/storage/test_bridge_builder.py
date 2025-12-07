@@ -14,7 +14,7 @@ from uuid import uuid4, UUID
 
 from merlt.storage.bridge import BridgeTable, BridgeTableConfig
 from merlt.storage.bridge.bridge_builder import BridgeBuilder, insert_ingestion_result
-from merlt.preprocessing.ingestion_pipeline_v2 import BridgeMapping
+from merlt.pipeline.ingestion import BridgeMapping
 
 
 @pytest_asyncio.fixture(scope="function")

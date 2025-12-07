@@ -18,7 +18,7 @@ from merlt.storage.retriever import (
     GraphPath
 )
 from merlt.storage.bridge import BridgeTable, BridgeTableConfig
-from merlt.storage.falkordb import FalkorDBClient, FalkorDBConfig
+from merlt.storage.graph import FalkorDBClient, FalkorDBConfig
 
 
 @pytest.fixture
