@@ -116,7 +116,11 @@ class MerltConfig:
     qdrant_collection: Optional[str] = None  # Defaults to graph_name
 
     # PostgreSQL Bridge Table
-    postgres_url: Optional[str] = None  # e.g., postgresql://user:pass@localhost:5433/rlcf_dev
+    postgres_host: str = "localhost"
+    postgres_port: int = 5433
+    postgres_database: str = "rlcf_dev"
+    postgres_user: str = "dev"
+    postgres_password: str = "devpassword"
 
     # Embedding model
     embedding_model: str = "intfloat/multilingual-e5-large"
@@ -276,18 +280,23 @@ class LegalKnowledgeGraph:
                 logger.warning(f"Qdrant connection failed: {e}")
                 self._qdrant = None
 
-        # Bridge Table (optional)
-        if self.config.postgres_url:
-            try:
-                bridge_config = BridgeTableConfig(database_url=self.config.postgres_url)
-                self._bridge_table = BridgeTable(bridge_config)
-                await self._bridge_table.connect()
-                self._bridge_builder = BridgeBuilder(self._bridge_table)
-                logger.info("Bridge Table connected")
-            except Exception as e:
-                logger.warning(f"Bridge Table connection failed: {e}")
-                self._bridge_table = None
-                self._bridge_builder = None
+        # Bridge Table
+        try:
+            bridge_config = BridgeTableConfig(
+                host=self.config.postgres_host,
+                port=self.config.postgres_port,
+                database=self.config.postgres_database,
+                user=self.config.postgres_user,
+                password=self.config.postgres_password,
+            )
+            self._bridge_table = BridgeTable(bridge_config)
+            await self._bridge_table.connect()
+            self._bridge_builder = BridgeBuilder(self._bridge_table)
+            logger.info("Bridge Table connected")
+        except Exception as e:
+            logger.warning(f"Bridge Table connection failed: {e}")
+            self._bridge_table = None
+            self._bridge_builder = None
 
         # Initialize pipelines
         self._ingestion_pipeline = IngestionPipelineV2(
@@ -321,7 +330,7 @@ class LegalKnowledgeGraph:
         if self._falkordb:
             await self._falkordb.close()
         if self._bridge_table:
-            await self._bridge_table.disconnect()
+            await self._bridge_table.close()
         if self._qdrant:
             self._qdrant.close()
 
@@ -387,21 +396,25 @@ class LegalKnowledgeGraph:
 
         logger.info(f"Ingesting: {tipo_atto} art. {articolo}")
 
+        # NormaVisitata ha solo .urn, l'URL viene recuperato dopo fetch
         result = UnifiedIngestionResult(
             article_urn=nv.urn,
-            article_url=nv.url,
+            article_url="",  # Sarà aggiornato dopo fetch
         )
 
         try:
             # 1. Fetch from Normattiva
-            article_text, article_url = await self._normattiva_scraper.fetch_document(nv)
+            article_text, article_url = await self._normattiva_scraper.get_document(nv)
+            result.article_url = article_url
 
             # 2. Fetch Brocardi enrichment (optional)
             brocardi_info = None
             if include_brocardi:
                 try:
-                    if await self._brocardi_scraper.knowledge_exists(nv):
-                        brocardi_info = await self._brocardi_scraper.get_info(nv)
+                    # get_info returns (position, info_dict, brocardi_url)
+                    position, info_dict, brocardi_url = await self._brocardi_scraper.get_info(nv)
+                    if info_dict:
+                        brocardi_info = info_dict
                         result.brocardi_enriched = True
                 except Exception as e:
                     logger.warning(f"Brocardi fetch failed: {e}")
