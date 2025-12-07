@@ -1,0 +1,27 @@
+authority_weights:
+  baseline_credentials: 0.4
+  track_record: 0.4
+  recent_performance: 0.2
+track_record:
+  update_factor: 0.05
+thresholds:
+  disagreement: 0.3
+baseline_credentials:
+  types:
+    ACADEMIC_DEGREE:
+      weight: 0.3
+      scoring_function:
+        type: map
+        values:
+          Bachelor: 1.0
+          LLM: 1.1
+          JD: 1.2
+          PhD: 1.5
+        expression: ''
+        default: 0.0
+ai_model:
+  name: openai/gpt-3.5-turbo
+  temperature: 0.7
+  max_tokens: 1000
+  top_p: 0.9
+  api_key_env: OPENROUTER_API_KEY

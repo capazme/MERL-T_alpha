@@ -5,23 +5,30 @@ MERL-T RLCF Framework
 Reinforcement Learning from Collective Feedback per ricerca giuridica.
 
 Componenti:
-- AuthorityModule: Scoring basato su autorevolezza fonte
-- AggregationEngine: Aggregazione feedback esperti
+- authority: Funzioni per calcolo autorevolezza fonte
+- aggregation: AggregationEngine per aggregazione feedback
+- ai_service: OpenRouterService per AI responses
+- models: SQLAlchemy models per RLCF data
 
 Esempio:
-    from merlt.rlcf import AuthorityModule
+    from merlt.rlcf.ai_service import OpenRouterService
 
-    authority = AuthorityModule()
-    score = authority.compute_authority_score(source)
+    service = OpenRouterService()
+    response = await service.generate(prompt="...")
+
+Note:
+    Il modulo è in fase di sviluppo. Alcuni componenti richiedono
+    configurazione database (SQLAlchemy) per funzionare completamente.
 """
 
-from merlt.rlcf.authority import AuthorityModule
-from merlt.rlcf.aggregation import AggregationEngine
-from merlt.rlcf.models import RLCFFeedback, AuthorityScore
+# Lazy imports to avoid circular dependencies and allow partial module use
+# Import specific components as needed:
+#   from merlt.rlcf.ai_service import OpenRouterService
+#   from merlt.rlcf.aggregation import AggregationEngine
 
 __all__ = [
-    "AuthorityModule",
-    "AggregationEngine",
-    "RLCFFeedback",
-    "AuthorityScore",
+    "ai_service",
+    "aggregation",
+    "authority",
+    "models",
 ]
