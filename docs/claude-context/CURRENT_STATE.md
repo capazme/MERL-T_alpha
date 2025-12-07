@@ -9,9 +9,9 @@
 
 | Campo | Valore |
 |-------|--------|
-| **Data ultimo aggiornamento** | 7 Dicembre 2025 (02:30) |
-| **Fase progetto** | **Refactoring Completato** - `merlt/` package |
-| **Prossimo obiettivo** | Testing CI/CD, stabilizzazione |
+| **Data ultimo aggiornamento** | 7 Dicembre 2025 (03:00) |
+| **Fase progetto** | **Test Integrazione Completati** - 15/15 passing |
+| **Prossimo obiettivo** | Stabilizzazione API, cleanup |
 | **Blocchi attivi** | Nessuno |
 
 ---
@@ -55,6 +55,21 @@ from merlt.pipeline import IngestionPipelineV2
 ---
 
 ## Cosa Abbiamo Fatto (Sessione Corrente - 7 Dic 2025)
+
+### Test di Integrazione Completi - COMPLETATO ✅
+
+- [x] **15/15 test passano** senza mock:
+  - `TestImports` (5/5): Core, sources, storage, pipeline, config
+  - `TestFalkorDBIntegration` (2/2): Connect, CRUD nodes
+  - `TestBridgeTableIntegration` (2/2): Health, CRUD mappings
+  - `TestScraperIntegration` (2/2): Normattiva, Brocardi (siti reali)
+  - `TestPipelineIntegration` (2/2): CommaParser, StructuralChunker
+  - `TestEmbeddingIntegration` (2/2): Singleton, generation
+
+- [x] **CI/CD Aggiornato**:
+  - Job `integration` con Docker services (FalkorDB, PostgreSQL, Qdrant)
+  - Health checks per tutti i container
+  - Test senza mock in CI
 
 ### Refactoring backend/ → merlt/ - COMPLETATO ✅
 

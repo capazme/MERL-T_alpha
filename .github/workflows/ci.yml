@@ -50,6 +50,61 @@ jobs:
       - name: Run storage tests
         run: pytest tests/storage/ -v --tb=short -k "not integration" || echo "Storage tests pending"
 
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      falkordb:
+        image: falkordb/falkordb:latest
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      postgres:
+        image: postgres:15
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_DB: rlcf_dev
+          POSTGRES_USER: dev
+          POSTGRES_PASSWORD: devpassword
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      qdrant:
+        image: qdrant/qdrant:latest
+        ports:
+          - 6333:6333
+        options: >-
+          --health-cmd "curl -f http://localhost:6333/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install pytest pytest-asyncio
+
+      - name: Run integration tests (no mocks)
+        run: |
+          pytest tests/integration/ -v --tb=short
+
   lint:
     runs-on: ubuntu-latest
     steps:
