@@ -1041,10 +1041,10 @@ class IngestionPipelineV2:
         Pipeline format:
             {'corte': 'Cassazione', 'numero': '36918/2021', 'estratto': 'text...'}
         """
-        autorita = massima.get("autorita", "Cassazione")
-        numero = massima.get("numero", f"unknown_{index}")
-        anno = massima.get("anno", "")
-        testo = massima.get("massima", "")
+        autorita = massima.get("autorita", "Cassazione") or "Cassazione"
+        numero = massima.get("numero") or f"unknown_{index}"
+        anno = massima.get("anno") or ""
+        testo = massima.get("massima") or ""
 
         # Normalize autorita to corte
         # Supporta tutte le autorità giudiziarie italiane ed europee
@@ -1112,9 +1112,9 @@ class IngestionPipelineV2:
         result: IngestionResult,
     ) -> None:
         """Create AttoGiudiziario node from a single massima."""
-        corte = massima.get("corte", "Cassazione")
-        numero = massima.get("numero", f"unknown_{index}")
-        estratto = massima.get("estratto", "")
+        corte = massima.get("corte", "Cassazione") or "Cassazione"
+        numero = massima.get("numero") or f"unknown_{index}"
+        estratto = massima.get("estratto", "") or ""
 
         # Parse numero for year
         anno = ""
