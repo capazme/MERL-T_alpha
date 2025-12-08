@@ -6,9 +6,9 @@
 
 ## Stato Attuale: Core Implementato
 
-### Backend Core (`merlt/core/`)
+### Core Library (`merlt/core/`)
 ```python
-from backend.core import LegalKnowledgeGraph, MerltConfig
+from merlt import LegalKnowledgeGraph, MerltConfig
 
 # Configurazione
 config = MerltConfig(
@@ -59,11 +59,11 @@ merlt/
 │   ├── bridge/                    # ✅ BridgeTable, BridgeBuilder
 │   └── retriever/                 # ✅ GraphAwareRetriever
 │
-├── preprocessing/                 # Processing Pipelines
-│   ├── ingestion_pipeline_v2.py   # ✅ IngestionPipelineV2
-│   ├── multivigenza_pipeline.py   # ✅ MultivigenzaPipeline
-│   ├── comma_parser.py            # ✅ CommaParser
-│   └── structural_chunker.py      # ✅ StructuralChunker
+├── pipeline/                      # Processing Pipelines
+│   ├── ingestion.py               # ✅ IngestionPipelineV2
+│   ├── multivigenza.py            # ✅ MultivigenzaPipeline
+│   ├── parsing.py                 # ✅ CommaParser
+│   └── chunking.py                # ✅ StructuralChunker
 │
 ├── orchestration/services/        # Services
 │   └── embedding_service.py       # ✅ EmbeddingService (E5-large)
@@ -158,7 +158,7 @@ class UnifiedIngestionResult:
 ### Per scripts di ingestion
 ```python
 # Invece di logica custom in scripts/
-from backend.core import LegalKnowledgeGraph, MerltConfig
+from merlt import LegalKnowledgeGraph, MerltConfig
 
 async def main():
     kg = LegalKnowledgeGraph()
@@ -184,4 +184,4 @@ for r in results:
 
 ---
 
-*Ultimo aggiornamento: 2025-12-07*
+*Ultimo aggiornamento: 2025-12-08*

@@ -1,7 +1,7 @@
 # MERL-T System Architecture Map (v2)
 
-> **Versione**: 2.0
-> **Ultimo aggiornamento**: 2 Dicembre 2025
+> **Versione**: 2.1
+> **Ultimo aggiornamento**: 8 Dicembre 2025
 > **Stato**: Reference Document - ARCHITETTURA v2
 
 ---
@@ -132,9 +132,9 @@
 
 | Componente | Tecnologia | Status | Note v2 |
 |------------|------------|--------|---------|
-| **Graph DB** | FalkorDB | 0% | Sostituisce Neo4j, 496x piu veloce |
-| Vector DB | Qdrant | 100% | Invariato |
-| **Bridge Table** | PostgreSQL | 0% | **NUOVO v2**: Mappa chunk ↔ node |
+| **Graph DB** | FalkorDB | **100%** | ✅ Operativo, 15K+ nodi |
+| Vector DB | Qdrant | **100%** | ✅ 17K+ embeddings |
+| **Bridge Table** | PostgreSQL | **100%** | ✅ 1.5K+ mappings |
 | Main DB | PostgreSQL | 100% | Invariato |
 | Cache | Redis | 100% | Invariato |
 
@@ -283,5 +283,6 @@ dove alpha=0.3, beta=0.5, gamma=0.2
 
 | Data | Versione | Modifiche |
 |------|----------|-----------|
+| 2025-12-08 | 2.1 | Aggiornato status Storage Layer (tutti 100%), 7 esperimenti completati |
 | 2025-12-02 | 2.0 | Aggiornamento a architettura v2: Expert autonomi, FalkorDB, Bridge Table, RLCF multilivello |
 | 2025-12-02 | 1.0 | Creazione documento iniziale |

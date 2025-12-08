@@ -10,8 +10,10 @@
 ### Fase 1: Data Ingestion
 | ID | Nome | Status | Data | RQ | Descrizione |
 |----|------|--------|------|-----|-------------|
-| [EXP-001](./EXP-001_ingestion_libro_iv/) | ingestion_libro_iv | **COMPLETED** | 2025-12-03/04 | RQ1-4 | Ingestion completa 887 articoli Libro IV CC con Brocardi enrichment |
+| [EXP-001](./EXP-001_ingestion_libro_iv/) | ingestion_libro_iv | **COMPLETED** | 2025-12-03/05 | RQ1-4 | Ingestion completa 887 articoli Libro IV CC con Brocardi enrichment |
 | [EXP-004](./EXP-004_ingestion_costituzione/) | ingestion_costituzione | **COMPLETED** | 2025-12-05 | RQ1-3 | Ingestion 139 articoli Costituzione Italiana |
+| [EXP-006](./EXP-006_libro_primo_cp/) | libro_primo_cp | **COMPLETED** | 2025-12-07 | RQ1-4 | Ingestion 263 articoli Libro I Codice Penale + RAG validation |
+| [EXP-007](./EXP-007_full_ingestion/) | full_ingestion | **COMPLETED** | 2025-12-08 | RQ1-4 | Pipeline end-to-end: Brocardi + Bridge + Multivigenza |
 
 > **Nota**: EXP-002 (Brocardi Enrichment) è stato integrato direttamente in EXP-001 durante il re-run del 4 dicembre 2025.
 
@@ -20,16 +22,22 @@
 |----|------|--------|------|-----|-------------|
 | [EXP-002](./EXP-002_rag_pipeline_test/) | rag_pipeline_test | **COMPLETED** | 2025-12-04 | RQ4-5 | Test end-to-end RAG: semantic search + Bridge Table + graph enrichment |
 | [EXP-003](./EXP-003_rag_full_dataset/) | rag_full_dataset | **COMPLETED** | 2025-12-05 | RQ4-5 | RAG con dataset completo (12K vectors): Norma + Massime |
+| [EXP-005](./EXP-005_multivigenza_241/) | multivigenza_241 | **COMPLETED** | 2025-12-06 | RQ2-4 | Fix e validazione pipeline multivigenza |
 
 ### Fase 3: Expert Reasoning
 | ID | Nome | Status | Data | RQ | Descrizione |
 |----|------|--------|------|-----|-------------|
-| - | - | - | - | - | - |
+| EXP-009 | expert_comparison | PLANNED | - | RQ5 | Confronto 4 Expert con tools specializzati |
 
 ### Fase 4: RLCF Learning
 | ID | Nome | Status | Data | RQ | Descrizione |
 |----|------|--------|------|-----|-------------|
-| - | - | - | - | - | - |
+| EXP-010 | rlcf_convergence | PLANNED | - | RQ6 | Test convergenza RLCF multilivello |
+
+### Fase 5: Benchmark & Validation
+| ID | Nome | Status | Data | RQ | Descrizione |
+|----|------|--------|------|-----|-------------|
+| EXP-008 | bridge_benchmark | PLANNED | - | RQ4 | Benchmark formale Bridge Table vs join runtime |
 
 ---
 
@@ -37,10 +45,10 @@
 
 | Metrica | Valore |
 |---------|--------|
-| Esperimenti totali | **4** |
-| Completati | **4** |
+| Esperimenti totali | **10** |
+| Completati | **7** |
 | In corso | 0 |
-| Pianificati | 0 |
+| Pianificati | **3** (EXP-008, EXP-009, EXP-010) |
 | Falliti | 0 |
 
 ---
@@ -92,20 +100,40 @@
 ├── EXP-004 design document creato (15:10)
 ├── EXP-004 ingestion Costituzione avviata (15:25)
 └── EXP-004 completato (15:30) - 139 articoli, 152 embeddings
+
+2025-12-06
+├── EXP-005 design document creato
+├── Bug fix multivigenza: filtering articolo, is_abrogato, parsing destinazione
+├── Validazione ground truth vs Normattiva (5/5 articoli corretti)
+└── EXP-005 completato - multivigenza pipeline validata
+
+2025-12-07
+├── EXP-006 design document creato
+├── EXP-006 ingestion Codice Penale avviata
+├── EXP-006 completato - 263 articoli, 6,195 massime
+├── RAG testing: 12 query, Precision@5=0.200, Recall=0.528
+└── Core Library creata (LegalKnowledgeGraph)
+
+2025-12-08
+├── EXP-007 eseguito - 17 articoli con pipeline end-to-end
+├── 17/17 Brocardi dottrina (100%), 467 massime, 5 multivigenza
+├── Fix RLCF module (config files, database.py, lazy imports)
+├── Assessment documentazione completo
+└── Roadmap RQ1-RQ6 definita
 ```
 
 ---
 
 ## Research Questions Coverage
 
-| RQ | Descrizione | Esperimento | Status |
+| RQ | Descrizione | Esperimenti | Status |
 |----|-------------|-------------|--------|
-| RQ1 | Chunking comma-level preserva integrità semantica? | EXP-001 | **Verified** ✅ |
-| RQ2 | Struttura gerarchica migliora navigabilità? | EXP-001 | **Verified** ✅ |
-| RQ3 | Enrichment Brocardi aggiunge valore misurabile? | EXP-001 | **Verified** ✅ |
-| RQ4 | Bridge Table riduce latenza vs join runtime? | EXP-001 | **Data Ready** |
-| RQ5 | Expert specialization migliora qualità? | - | Not started |
-| RQ6 | RLCF converge a pesi ottimali? | - | Not started |
+| RQ1 | Chunking comma-level preserva integrità semantica? | EXP-001, EXP-006 | ✅ **Verified** |
+| RQ2 | Struttura gerarchica migliora navigabilità? | EXP-001 | ✅ **Verified** |
+| RQ3 | Enrichment Brocardi aggiunge valore misurabile? | EXP-001, EXP-006, EXP-007 | ✅ **Verified** |
+| RQ4 | Bridge Table riduce latenza vs join runtime? | EXP-002, EXP-003 | ⚠️ **Data Ready** (benchmark formale: EXP-008) |
+| RQ5 | Expert specialization migliora qualità? | - | ❌ Planned (EXP-009) |
+| RQ6 | RLCF converge a pesi ottimali? | - | ❌ Planned (EXP-010) |
 
 ---
 
@@ -201,4 +229,31 @@
 
 ---
 
-*Ultimo aggiornamento: 2025-12-05 12:50*
+---
+
+## Risultati Chiave EXP-006 (Codice Penale)
+
+| Metrica | Valore |
+|---------|--------|
+| Articoli processati | 263/263 (100%) |
+| Brocardi enrichment | 262/263 (99.6%) |
+| Massime totali | 6,195 |
+| RAG Precision@5 | 0.200 |
+| RAG Recall | 0.528 |
+| RAG MRR | 0.562 |
+
+---
+
+## Risultati Chiave EXP-007 (Full Pipeline)
+
+| Metrica | Valore |
+|---------|--------|
+| Articoli processati | 17/17 (100%) |
+| Brocardi dottrina | 17/17 (100%) |
+| Massime totali | 467 |
+| Jurisprudence coverage | 16/17 (94%) |
+| Multivigenza relations | 5 |
+
+---
+
+*Ultimo aggiornamento: 2025-12-08*

@@ -5,6 +5,61 @@
 
 ---
 
+## 2025-12-08 - Assessment Documentazione + EXP-007 ✅
+
+**Durata**: ~3 ore
+**Obiettivo**: Assessment completo documentazione e riallineamento per tesi
+**Risultato**: ✓ Documentazione riallineata, roadmap RQ1-RQ6 definita
+
+### EXP-007: Full Ingestion con Pipeline Completa
+
+1. **Ingestion 17 articoli (Art. 1453-1469)**
+   - Articoli processati: 17/17 (100%)
+   - Brocardi enrichment: 17/17 (100%)
+   - Massime totali: 467
+   - Jurisprudence coverage: 16/17 (94%)
+   - Multivigenza relations: 5
+
+2. **Fix RLCF Module**
+   - Ripristinati file config mancanti (config.py, model_config.yaml, task_config.yaml)
+   - Creato database.py con SQLAlchemy Base
+   - Fix lazy imports in __init__.py
+   - OpenRouterService ora importabile
+
+### Assessment Documentazione Completo
+
+1. **Stato Research Questions**
+   | RQ | Status | Note |
+   |----|--------|------|
+   | RQ1 (Chunking) | ✅ VERIFIED | Comma-level funzionante |
+   | RQ2 (Gerarchia) | ✅ VERIFIED | Titolo→Capo→Sezione→Art |
+   | RQ3 (Brocardi) | ✅ VERIFIED | 100% dottrina |
+   | RQ4 (Bridge) | ⚠️ DATA READY | Test formali mancanti |
+   | RQ5 (Expert) | ❌ NOT STARTED | Da implementare |
+   | RQ6 (RLCF) | ❌ NOT STARTED | Da implementare |
+
+2. **Discrepanze Identificate e Corrette**
+   - Naming: `backend.core` → `merlt`
+   - Path: `preprocessing/` → `pipeline/`
+   - Esperimenti mancanti: EXP-005, EXP-006, EXP-007
+   - Status architettura obsoleti
+
+3. **Roadmap Definita**
+   - FASE A: Riallineamento docs (oggi)
+   - FASE B: RQ4 Benchmark (EXP-008)
+   - FASE C: RQ5 Expert Tools (EXP-009)
+   - FASE D: RQ6 RLCF (EXP-010)
+   - FASE E: Integrazione finale
+
+### File Modificati
+- `docs/claude-context/CURRENT_STATE.md`
+- `docs/claude-context/LIBRARY_ARCHITECTURE.md`
+- `docs/claude-context/PROGRESS_LOG.md`
+- `docs/experiments/INDEX.md`
+- `docs/experiments/EXP-007_full_ingestion/` (nuovo)
+
+---
+
 ## 2025-12-07 - Core Library + EXP-006 Completato ✅
 
 **Durata**: ~3 ore
@@ -904,6 +959,12 @@ Codice Civile -[contiene]-> Art. 1456 c.c. -[disciplina]-> "Clausola risolutiva 
 | 2025-12-04 | **EXP-001 COMPLETO** | 887 articoli, 3,462 nodi, 26,577 relazioni |
 | 2025-12-04 | **Embedding Generation COMPLETO** | 2,546 vectors in Qdrant (1024 dim) |
 | 2025-12-04 | **Sistema RAG Operativo** | Graph + Vector + Bridge integrati |
+| 2025-12-05 | **EXP-004 COMPLETO** | 139 articoli Costituzione |
+| 2025-12-06 | **EXP-005 COMPLETO** | Validazione multivigenza |
+| 2025-12-07 | **EXP-006 COMPLETO** | 263 articoli Codice Penale |
+| 2025-12-07 | **Core Library creata** | LegalKnowledgeGraph + MerltConfig |
+| 2025-12-08 | **EXP-007 COMPLETO** | Pipeline end-to-end validata |
+| 2025-12-08 | **Assessment Documentazione** | Roadmap RQ1-RQ6 definita |
 
 ---
 
@@ -911,14 +972,16 @@ Codice Civile -[contiene]-> Art. 1456 c.c. -[disciplina]-> "Clausola risolutiva 
 
 | Metrica | Valore |
 |---------|--------|
-| Sessioni totali | 6 |
-| Ore totali | ~20 |
-| LOC scritte | ~5500 |
-| LOC documentazione | ~4000 |
+| Sessioni totali | **8** |
+| Ore totali | **~25** |
+| LOC scritte | ~6500 |
+| LOC documentazione | ~5000 |
 | Container attivi | 4 (FalkorDB, PostgreSQL, Qdrant, Redis) |
-| Test passano | 91+ |
-| Articoli ingested | **887** (Libro IV completo) |
-| Nodi FalkorDB | **3,462** |
-| Relazioni FalkorDB | **26,577** |
-| Bridge mappings | **2,546** |
-| **Embeddings Qdrant** | **2,546** (1024 dim) |
+| **Esperimenti completati** | **7** (EXP-001 → EXP-007) |
+| **Test passano** | **153** |
+| **Articoli ingested** | **1,306** (CC 887 + Cost 139 + CP 263 + 17) |
+| Nodi FalkorDB | ~15,000+ |
+| Relazioni FalkorDB | ~30,000+ |
+| Bridge mappings | ~1,500+ |
+| Embeddings Qdrant | ~17,000+ (1024 dim) |
+| **Research Questions** | 4/6 verified (RQ1-RQ4) |

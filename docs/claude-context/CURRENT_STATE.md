@@ -9,9 +9,9 @@
 
 | Campo | Valore |
 |-------|--------|
-| **Data ultimo aggiornamento** | 7 Dicembre 2025 (03:00) |
-| **Fase progetto** | **Test Integrazione Completati** - 15/15 passing |
-| **Prossimo obiettivo** | Stabilizzazione API, cleanup |
+| **Data ultimo aggiornamento** | 8 Dicembre 2025 |
+| **Fase progetto** | **Ingestion Completa + Assessment** - 7 esperimenti completati |
+| **Prossimo obiettivo** | Implementazione RQ5-RQ6 (Expert con Tools + RLCF Multilivello) |
 | **Blocchi attivi** | Nessuno |
 
 ---
@@ -34,15 +34,12 @@ merlt/                           # Package principale
 
 ### Imports Aggiornati
 ```python
-# Prima
-from backend.core import LegalKnowledgeGraph
-from backend.external_sources.visualex.scrapers.normattiva_scraper import NormattivaScraper
-
-# Dopo
+# Tutti gli imports usano ora il package merlt
 from merlt import LegalKnowledgeGraph
 from merlt.sources import NormattivaScraper, BrocardiScraper
 from merlt.storage.graph import FalkorDBClient
 from merlt.pipeline import IngestionPipelineV2
+from merlt.rlcf import OpenRouterService
 ```
 
 ### File CI/CD Aggiornati
@@ -54,7 +51,44 @@ from merlt.pipeline import IngestionPipelineV2
 
 ---
 
-## Cosa Abbiamo Fatto (Sessione Corrente - 7 Dic 2025)
+## Cosa Abbiamo Fatto (Sessione Corrente - 8 Dic 2025)
+
+### EXP-007: Full Ingestion con Brocardi + Bridge + Multivigenza - COMPLETATO ✅
+
+- [x] **Ingestion 17 articoli (Art. 1453-1469)** ✅:
+  - 17/17 processati (100%)
+  - 17/17 con Brocardi dottrina (100%)
+  - 467 massime giurisprudenziali
+  - 16/17 con jurisprudence (94%)
+  - 5 relazioni multivigenza
+
+- [x] **Assessment Documentazione** ✅:
+  - Analisi completa docs/claude-context/
+  - Analisi completa docs/experiments/
+  - Analisi completa docs/architecture/
+  - Mappatura Research Questions RQ1-RQ6
+  - Piano riallineamento creato
+
+- [x] **Fix RLCF Module** ✅:
+  - Ripristinati config.py, model_config.yaml, task_config.yaml
+  - Creato database.py con SQLAlchemy Base
+  - Fix lazy imports in __init__.py
+  - OpenRouterService ora importabile
+
+### Research Questions Status ✅
+
+| RQ | Status | Esperimenti |
+|----|--------|-------------|
+| RQ1 (Chunking) | ✅ VERIFIED | EXP-001, EXP-006 |
+| RQ2 (Gerarchia) | ✅ VERIFIED | EXP-001 |
+| RQ3 (Brocardi) | ✅ VERIFIED | EXP-001, EXP-006, EXP-007 |
+| RQ4 (Bridge Table) | ⚠️ DATA READY | EXP-002, EXP-003 |
+| RQ5 (Expert Tools) | ❌ NOT STARTED | - |
+| RQ6 (RLCF) | ❌ NOT STARTED | - |
+
+---
+
+## Cosa Abbiamo Fatto (Sessione Precedente - 7 Dic 2025)
 
 ### Test di Integrazione Completi - COMPLETATO ✅
 
@@ -476,48 +510,51 @@ from merlt.pipeline import IngestionPipelineV2
 
 ## Prossimi Passi Immediati
 
-### Priorita 1: Ingestion Pipeline (Settimana 1-2) - COMPLETATA ✅
-- [x] Setup FalkorDB container (porta 6380)
-- [x] Test query Cypher su FalkorDB
-- [x] VisualexAPI ingestion pipeline (conforme allo schema)
-- [x] Implementare FalkorDBClient reale con falkordb-py
-- [x] Integrare VisualexAPI scrapers e tools
-- [x] **Primo batch ingestion** - Art. 1453-1456 Codice Civile ✅
-- [x] Creare Bridge Table in PostgreSQL ✅
-- [x] Schema definitivo API → Grafo con 21 properties ✅
-- [x] **CommaParser** dall'output VisualexAPI ✅
-- [x] **StructuralChunker** (comma-level) ✅
-- [x] **URN extension** per comma (tramite StructuralChunker, non modifica urngenerator) ✅
-- [x] **IngestionPipelineV2** con Brocardi enrichment ✅
-- [x] **BridgeBuilder** con mappings e confidence scoring ✅
+### COMPLETATI ✅
 
-### Priorita 1.5: Batch Ingestion - COMPLETATA ✅
-- [x] Script batch ingestion per 887 articoli Libro IV
-- [x] Monitoring e progress tracking
-- [x] Embedding generation con E5-large (HuggingFace) ✅
+#### Ingestion Pipeline - COMPLETATA ✅
+- [x] FalkorDB, Qdrant, PostgreSQL operativi
+- [x] IngestionPipelineV2 con Brocardi enrichment
+- [x] CommaParser + StructuralChunker
+- [x] BridgeBuilder con mappings
+- [x] Embedding generation con E5-large
 
-### Priorita 1.6: Brocardi Enrichment - COMPLETATO ✅
-- [x] Brocardi integrato direttamente in EXP-001
-- [x] Enrichment con massime giurisprudenziali (827 AttoGiudiziario)
-- [x] Dottrina completa (1,630 nodi: Ratio + Spiegazione)
+#### Batch Ingestion - COMPLETATA ✅
+- [x] CC Libro IV: 887 articoli
+- [x] Costituzione: 139 articoli
+- [x] CP Libro I: 263 articoli
+- [x] EXP-007: 17 articoli con pipeline completa
 
-### Priorita 2: Expert con Tools (Settimana 3-4)
-- [ ] Implementare classe `ExpertWithTools`
-- [ ] Definire tools per Literal (get_exact_text, get_definitions)
-- [ ] Definire tools per Systemic (get_legislative_history)
-- [ ] Definire tools per Principles (get_constitutional_basis)
-- [ ] Definire tools per Precedent (search_cases, get_citation_chain)
+#### GraphAwareRetriever - COMPLETATO ✅
+- [x] Hybrid scoring (vector + graph)
+- [x] Integrazione Bridge Table
+- [x] Alpha parameter configurabile
 
-### Priorita 3: Graph-Aware Retriever (Settimana 5-6)
-- [ ] Implementare `GraphAwareRetriever`
-- [ ] Integrazione con Bridge Table
-- [ ] Alpha parameter learning
+---
 
-### Priorita 4: RLCF Multilivello (Settimana 7-8)
+### DA IMPLEMENTARE
+
+#### Priorità 1: RQ4 Benchmark (EXP-008)
+- [ ] Script benchmark latenza Bridge vs join
+- [ ] Misurazioni formali con metriche
+- [ ] Documentazione risultati
+
+#### Priorità 2: RQ5 Expert con Tools (EXP-009)
+- [ ] Interfaccia base `ExpertWithTools`
+- [ ] `LiteralExpert` con tools (get_exact_text, get_definitions)
+- [ ] `SystemicExpert` con tools (get_legislative_history)
+- [ ] `PrinciplesExpert` con tools (get_constitutional_basis)
+- [ ] `PrecedentExpert` con tools (search_cases, get_citation_chain)
+- [ ] `ExpertGatingNetwork` (MoE-style)
+- [ ] Esperimento comparativo
+
+#### Priorità 3: RQ6 RLCF Multilivello (EXP-010)
 - [ ] Schema DB per authority multilivello
 - [ ] `MultilevelAuthority` class
-- [ ] `MultilevelFeedback` schema
-- [ ] Policy gradient training loop
+- [ ] `LearnableSystemParameters` (theta_traverse, theta_gating, theta_rerank)
+- [ ] Policy gradient training (REINFORCE)
+- [ ] Feedback collection endpoint
+- [ ] Esperimento convergenza
 
 ---
 
@@ -561,11 +598,11 @@ from merlt.pipeline import IngestionPipelineV2
 
 ### File chiave da leggere:
 1. `CLAUDE.md` - Istruzioni generali progetto
-2. `docs/SYSTEM_ARCHITECTURE.md` - Mappa tecnica v2
-3. `docs/03-architecture/02-orchestration-layer.md` - Expert autonomi, gating
-4. `docs/03-architecture/03-reasoning-layer.md` - Expert con tools
-5. `docs/03-architecture/04-storage-layer.md` - FalkorDB, Bridge Table
-6. `docs/03-architecture/05-learning-layer.md` - RLCF multilivello
+2. `docs/claude-context/LIBRARY_VISION.md` - Principi guida libreria
+3. `docs/claude-context/LIBRARY_ARCHITECTURE.md` - Architettura componenti
+4. `docs/experiments/INDEX.md` - Stato esperimenti (7 completati)
+5. `docs/architecture/overview.md` - Mappa tecnica v2
+6. `docs/archive/08-iteration/INGESTION_METHODOLOGY.md` - Research Questions RQ1-RQ6
 
 ### Pattern da seguire:
 - Documentare prima di implementare
@@ -590,12 +627,12 @@ docker-compose -f docker-compose.dev.yml ps
 redis-cli -p 6380 ping  # FalkorDB
 curl http://localhost:6333/  # Qdrant
 
-# Backend
-uvicorn backend.orchestration.api.main:app --reload --port 8000
-
 # Test
 pytest tests/ -v
 
+# Test imports
+python -c "from merlt import LegalKnowledgeGraph; print('OK')"
+
 # Test FalkorDB
-.venv/bin/python -c "from backend.storage.falkordb import FalkorDBClient; import asyncio; asyncio.run(FalkorDBClient().health_check())"
+python -c "from merlt.storage.graph import FalkorDBClient; import asyncio; asyncio.run(FalkorDBClient().health_check())"
 ```
