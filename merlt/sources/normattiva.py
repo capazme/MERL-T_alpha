@@ -16,9 +16,26 @@ from merlt.sources.utils.text import normalize_act_type
 log = structlog.get_logger()
 
 
-# Cache LLM service instance and availability flag
-_llm_service = None
-_llm_service_checked = False  # Track if we've already checked availability
+# Thread-safe singleton per LLM service
+import asyncio
+from functools import lru_cache
+
+
+@lru_cache(maxsize=1)
+def _get_llm_service():
+    """
+    Singleton thread-safe per LLM service.
+
+    Usa lru_cache per garantire che il service venga inizializzato una sola volta.
+    """
+    try:
+        from merlt.rlcf.ai_service import OpenRouterService
+        service = OpenRouterService()
+        log.info("LLM service initialized for destinazione parsing")
+        return service
+    except (ImportError, Exception) as e:
+        log.info(f"LLM service not available: {e.__class__.__name__}")
+        return None
 
 
 async def parse_destinazione_with_llm(
@@ -38,24 +55,14 @@ async def parse_destinazione_with_llm(
     Returns:
         Dict con target_article, comma, lettera, destinazione normalizzata, o None
     """
-    global _llm_service, _llm_service_checked
-
     if not use_llm:
         return None
 
-    # Lazy import and singleton pattern - only try once
-    if not _llm_service_checked:
-        _llm_service_checked = True
-        try:
-            from merlt.rlcf.ai_service import OpenRouterService
-            _llm_service = OpenRouterService()
-            log.info("LLM service initialized for destinazione parsing")
-        except (ImportError, Exception) as e:
-            log.info(f"LLM service not available for destinazione parsing: {e.__class__.__name__}")
-            _llm_service = None
+    # Thread-safe singleton
+    llm_service = _get_llm_service()
 
-    # If service is not available after check, return silently
-    if _llm_service is None:
+    # If service is not available, return silently
+    if llm_service is None:
         return None
 
     prompt = f"""Estrai la destinazione di questa modifica normativa italiana.
@@ -80,7 +87,7 @@ Esempi:
 Se non riesci a identificare, usa null."""
 
     try:
-        response = await _llm_service.generate(
+        response = await llm_service.generate(
             prompt=prompt,
             model="google/gemini-2.0-flash-001",  # Fast and cheap
             max_tokens=150,
@@ -124,9 +131,37 @@ Se non riesci a identificare, usa null."""
 
 
 class NormattivaScraper(BaseScraper):
-    def __init__(self) -> None:
+    """
+    Scraper per Normattiva.it - testi ufficiali delle leggi italiane.
+
+    Fornisce accesso a:
+    - Testo vigente degli articoli
+    - Storia delle modifiche (multivigenza)
+    - Versioni storiche (a una data specifica)
+
+    Example:
+        >>> from merlt.sources import NormattivaScraper
+        >>> from merlt.sources.utils.norma import Norma, NormaVisitata
+        >>>
+        >>> scraper = NormattivaScraper()
+        >>> norma = Norma(tipo_atto="codice civile")
+        >>> nv = NormaVisitata(norma=norma, numero_articolo="1")
+        >>> text, urn = await scraper.get_document(nv)
+    """
+
+    def __init__(self, config: Optional["ScraperConfig"] = None) -> None:
+        """
+        Inizializza NormattivaScraper.
+
+        Args:
+            config: Configurazione opzionale (timeout, retry, etc.)
+        """
+        # Import locale per evitare import circolari
+        from merlt.sources.base import ScraperConfig
+        super().__init__(config or ScraperConfig())
+
         self.base_url: str = "https://www.normattiva.it/"
-        log.info("NormattivaScraper initialized")
+        log.info("NormattivaScraper initialized", timeout=self.config.timeout)
 
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def get_document(self, normavisitata: NormaVisitata) -> Tuple[str, str]:

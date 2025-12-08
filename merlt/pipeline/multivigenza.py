@@ -417,19 +417,32 @@ class MultivigenzaPipeline:
         )
     """
 
-    def __init__(self, falkordb_client=None, scraper: Optional[NormattivaScraper] = None):
+    def __init__(
+        self,
+        falkordb_client=None,
+        scraper: Optional[NormattivaScraper] = None,
+        dry_run: bool = False
+    ):
         """
         Initialize pipeline.
 
         Args:
             falkordb_client: FalkorDB client for graph operations
             scraper: Optional NormattivaScraper (default: creates new one)
+            dry_run: Se True, non scrive nel grafo (solo logging)
+
+        Example:
+            # Dry-run per test
+            pipeline = MultivigenzaPipeline(dry_run=True)
+            result = await pipeline.ingest_with_history(nv)
+            print(f"Would create {len(result.storia.modifiche)} modifiche")
         """
         self.falkordb = falkordb_client
         self.scraper = scraper or NormattivaScraper()
+        self.dry_run = dry_run
         self._timestamp = None
 
-        logger.info("MultivigenzaPipeline initialized")
+        logger.info("MultivigenzaPipeline initialized", dry_run=dry_run)
 
     async def ingest_with_history(
         self,
@@ -483,6 +496,16 @@ class MultivigenzaPipeline:
             )
 
             logger.info(f"Found {len(modifiche)} amendments for {article_urn}")
+
+            # Dry-run: skip graph operations
+            if self.dry_run:
+                logger.info(
+                    "[DRY-RUN] Would process article",
+                    article_urn=article_urn,
+                    modifiche=len(modifiche),
+                    is_abrogato=is_abrogato
+                )
+                return result
 
             # 2. Update article node with multivigenza properties
             await self._update_article_properties(normavisitata, result)

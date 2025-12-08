@@ -50,11 +50,13 @@ ENVIRONMENTS = {
     "test": {
         "graph": "merl_t_test",
         "collection": "merl_t_test_chunks",
+        "bridge_table": "bridge_table_test",
         "description": "Test environment for experiments",
     },
     "prod": {
         "graph": "merl_t_prod",
         "collection": "merl_t_prod_chunks",
+        "bridge_table": "bridge_table_prod",
         "description": "Production environment with validated data",
     },
 }
@@ -202,28 +204,91 @@ def create_qdrant_collection(
         return False
 
 
-async def clear_bridge_table(dsn: str, dry_run: bool = False) -> bool:
-    """Clear the bridge table."""
+async def create_bridge_table(dsn: str, table_name: str, dry_run: bool = False) -> bool:
+    """Create a bridge table for the environment."""
     try:
         if dry_run:
-            print("   [DRY RUN] Would clear bridge table")
+            print(f"   [DRY RUN] Would create bridge table '{table_name}'")
             return True
 
         conn = await asyncpg.connect(dsn)
 
-        # Count before delete
-        count = await conn.fetchval("SELECT COUNT(*) FROM bridge_table")
+        # Check if table exists and get count
+        exists = await conn.fetchval(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = $1)",
+            table_name
+        )
 
-        # Delete all
-        await conn.execute("DELETE FROM bridge_table")
+        if exists:
+            count = await conn.fetchval(f"SELECT COUNT(*) FROM {table_name}")
+            print(f"   Bridge table '{table_name}' exists ({count} rows)")
+            # Drop and recreate
+            await conn.execute(f"DROP TABLE IF EXISTS {table_name} CASCADE")
+            print(f"   Dropped table '{table_name}'")
+        else:
+            print(f"   Bridge table '{table_name}' does not exist, will create")
+
+        # Create table with full schema
+        create_sql = f"""
+        CREATE TABLE {table_name} (
+            id SERIAL PRIMARY KEY,
+            chunk_id UUID NOT NULL,
+            chunk_text TEXT,
+            graph_node_urn VARCHAR(500) NOT NULL,
+            node_type VARCHAR(50) NOT NULL,
+            relation_type VARCHAR(50),
+            confidence FLOAT,
+            source VARCHAR(100),
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW(),
+            metadata JSONB,
+            CONSTRAINT {table_name}_chunk_id_graph_node_urn_key UNIQUE (chunk_id, graph_node_urn),
+            CONSTRAINT {table_name}_confidence_check CHECK (confidence >= 0 AND confidence <= 1)
+        )
+        """
+        await conn.execute(create_sql)
+
+        # Create indexes
+        await conn.execute(f"CREATE INDEX {table_name}_chunk_id_idx ON {table_name}(chunk_id)")
+        await conn.execute(f"CREATE INDEX {table_name}_graph_node_urn_idx ON {table_name}(graph_node_urn)")
+        await conn.execute(f"CREATE INDEX {table_name}_node_type_idx ON {table_name}(node_type)")
 
         await conn.close()
 
-        print(f"   Cleared bridge table ({count} rows deleted)")
+        print(f"   Created bridge table '{table_name}' with indexes")
         return True
 
     except Exception as e:
-        print(f"   Error clearing bridge table: {e}")
+        print(f"   Error creating bridge table '{table_name}': {e}")
+        return False
+
+
+async def clear_bridge_table(dsn: str, dry_run: bool = False) -> bool:
+    """Clear the legacy bridge table (backward compatibility)."""
+    try:
+        if dry_run:
+            print("   [DRY RUN] Would clear legacy bridge table")
+            return True
+
+        conn = await asyncpg.connect(dsn)
+
+        # Check if table exists
+        exists = await conn.fetchval(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'bridge_table')"
+        )
+
+        if exists:
+            count = await conn.fetchval("SELECT COUNT(*) FROM bridge_table")
+            await conn.execute("DELETE FROM bridge_table")
+            print(f"   Cleared legacy bridge table ({count} rows deleted)")
+        else:
+            print("   Legacy bridge table does not exist (OK)")
+
+        await conn.close()
+        return True
+
+    except Exception as e:
+        print(f"   Error clearing legacy bridge table: {e}")
         return False
 
 
@@ -297,12 +362,15 @@ async def main():
         # Create Qdrant collection
         create_qdrant_collection(qdrant, env["collection"], dry_run=args.dry_run)
 
-    # Step 4: Clear bridge table
+        # Create bridge table for this environment
+        await create_bridge_table(POSTGRES_DSN, env["bridge_table"], dry_run=args.dry_run)
+
+    # Step 4: Clear legacy bridge table (if exists)
     if not args.skip_bridge:
-        print("\n4. Clearing bridge table...")
+        print("\n4. Cleaning up legacy bridge table...")
         await clear_bridge_table(POSTGRES_DSN, dry_run=args.dry_run)
     else:
-        print("\n4. Skipping bridge table cleanup (--skip-bridge)")
+        print("\n4. Skipping legacy bridge table cleanup (--skip-bridge)")
 
     # Summary
     print("\n" + "=" * 70)
@@ -319,11 +387,17 @@ async def main():
             print(f"\n  {env_name.upper()}:")
             print(f"    Graph: {env['graph']}")
             print(f"    Collection: {env['collection']}")
+            print(f"    Bridge Table: {env['bridge_table']}")
 
         print("\nUsage:")
         print("  from merlt.config import get_environment_config, TEST_ENV")
         print("  config = get_environment_config(TEST_ENV)")
         print("  print(config.falkordb_graph)  # 'merl_t_test'")
+        print("")
+        print("  # Per bridge table con ambiente:")
+        print("  from merlt.storage.bridge import BridgeTable, BridgeTableConfig")
+        print("  config = BridgeTableConfig.from_environment(get_environment_config(TEST_ENV))")
+        print("  # oppure: config = BridgeTableConfig.for_test()")
 
     print("\n" + "=" * 70)
 
