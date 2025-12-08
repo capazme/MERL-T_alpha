@@ -254,3 +254,9 @@ python -c "from merlt import LegalKnowledgeGraph; print('OK')"
 ---
 
 *Questa è la libreria dell'informatica giuridica italiana. Ogni riga conta.*
+- ricordiamoci di aggiungere test in CI/CD per tutto senza mock
+- salva sempre i log nella cartella logs/ non in tmp
+- DObbiamo irrobustire il parsing per gestire tutti i possibili casi presenti su normattiva. Quindi man mano che troviamo nuovi casi dobbiamo aggiungerli per un'estrazione robusta
+- quando viene aggiunta una feature o un fix, aggiungilo ai test per evitare regression
+- esternalizziamo sempre i modelli nell'env in modo da poter usare sempre il migliore per il caso d'uso specifico
+- **CONVENZIONE DATABASE**: ogni database deve avere versione `_dev` e `_prod`. FalkorDB usa `merl_t_dev` per sviluppo e `merl_t_prod` per produzione. Stessa logica per Redis e altri storage.

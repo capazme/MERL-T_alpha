@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from uuid import UUID
 
-from merlt.pipeline.parsing import CommaParser, ArticleStructure, parse_article
+from merlt.pipeline.parsing import CommaParser, ArticleStructure, Comma, Lettera, parse_article
 from merlt.pipeline.chunking import StructuralChunker, Chunk, chunk_article
 from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
 
@@ -37,6 +37,56 @@ from merlt.sources.utils.tree import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_number_from_urn(urn: str, level: str) -> Optional[int]:
+    """
+    Estrae il numero dal suffisso dell'URN per un dato livello gerarchico.
+
+    Args:
+        urn: URN completo (es. "https://...~libro2~tit1")
+        level: Livello da estrarre ('libro', 'parte', 'titolo', 'capo', 'sezione')
+
+    Returns:
+        Il numero come intero, o None se non trovato.
+
+    Note:
+        Per 'parte', prova sia ~parte(N) che ~libro(N) perché alcuni atti
+        (es. Costituzione) usano 'libro' nell'URN per strutture logicamente 'parte'.
+
+    Examples:
+        >>> _extract_number_from_urn("https://...~libro2~tit1", "libro")
+        2
+        >>> _extract_number_from_urn("https://...~libro2~tit1", "titolo")
+        1
+        >>> _extract_number_from_urn("https://...~parte1", "parte")
+        1
+        >>> _extract_number_from_urn("https://...costituzione~libro1", "parte")
+        1  # Fallback: ~libro quando cercando ~parte
+    """
+    if not urn:
+        return None
+
+    # Mapping level -> pattern(s) suffix
+    # Some levels have multiple patterns (e.g., 'parte' may use ~libro in URN)
+    patterns = {
+        'libro': [r'~libro(\d+)'],
+        'parte': [r'~parte(\d+)', r'~libro(\d+)'],  # Fallback: Costituzione uses ~libro
+        'titolo': [r'~tit(\d+)'],
+        'capo': [r'~capo(\d+)'],
+        'sezione': [r'~sez(\d+)'],
+    }
+
+    level_patterns = patterns.get(level)
+    if not level_patterns:
+        return None
+
+    # Try each pattern in order, return first match
+    for pattern in level_patterns:
+        match = re.search(pattern, urn, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return None
 
 
 @dataclass
@@ -331,21 +381,18 @@ class IngestionPipelineV2:
         return result
 
     def _roman_to_arabic(self, roman: str) -> int:
-        """Convert Roman numeral to Arabic number."""
-        roman_values = {
-            'I': 1, 'V': 5, 'X': 10, 'L': 50,
-            'C': 100, 'D': 500, 'M': 1000
-        }
-        result = 0
-        prev = 0
-        for char in reversed(roman.upper()):
-            curr = roman_values.get(char, 0)
-            if curr < prev:
-                result -= curr
-            else:
-                result += curr
-            prev = curr
-        return result
+        """
+        Convert Roman numeral or Italian ordinal word to Arabic number.
+
+        Supporta:
+        - Numeri romani: I, II, III, IV, V, ..., XIV, ...
+        - Parole ordinali: primo, secondo, terzo, ... cinquantesimo (usate dal Codice Penale)
+
+        Usa il modulo merlt.sources.utils.ordinals per la mappatura completa.
+        """
+        from merlt.sources.utils.ordinals import to_arabic
+        result = to_arabic(roman)
+        return result if result is not None else 0
 
     async def _create_graph_structure(
         self,
@@ -380,6 +427,13 @@ class IngestionPipelineV2:
         await self._create_norma_articolo(
             article=article,
             article_structure=article_structure,
+            result=result,
+        )
+
+        # Create Comma and Lettera nodes
+        await self._create_comma_nodes(
+            article_structure=article_structure,
+            article_urn=result.article_urn,
             result=result,
         )
 
@@ -432,37 +486,51 @@ class IngestionPipelineV2:
         result: IngestionResult,
     ) -> None:
         """
-        Create Norma nodes for libro, titolo, capo, sezione.
+        Create Norma nodes for libro/parte, titolo, capo, sezione.
 
-        Hierarchy: Codice → Libro → Titolo → Capo → Sezione → Articolo
+        Hierarchy:
+        - Codici: Codice → Libro → Titolo → Capo → Sezione → Articolo
+        - Costituzione: Costituzione → Parte → Titolo → Articolo
         """
         if not brocardi_position:
             return
 
         hierarchy = self._extract_hierarchy_urns(codice_urn, brocardi_position)
 
-        # Extract titles from position using generic method
+        # Extract titles from position - cerca sia 'libro' che 'parte'
         titles = {
             level: self._extract_hierarchy_title(brocardi_position, level)
-            for level in ('libro', 'titolo', 'capo', 'sezione')
+            for level in ('libro', 'parte', 'titolo', 'capo', 'sezione')
         }
+        # Usa 'libro' se presente, altrimenti 'parte' (Costituzione)
+        libro_title = titles['libro'] or titles['parte']
 
-        # Create Libro node
+        # Create Libro/Parte node
+        # Determina se e' un Libro (Codici) o Parte (Costituzione)
+        is_parte = 'parte' in brocardi_position.lower() and 'libro' not in brocardi_position.lower()
+        tipo_doc = 'parte' if is_parte else 'libro'
+
         if hierarchy.libro:
+            libro_numero = _extract_number_from_urn(hierarchy.libro, tipo_doc)  # 'libro' o 'parte'
+            # Usa numero_libro o numero_parte in base al tipo
+            numero_field = "numero_parte" if tipo_doc == "parte" else "numero_libro"
             await self.falkordb.query(
-                """
-                MERGE (libro:Norma {URN: $urn})
+                f"""
+                MERGE (libro:Norma {{URN: $urn}})
                 ON CREATE SET
                     libro.node_id = $urn,
-                    libro.tipo_documento = 'libro',
+                    libro.tipo_documento = $tipo_doc,
+                    libro.{numero_field} = $numero,
                     libro.titolo = $titolo,
+                    libro.rubrica = $titolo,
                     libro.vigenza = 'vigente',
                     libro.fonte = 'Brocardi',
-                    libro.created_at = $timestamp
+                    libro.created_at = $timestamp,
+                    libro.updated_at = $timestamp
                 """,
-                {"urn": hierarchy.libro, "titolo": titles['libro'] or "", "timestamp": self._timestamp}
+                {"urn": hierarchy.libro, "tipo_doc": tipo_doc, "numero": libro_numero, "titolo": libro_title or "", "timestamp": self._timestamp}
             )
-            result.nodes_created.append(f"Norma(libro):{hierarchy.libro}")
+            result.nodes_created.append(f"Norma({tipo_doc}):{hierarchy.libro}")
 
             # Relation: codice -[contiene]-> libro
             await self.falkordb.query(
@@ -478,18 +546,22 @@ class IngestionPipelineV2:
 
         # Create Titolo node
         if hierarchy.titolo and hierarchy.libro:
+            titolo_numero = _extract_number_from_urn(hierarchy.titolo, 'titolo')
             await self.falkordb.query(
                 """
                 MERGE (titolo:Norma {URN: $urn})
                 ON CREATE SET
                     titolo.node_id = $urn,
                     titolo.tipo_documento = 'titolo',
+                    titolo.numero_titolo = $numero,
                     titolo.titolo = $titolo,
+                    titolo.rubrica = $titolo,
                     titolo.vigenza = 'vigente',
                     titolo.fonte = 'Brocardi',
-                    titolo.created_at = $timestamp
+                    titolo.created_at = $timestamp,
+                    titolo.updated_at = $timestamp
                 """,
-                {"urn": hierarchy.titolo, "titolo": titles['titolo'] or "", "timestamp": self._timestamp}
+                {"urn": hierarchy.titolo, "numero": titolo_numero, "titolo": titles['titolo'] or "", "timestamp": self._timestamp}
             )
             result.nodes_created.append(f"Norma(titolo):{hierarchy.titolo}")
 
@@ -507,18 +579,22 @@ class IngestionPipelineV2:
 
         # Create Capo node
         if hierarchy.capo and hierarchy.titolo:
+            capo_numero = _extract_number_from_urn(hierarchy.capo, 'capo')
             await self.falkordb.query(
                 """
                 MERGE (capo:Norma {URN: $urn})
                 ON CREATE SET
                     capo.node_id = $urn,
                     capo.tipo_documento = 'capo',
+                    capo.numero_capo = $numero,
                     capo.titolo = $titolo,
+                    capo.rubrica = $titolo,
                     capo.vigenza = 'vigente',
                     capo.fonte = 'Brocardi',
-                    capo.created_at = $timestamp
+                    capo.created_at = $timestamp,
+                    capo.updated_at = $timestamp
                 """,
-                {"urn": hierarchy.capo, "titolo": titles['capo'] or "", "timestamp": self._timestamp}
+                {"urn": hierarchy.capo, "numero": capo_numero, "titolo": titles['capo'] or "", "timestamp": self._timestamp}
             )
             result.nodes_created.append(f"Norma(capo):{hierarchy.capo}")
 
@@ -536,18 +612,22 @@ class IngestionPipelineV2:
 
         # Create Sezione node
         if hierarchy.sezione and hierarchy.capo:
+            sezione_numero = _extract_number_from_urn(hierarchy.sezione, 'sezione')
             await self.falkordb.query(
                 """
                 MERGE (sezione:Norma {URN: $urn})
                 ON CREATE SET
                     sezione.node_id = $urn,
                     sezione.tipo_documento = 'sezione',
+                    sezione.numero_sezione = $numero,
                     sezione.titolo = $titolo,
+                    sezione.rubrica = $titolo,
                     sezione.vigenza = 'vigente',
                     sezione.fonte = 'Brocardi',
-                    sezione.created_at = $timestamp
+                    sezione.created_at = $timestamp,
+                    sezione.updated_at = $timestamp
                 """,
-                {"urn": hierarchy.sezione, "titolo": titles['sezione'] or "", "timestamp": self._timestamp}
+                {"urn": hierarchy.sezione, "numero": sezione_numero, "titolo": titles['sezione'] or "", "timestamp": self._timestamp}
             )
             result.nodes_created.append(f"Norma(sezione):{hierarchy.sezione}")
 
@@ -567,9 +647,11 @@ class IngestionPipelineV2:
         """
         Extract title for a hierarchy level from Brocardi position.
 
+        Supporta sia Codici (Libro) che Costituzione (Parte).
+
         Args:
             position: Brocardi position string
-            level: One of 'libro', 'titolo', 'capo', 'sezione'
+            level: One of 'libro', 'parte', 'titolo', 'capo', 'sezione'
 
         Returns:
             The title text after the Roman numeral, or None if not found.
@@ -577,9 +659,15 @@ class IngestionPipelineV2:
         Example:
             position = "Libro IV - Delle obbligazioni, Titolo II - Dei contratti"
             _extract_hierarchy_title(position, 'libro') -> "Delle obbligazioni"
+
+            position = "Parte II - Ordinamento della repubblica, Titolo V - Le regioni"
+            _extract_hierarchy_title(position, 'parte') -> "Ordinamento della repubblica"
         """
         # Match pattern: "Libro IV - Delle obbligazioni" captures "Delle obbligazioni"
-        pattern = rf'{level}\s+[IVX]+\s*[-–]\s*([^,]+)'
+        # Or "Parte II - Ordinamento..." captures "Ordinamento..."
+        # Or "Libro primo - Dei reati..." captures "Dei reati..." (CP usa parole)
+        from merlt.sources.utils.ordinals import ROMAN_OR_ORDINAL_PATTERN
+        pattern = rf'{level}\s+{ROMAN_OR_ORDINAL_PATTERN}\s*[-–]\s*([^,>]+)'
         match = re.search(pattern, position, re.IGNORECASE)
         return match.group(1).strip() if match else None
 
@@ -647,6 +735,103 @@ class IngestionPipelineV2:
             {"parent_urn": parent_urn, "art_urn": result.article_urn}
         )
         result.relations_created.append(f"contiene:{parent_urn}->{result.article_urn}")
+
+    async def _create_comma_nodes(
+        self,
+        article_structure: ArticleStructure,
+        article_urn: str,
+        result: IngestionResult,
+    ) -> None:
+        """
+        Create Comma and Lettera nodes for an article.
+
+        Graph structure:
+            (Articolo)-[:contiene]->(Comma)-[:contiene]->(Lettera)
+
+        URN format (NIR-like):
+            Comma:   {article_urn}-com{N}
+            Lettera: {article_urn}-com{N}-let{X}
+
+        Example:
+            urn:nir:stato:costituzione:1947-12-27~art117-com2
+            urn:nir:stato:costituzione:1947-12-27~art117-com2-leta
+        """
+        for comma in article_structure.commas:
+            comma_urn = f"{article_urn}-com{comma.numero}"
+
+            # Create Comma node
+            await self.falkordb.query(
+                """
+                MERGE (c:Comma {URN: $urn})
+                ON CREATE SET
+                    c.node_id = $urn,
+                    c.numero = $numero,
+                    c.testo = $testo,
+                    c.token_count = $tokens,
+                    c.created_at = $timestamp
+                """,
+                {
+                    "urn": comma_urn,
+                    "numero": comma.numero,
+                    "testo": comma.testo,
+                    "tokens": comma.token_count,
+                    "timestamp": self._timestamp,
+                }
+            )
+            result.nodes_created.append(f"Comma:{comma_urn}")
+
+            # Relation: Articolo -[contiene]-> Comma
+            await self.falkordb.query(
+                """
+                MATCH (art:Norma {URN: $art_urn})
+                MATCH (c:Comma {URN: $comma_urn})
+                MERGE (art)-[r:contiene]->(c)
+                ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
+                """,
+                {"art_urn": article_urn, "comma_urn": comma_urn}
+            )
+            result.relations_created.append(f"contiene:{article_urn}->{comma_urn}")
+
+            # Create Lettera nodes (if present)
+            for lettera in comma.lettere:
+                lettera_urn = f"{comma_urn}-let{lettera.lettera}"
+
+                await self.falkordb.query(
+                    """
+                    MERGE (l:Lettera {URN: $urn})
+                    ON CREATE SET
+                        l.node_id = $urn,
+                        l.lettera = $lettera,
+                        l.testo = $testo,
+                        l.token_count = $tokens,
+                        l.created_at = $timestamp
+                    """,
+                    {
+                        "urn": lettera_urn,
+                        "lettera": lettera.lettera,
+                        "testo": lettera.testo,
+                        "tokens": lettera.token_count,
+                        "timestamp": self._timestamp,
+                    }
+                )
+                result.nodes_created.append(f"Lettera:{lettera_urn}")
+
+                # Relation: Comma -[contiene]-> Lettera
+                await self.falkordb.query(
+                    """
+                    MATCH (c:Comma {URN: $comma_urn})
+                    MATCH (l:Lettera {URN: $lettera_urn})
+                    MERGE (c)-[r:contiene]->(l)
+                    ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
+                    """,
+                    {"comma_urn": comma_urn, "lettera_urn": lettera_urn}
+                )
+                result.relations_created.append(f"contiene:{comma_urn}->{lettera_urn}")
+
+        logger.info(
+            f"Created {len(article_structure.commas)} comma nodes with "
+            f"{sum(len(c.lettere) for c in article_structure.commas)} lettere"
+        )
 
     async def _create_brocardi_enrichment(
         self,
@@ -729,6 +914,10 @@ class IngestionPipelineV2:
             )
             result.relations_created.append(f"commenta:{dottrina_id}->{article_urn}")
 
+        # Relazioni di accompagnamento → Dottrina (tipo: relazione_accompagnamento)
+        # Gestisce: RelazioneCostituzione (Ruini 1947), Relazioni Guardasigilli (CC 1942), etc.
+        await self._create_relazioni_accompagnamento(brocardi, article_urn, estremi, result)
+
         # Massime → AttoGiudiziario (multiple)
         massime = brocardi.get("Massime", [])
         if isinstance(massime, list):
@@ -750,6 +939,116 @@ class IngestionPipelineV2:
                     result=result,
                 )
 
+    async def _create_relazioni_accompagnamento(
+        self,
+        brocardi: Dict[str, Any],
+        article_urn: str,
+        estremi: str,
+        result: IngestionResult,
+    ) -> None:
+        """
+        Crea nodi Dottrina per le Relazioni di accompagnamento storiche.
+
+        Gestisce:
+        - RelazioneCostituzione: Relazione al Progetto della Costituzione (Ruini, 1947)
+        - Relazioni: Relazione del Guardasigilli al Codice Civile (1942) e simili
+        """
+        # 1. Relazione al Progetto della Costituzione (direttamente nell'HTML)
+        if brocardi.get("RelazioneCostituzione"):
+            rel = brocardi["RelazioneCostituzione"]
+            dottrina_id = f"dottrina_relazione_{article_urn.split('~')[-1]}_costituzione"
+            await self.falkordb.query(
+                """
+                MERGE (d:Dottrina {node_id: $id})
+                ON CREATE SET
+                    d.titolo = $titolo,
+                    d.descrizione = $descrizione,
+                    d.tipo_dottrina = 'relazione_accompagnamento',
+                    d.sottotipo = 'relazione_costituzione',
+                    d.fonte = 'Brocardi.it',
+                    d.autore = $autore,
+                    d.anno = $anno,
+                    d.confidence = 0.95,
+                    d.created_at = $timestamp
+                """,
+                {
+                    "id": dottrina_id,
+                    "titolo": rel.get("titolo", "Relazione al Progetto della Costituzione"),
+                    "descrizione": rel.get("testo", ""),
+                    "autore": rel.get("autore", "Meuccio Ruini"),
+                    "anno": rel.get("anno", 1947),
+                    "timestamp": self._timestamp,
+                }
+            )
+            result.nodes_created.append(f"Dottrina:{dottrina_id}")
+            logger.info(f"Created Dottrina RelazioneCostituzione for {estremi}")
+
+            await self.falkordb.query(
+                """
+                MATCH (d:Dottrina {node_id: $d_id})
+                MATCH (art:Norma {URN: $art_urn})
+                MERGE (d)-[r:commenta]->(art)
+                ON CREATE SET r.certezza = 0.95, r.tipo = 'storica', r.fonte = 'Brocardi.it'
+                """,
+                {"d_id": dottrina_id, "art_urn": article_urn}
+            )
+            result.relations_created.append(f"commenta:{dottrina_id}->{article_urn}")
+
+        # 2. Relazioni Guardasigilli e simili (caricate via AJAX per Codici)
+        relazioni = brocardi.get("Relazioni", [])
+        if isinstance(relazioni, list):
+            for i, rel in enumerate(relazioni):
+                if not isinstance(rel, dict) or not rel.get("testo"):
+                    continue
+
+                dottrina_id = f"dottrina_relazione_{article_urn.split('~')[-1]}_{i}"
+                titolo = rel.get("titolo", "Relazione di accompagnamento")
+
+                # Determina sottotipo dal titolo
+                sottotipo = "relazione_generica"
+                if "Guardasigilli" in titolo or "Codice Civile" in titolo:
+                    sottotipo = "relazione_guardasigilli"
+                elif "Costituzione" in titolo:
+                    sottotipo = "relazione_costituzione"
+
+                await self.falkordb.query(
+                    """
+                    MERGE (d:Dottrina {node_id: $id})
+                    ON CREATE SET
+                        d.titolo = $titolo,
+                        d.descrizione = $descrizione,
+                        d.tipo_dottrina = 'relazione_accompagnamento',
+                        d.sottotipo = $sottotipo,
+                        d.fonte = 'Brocardi.it',
+                        d.autore = $autore,
+                        d.anno = $anno,
+                        d.confidence = 0.9,
+                        d.created_at = $timestamp
+                    """,
+                    {
+                        "id": dottrina_id,
+                        "titolo": titolo,
+                        "descrizione": rel.get("testo", ""),
+                        "sottotipo": sottotipo,
+                        "autore": rel.get("autore", ""),
+                        "anno": rel.get("anno"),
+                        "timestamp": self._timestamp,
+                    }
+                )
+                result.nodes_created.append(f"Dottrina:{dottrina_id}")
+                logger.info(f"Created Dottrina Relazione for {estremi}: {titolo}")
+
+                await self.falkordb.query(
+                    """
+                    MATCH (d:Dottrina {node_id: $d_id})
+                    MATCH (art:Norma {URN: $art_urn})
+                    MERGE (d)-[r:commenta]->(art)
+                    ON CREATE SET r.certezza = 0.9, r.tipo = 'storica', r.fonte = 'Brocardi.it'
+                    """,
+                    {"d_id": dottrina_id, "art_urn": article_urn}
+                )
+                result.relations_created.append(f"commenta:{dottrina_id}->{article_urn}")
+
     def _normalize_massima(self, massima: Dict[str, Any], index: int) -> Dict[str, Any]:
         """
         Normalize massima from new BrocardiScraper format to pipeline format.
@@ -766,16 +1065,50 @@ class IngestionPipelineV2:
         testo = massima.get("massima", "")
 
         # Normalize autorita to corte
-        corte = "Cassazione"  # Default
+        # Supporta tutte le autorità giudiziarie italiane ed europee
+        corte = autorita if autorita else "Cassazione"  # Mantieni l'originale se presente
+
         if autorita:
-            if "civ" in autorita.lower():
-                corte = "Cassazione civile"
-            elif "pen" in autorita.lower():
-                corte = "Cassazione penale"
-            elif "lav" in autorita.lower():
-                corte = "Cassazione lavoro"
-            elif "sez" in autorita.lower() and "un" in autorita.lower():
-                corte = "Cassazione Sezioni Unite"
+            autorita_lower = autorita.lower()
+
+            # Corte Costituzionale (priorità alta - prima di Cassazione)
+            if "cost" in autorita_lower or "costituzionale" in autorita_lower:
+                corte = "Corte Costituzionale"
+
+            # Cassazione (varie sezioni)
+            elif "cass" in autorita_lower or autorita_lower.startswith("c."):
+                if "sez" in autorita_lower and "un" in autorita_lower:
+                    corte = "Cassazione Sezioni Unite"
+                elif "civ" in autorita_lower:
+                    corte = "Cassazione civile"
+                elif "pen" in autorita_lower:
+                    corte = "Cassazione penale"
+                elif "lav" in autorita_lower:
+                    corte = "Cassazione lavoro"
+                else:
+                    corte = "Cassazione"
+
+            # Giustizia Amministrativa
+            elif "tar" in autorita_lower:
+                corte = autorita  # Mantieni "TAR Lazio", "TAR Lombardia", etc.
+            elif "cons" in autorita_lower and "st" in autorita_lower:
+                corte = "Consiglio di Stato"
+
+            # Corte dei Conti
+            elif "conti" in autorita_lower:
+                corte = "Corte dei Conti"
+
+            # Corti ordinarie
+            elif "app" in autorita_lower:
+                corte = "Corte d'Appello"
+            elif "trib" in autorita_lower:
+                corte = "Tribunale"
+
+            # Corti europee
+            elif "cgue" in autorita_lower or "giustizia" in autorita_lower and "ue" in autorita_lower:
+                corte = "CGUE"
+            elif "cedu" in autorita_lower:
+                corte = "CEDU"
 
         # Combine numero/anno in expected format
         if anno:

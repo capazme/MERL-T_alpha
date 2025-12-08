@@ -12,23 +12,44 @@ See docs/03-architecture/04-storage-layer.md for design details.
 
 import logging
 import asyncio
+import os
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from falkordb import FalkorDB, Graph
 
 logger = logging.getLogger(__name__)
 
 
+def _get_env_str(key: str, default: str) -> str:
+    """Legge variabile ambiente come stringa."""
+    return os.environ.get(key, default)
+
+
+def _get_env_int(key: str, default: int) -> int:
+    """Legge variabile ambiente come intero."""
+    return int(os.environ.get(key, default))
+
+
 @dataclass
 class FalkorDBConfig:
-    """Configuration for FalkorDB connection."""
-    host: str = "localhost"
-    port: int = 6380  # FalkorDB default (changed from 6379 to avoid Redis conflict)
-    graph_name: str = "merl_t_legal"
-    max_connections: int = 10
-    timeout_ms: int = 5000
-    password: Optional[str] = None
+    """
+    Configuration for FalkorDB connection.
+
+    Configurabile via environment variables:
+    - FALKORDB_HOST: Host del server (default: localhost)
+    - FALKORDB_PORT: Porta del server (default: 6380)
+    - FALKORDB_GRAPH_NAME: Nome del grafo (default: merl_t_dev)
+    - FALKORDB_PASSWORD: Password (default: vuota)
+    - FALKORDB_MAX_CONNECTIONS: Max connessioni (default: 10)
+    - FALKORDB_TIMEOUT_MS: Timeout in ms (default: 5000)
+    """
+    host: str = field(default_factory=lambda: _get_env_str("FALKORDB_HOST", "localhost"))
+    port: int = field(default_factory=lambda: _get_env_int("FALKORDB_PORT", 6380))
+    graph_name: str = field(default_factory=lambda: _get_env_str("FALKORDB_GRAPH_NAME", "merl_t_dev"))
+    max_connections: int = field(default_factory=lambda: _get_env_int("FALKORDB_MAX_CONNECTIONS", 10))
+    timeout_ms: int = field(default_factory=lambda: _get_env_int("FALKORDB_TIMEOUT_MS", 5000))
+    password: Optional[str] = field(default_factory=lambda: _get_env_str("FALKORDB_PASSWORD", "") or None)
 
 
 class FalkorDBClient:

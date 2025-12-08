@@ -18,5 +18,5 @@ class FalkorDBConfig:
     """Configurazione connessione FalkorDB."""
     host: str = "localhost"
     port: int = 6380
-    graph_name: str = "merl_t"
+    graph_name: str = "merl_t_dev"  # Convenzione: _dev per sviluppo, _prod per produzione
     password: str = ""
