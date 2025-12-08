@@ -44,11 +44,15 @@ jobs:
           python -c "from merlt.sources import NormattivaScraper, BrocardiScraper; print('OK')"
           python -c "from merlt.storage.graph import FalkorDBClient; print('OK')"
 
-      - name: Run unit tests
-        run: pytest tests/unit/ -v --tb=short || echo "Unit tests pending"
-
-      - name: Run storage tests
-        run: pytest tests/storage/ -v --tb=short -k "not integration" || echo "Storage tests pending"
+      - name: Run unit tests (no external services)
+        run: |
+          pytest tests/models/ tests/core/ -v --tb=short
+          pytest tests/preprocessing/ -v --tb=short
+          pytest tests/pipeline/ -v --tb=short
+          pytest tests/sources/ -v --tb=short -k "not fetch"
+          pytest tests/storage/test_embedding_service.py -v --tb=short
+          pytest tests/storage/test_retriever.py -v --tb=short -k "not real_data"
+          pytest tests/storage/test_graph_config.py -v --tb=short
 
   integration:
     runs-on: ubuntu-latest
@@ -101,9 +105,12 @@ jobs:
           pip install -e .
           pip install pytest pytest-asyncio
 
-      - name: Run integration tests (no mocks)
+      - name: Run integration tests (with Docker services)
         run: |
+          # Integration tests that require FalkorDB, PostgreSQL, Qdrant
           pytest tests/integration/ -v --tb=short
+          pytest tests/storage/test_bridge_table.py -v --tb=short
+          pytest tests/storage/test_bridge_builder.py -v --tb=short
 
   lint:
     runs-on: ubuntu-latest

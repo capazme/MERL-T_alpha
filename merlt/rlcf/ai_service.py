@@ -12,11 +12,11 @@ References:
 import aiohttp
 import asyncio
 import json
-import logging
+import structlog
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 
 @dataclass
@@ -195,7 +195,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
                 "X-Title": "RLCF Framework"
             }
             
-            logger.info(f"Generating AI response for task_type: {task_type}, model: {model_config.name}")
+            log.info(f"Generating AI response for task_type: {task_type}, model: {model_config.name}")
             
             async with session.post(
                 f"{self.OPENROUTER_BASE_URL}/chat/completions",
@@ -205,13 +205,13 @@ Please provide a concise legal summary highlighting key points, obligations, and
                 
                 if response.status != 200:
                     error_text = await response.text()
-                    logger.error(f"OpenRouter API error {response.status}: {error_text}")
+                    log.error(f"OpenRouter API error {response.status}: {error_text}")
                     raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
                 
                 data = await response.json()
                 
                 if "choices" not in data or not data["choices"]:
-                    logger.error(f"Invalid OpenRouter response: {data}")
+                    log.error(f"Invalid OpenRouter response: {data}")
                     raise Exception("Invalid response from OpenRouter API")
                 
                 ai_content = data["choices"][0]["message"]["content"]
@@ -227,11 +227,11 @@ Please provide a concise legal summary highlighting key points, obligations, and
                     "raw_content": ai_content
                 })
                 
-                logger.info(f"Successfully generated AI response for task {task_type}")
+                log.info(f"Successfully generated AI response for task {task_type}")
                 return parsed_response
                 
         except Exception as e:
-            logger.error(f"Error generating AI response: {str(e)}")
+            log.error(f"Error generating AI response: {str(e)}")
             # Return fallback response to prevent workflow interruption
             return self._get_fallback_response(task_type, str(e))
     
@@ -385,7 +385,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
                 "X-Title": "RLCF Framework"
             }
 
-            logger.info(f"Generating completion with model: {model}")
+            log.info(f"Generating completion with model: {model}")
 
             async with session.post(
                 f"{self.OPENROUTER_BASE_URL}/chat/completions",
@@ -395,22 +395,22 @@ Please provide a concise legal summary highlighting key points, obligations, and
 
                 if response.status != 200:
                     error_text = await response.text()
-                    logger.error(f"OpenRouter API error {response.status}: {error_text}")
+                    log.error(f"OpenRouter API error {response.status}: {error_text}")
                     raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
 
                 data = await response.json()
 
                 if "choices" not in data or not data["choices"]:
-                    logger.error(f"Invalid OpenRouter response: {data}")
+                    log.error(f"Invalid OpenRouter response: {data}")
                     raise Exception("Invalid response from OpenRouter API")
 
                 completion = data["choices"][0]["message"]["content"]
-                logger.info(f"Successfully generated completion ({len(completion)} chars)")
+                log.info(f"Successfully generated completion ({len(completion)} chars)")
 
                 return completion
 
         except Exception as e:
-            logger.error(f"Error generating completion: {str(e)}")
+            log.error(f"Error generating completion: {str(e)}")
             raise
 
     async def generate_response_async(
@@ -525,7 +525,7 @@ JSON:"""
                 "X-Title": "RLCF Framework"
             }
 
-            logger.info(f"Generating JSON completion with model: {model}")
+            log.info(f"Generating JSON completion with model: {model}")
 
             # Timeout per la richiesta HTTP
             request_timeout = aiohttp.ClientTimeout(total=timeout)
@@ -539,22 +539,22 @@ JSON:"""
 
                 if response.status != 200:
                     error_text = await response.text()
-                    logger.error(f"OpenRouter API error {response.status}: {error_text}")
+                    log.error(f"OpenRouter API error {response.status}: {error_text}")
                     raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
 
                 data = await response.json()
 
                 if "choices" not in data or not data["choices"]:
-                    logger.error(f"Invalid OpenRouter response: {data}")
+                    log.error(f"Invalid OpenRouter response: {data}")
                     raise Exception("Invalid response from OpenRouter API")
 
                 completion = data["choices"][0]["message"]["content"]
-                logger.info(f"Raw completion: {completion[:200]}...")
+                log.info(f"Raw completion: {completion[:200]}...")
 
                 # Prova a parsare direttamente
                 try:
                     result = json.loads(completion)
-                    logger.info(f"Successfully parsed JSON directly ({len(completion)} chars)")
+                    log.info(f"Successfully parsed JSON directly ({len(completion)} chars)")
                     return result
                 except json.JSONDecodeError:
                     pass  # Prova estrazione
@@ -574,7 +574,7 @@ JSON:"""
                             json_str = completion[start_idx:i+1]
                             try:
                                 result = json.loads(json_str)
-                                logger.info(f"Successfully extracted nested JSON ({len(json_str)} chars)")
+                                log.info(f"Successfully extracted nested JSON ({len(json_str)} chars)")
                                 return result
                             except json.JSONDecodeError:
                                 continue
@@ -593,7 +593,7 @@ JSON:"""
                             json_str = completion[start_idx:i+1]
                             try:
                                 result = json.loads(json_str)
-                                logger.info(f"Successfully extracted array JSON ({len(json_str)} chars)")
+                                log.info(f"Successfully extracted array JSON ({len(json_str)} chars)")
                                 return {"results": result}  # Wrap array in object
                             except json.JSONDecodeError:
                                 continue
@@ -603,16 +603,16 @@ JSON:"""
                 if json_match:
                     completion = json_match.group()
 
-                logger.info(f"Successfully generated JSON completion ({len(completion)} chars)")
+                log.info(f"Successfully generated JSON completion ({len(completion)} chars)")
 
                 result = json.loads(completion)
                 return result
 
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON response: {e}. Raw: {completion[:500] if 'completion' in dir() else 'N/A'}")
+            log.error(f"Failed to parse JSON response: {e}. Raw: {completion[:500] if 'completion' in dir() else 'N/A'}")
             raise
         except Exception as e:
-            logger.error(f"Error generating JSON completion: {str(e)}")
+            log.error(f"Error generating JSON completion: {str(e)}")
             raise
 
     def _generate_json_example(self, schema: Dict[str, Any]) -> str:

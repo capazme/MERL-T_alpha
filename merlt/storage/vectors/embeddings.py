@@ -20,7 +20,7 @@ The E5 models require specific prefixes for queries and passages:
 Reference: https://huggingface.co/intfloat/multilingual-e5-large
 """
 
-import logging
+import structlog
 import os
 from typing import List, Optional, Union
 import asyncio
@@ -35,7 +35,7 @@ except ImportError:
         "Install with: pip install sentence-transformers torch"
     )
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 
 class EmbeddingService:
@@ -95,7 +95,7 @@ class EmbeddingService:
         # Model will be loaded lazily on first use
         self._model = None
 
-        logger.info(
+        log.info(
             f"EmbeddingService configured",
             extra={
                 "model": self.model_name,
@@ -137,8 +137,8 @@ class EmbeddingService:
         if self._model is None:
             with self._lock:
                 if self._model is None:
-                    logger.info(f"Loading embedding model: {self.model_name} on device: {self.device}")
-                    logger.info("First-time download may take 2-3 minutes (~1.2GB for E5-large)")
+                    log.info(f"Loading embedding model: {self.model_name} on device: {self.device}")
+                    log.info("First-time download may take 2-3 minutes (~1.2GB for E5-large)")
 
                     try:
                         self._model = SentenceTransformer(
@@ -146,9 +146,9 @@ class EmbeddingService:
                             device=self.device
                         )
                         self._initialized = True
-                        logger.info(f"Model loaded successfully. Embedding dimension: {self._model.get_sentence_embedding_dimension()}")
+                        log.info(f"Model loaded successfully. Embedding dimension: {self._model.get_sentence_embedding_dimension()}")
                     except Exception as e:
-                        logger.error(f"Failed to load model: {e}", exc_info=True)
+                        log.error(f"Failed to load model: {e}", exc_info=True)
                         raise RuntimeError(f"Failed to load embedding model: {e}")
 
         return self._model
@@ -181,7 +181,7 @@ class EmbeddingService:
         # E5 models require "query: " prefix
         prefixed_text = f"query: {text}"
 
-        logger.debug(f"Encoding query: {text[:100]}...")
+        log.debug(f"Encoding query: {text[:100]}...")
 
         embedding = model.encode(
             prefixed_text,
@@ -208,7 +208,7 @@ class EmbeddingService:
         # E5 models require "passage: " prefix
         prefixed_text = f"passage: {text}"
 
-        logger.debug(f"Encoding document: {text[:100]}...")
+        log.debug(f"Encoding document: {text[:100]}...")
 
         embedding = model.encode(
             prefixed_text,
@@ -246,7 +246,7 @@ class EmbeddingService:
         prefix = "query: " if is_query else "passage: "
         prefixed_texts = [f"{prefix}{text}" for text in texts]
 
-        logger.info(f"Batch encoding {len(texts)} {'queries' if is_query else 'documents'}")
+        log.info(f"Batch encoding {len(texts)} {'queries' if is_query else 'documents'}")
 
         embeddings = model.encode(
             prefixed_texts,

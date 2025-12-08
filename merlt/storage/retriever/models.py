@@ -122,12 +122,12 @@ def _load_expert_weights() -> Dict[str, Dict[str, float]]:
             config = yaml.safe_load(f)
             return config.get("expert_traversal_weights", _get_default_weights())
     except FileNotFoundError:
-        import logging
-        logging.warning(f"Config file not found: {config_path}, using default weights")
+        import structlog
+        structlog.get_logger().warning(f"Config file not found: {config_path}, using default weights")
         return _get_default_weights()
     except Exception as e:
-        import logging
-        logging.error(f"Error loading config: {e}, using default weights")
+        import structlog
+        structlog.get_logger().error(f"Error loading config: {e}, using default weights")
         return _get_default_weights()
 
 

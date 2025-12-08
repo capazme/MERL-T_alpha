@@ -24,7 +24,7 @@ Graph Structure (conforme a docs/02-methodology/knowledge-graph.md):
 - Dottrina -[commenta]-> Norma
 """
 
-import logging
+import structlog
 import asyncio
 import re
 from typing import Dict, List, Optional, Any
@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import aiohttp
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 
 @dataclass
@@ -230,7 +230,7 @@ class VisualexIngestionPipeline:
         self.bridge_table = bridge_table
         self.embedding_service = embedding_service
 
-        logger.info("VisualexIngestionPipeline initialized")
+        log.info("VisualexIngestionPipeline initialized")
 
     async def ingest_article(self, article: VisualexArticle) -> Dict[str, Any]:
         """
@@ -242,7 +242,7 @@ class VisualexIngestionPipeline:
         Returns:
             Dict with ingestion results (nodes created, embeddings stored, etc.)
         """
-        logger.info(f"Ingesting article: {article.metadata.to_urn()}")
+        log.info(f"Ingesting article: {article.metadata.to_urn()}")
 
         results = {
             "urn": article.metadata.to_urn(),
@@ -264,7 +264,7 @@ class VisualexIngestionPipeline:
         if self.bridge_table:
             await self._create_bridge_entries(article, results)
 
-        logger.info(f"Ingestion complete: {results}")
+        log.info(f"Ingestion complete: {results}")
         return results
 
     async def _create_graph_structure(
@@ -507,7 +507,7 @@ class VisualexIngestionPipeline:
     ) -> None:
         """Create vector embeddings in Qdrant."""
         # v2 PLACEHOLDER: Implement embedding creation
-        logger.warning("Embedding creation not implemented yet")
+        log.warning("Embedding creation not implemented yet")
         results["embeddings_stored"] = False
 
     async def _create_bridge_entries(
@@ -517,7 +517,7 @@ class VisualexIngestionPipeline:
     ) -> None:
         """Create bridge table entries linking chunks to graph nodes."""
         # v2 PLACEHOLDER: Implement bridge table entries
-        logger.warning("Bridge table creation not implemented yet")
+        log.warning("Bridge table creation not implemented yet")
         results["bridge_entries"] = 0
 
 
@@ -558,7 +558,7 @@ async def ingest_codice_civile_articles(
                 results.append(result)
 
             except Exception as e:
-                logger.error(f"Failed to ingest article {article_num}: {e}")
+                log.error(f"Failed to ingest article {article_num}: {e}")
                 results.append({
                     "urn": f"art_{article_num}_cc",
                     "error": str(e)

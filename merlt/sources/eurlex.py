@@ -1,4 +1,3 @@
-import logging
 import structlog
 import os
 from aiocache import cached, Cache

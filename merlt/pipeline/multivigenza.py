@@ -28,7 +28,7 @@ Usage:
     result = await pipeline.ingest_with_history(norma_visitata)
 """
 
-import logging
+import structlog
 import re
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Tuple
@@ -43,7 +43,7 @@ from merlt.sources.utils.norma import (
 )
 from merlt.sources.normattiva import NormattivaScraper
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 
 # Graph relation types for modifications
@@ -298,7 +298,7 @@ async def parse_disposizione_with_llm(
             from merlt.rlcf.ai_service import OpenRouterService
             llm_service = OpenRouterService()
         except ImportError:
-            logger.warning("LLM service not available, using regex only")
+            log.warning("LLM service not available, using regex only")
             return result
 
     prompt = f"""Estrai le componenti strutturali dalla seguente disposizione normativa italiana.
@@ -363,7 +363,7 @@ Esempi:
         }
 
     except Exception as e:
-        logger.warning(f"LLM parsing failed: {e}, using regex result")
+        log.warning(f"LLM parsing failed: {e}, using regex result")
 
     return result
 
@@ -500,7 +500,7 @@ class MultivigenzaPipeline:
         self.dry_run = dry_run
         self._timestamp = None
 
-        logger.info("MultivigenzaPipeline initialized", dry_run=dry_run)
+        log.info("MultivigenzaPipeline initialized", dry_run=dry_run)
 
     async def ingest_with_history(
         self,
@@ -522,7 +522,7 @@ class MultivigenzaPipeline:
         self._timestamp = datetime.now(timezone.utc).isoformat()
         article_urn = normavisitata.urn
 
-        logger.info(f"Ingesting with history: {article_urn}")
+        log.info(f"Ingesting with history: {article_urn}")
 
         result = MultivigenzaResult(article_urn=article_urn)
 
@@ -533,7 +533,7 @@ class MultivigenzaPipeline:
             )
 
             if not modifiche:
-                logger.info(f"No amendments found for {article_urn}")
+                log.info(f"No amendments found for {article_urn}")
                 return result
 
             # Create StoriaArticolo
@@ -553,11 +553,11 @@ class MultivigenzaPipeline:
                 is_abrogato=is_abrogato,
             )
 
-            logger.info(f"Found {len(modifiche)} amendments for {article_urn}")
+            log.info(f"Found {len(modifiche)} amendments for {article_urn}")
 
             # Dry-run: skip graph operations
             if self.dry_run:
-                logger.info(
+                log.info(
                     "[DRY-RUN] Would process article",
                     article_urn=article_urn,
                     modifiche=len(modifiche),
@@ -579,11 +579,11 @@ class MultivigenzaPipeline:
                     normavisitata, modifiche, result
                 )
 
-            logger.info(f"Ingestion complete: {result.summary()}")
+            log.info(f"Ingestion complete: {result.summary()}")
 
         except Exception as e:
             error_msg = f"Error ingesting {article_urn}: {e}"
-            logger.error(error_msg, exc_info=True)
+            log.error(error_msg, exc_info=True)
             result.errors.append(error_msg)
 
         return result
@@ -622,7 +622,7 @@ class MultivigenzaPipeline:
             }
         )
 
-        logger.debug(f"Updated article properties: {article_urn}")
+        log.debug(f"Updated article properties: {article_urn}")
 
     async def _create_modification(
         self,
@@ -657,7 +657,7 @@ class MultivigenzaPipeline:
         atto_urn = modifica.atto_modificante_urn
 
         if not atto_urn:
-            logger.warning(f"Missing URN for modifying act: {modifica.atto_modificante_estremi}")
+            log.warning(f"Missing URN for modifying act: {modifica.atto_modificante_estremi}")
             return
 
         # Parse estremi per informazioni sull'atto
@@ -944,7 +944,7 @@ class MultivigenzaPipeline:
         relation_desc = f"{relation_type}:{source_urn}->{target_article_urn}"
         result.relazioni_create.append(relation_desc)
 
-        logger.debug(f"Created hierarchical modification: {relation_desc}")
+        log.debug(f"Created hierarchical modification: {relation_desc}")
 
     async def _fetch_all_versions(
         self,
@@ -1054,7 +1054,7 @@ class MultivigenzaPipeline:
             {"ver_urn": versioned_urn, "art_urn": base_urn}
         )
 
-        logger.debug(f"Saved version: {versioned_urn}")
+        log.debug(f"Saved version: {versioned_urn}")
 
 
 async def get_article_storia(

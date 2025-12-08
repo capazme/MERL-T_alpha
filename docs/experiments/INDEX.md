@@ -14,6 +14,8 @@
 | [EXP-004](./EXP-004_ingestion_costituzione/) | ingestion_costituzione | **COMPLETED** | 2025-12-05 | RQ1-3 | Ingestion 139 articoli Costituzione Italiana |
 | [EXP-006](./EXP-006_libro_primo_cp/) | libro_primo_cp | **COMPLETED** | 2025-12-07 | RQ1-4 | Ingestion 263 articoli Libro I Codice Penale + RAG validation |
 | [EXP-007](./EXP-007_full_ingestion/) | full_ingestion | **COMPLETED** | 2025-12-08 | RQ1-4 | Pipeline end-to-end: Brocardi + Bridge + Multivigenza |
+| EXP-011 | costituzione_schema | **COMPLETED** | 2025-12-08 | RQ1-3 | Allineamento schema + numero_* properties |
+| EXP-012 | multi_source_embeddings | **COMPLETED** | 2025-12-08 | RQ3-4 | Multi-source embeddings (norma + spiegazione + ratio + massime) |
 
 > **Nota**: EXP-002 (Brocardi Enrichment) è stato integrato direttamente in EXP-001 durante il re-run del 4 dicembre 2025.
 
@@ -45,8 +47,8 @@
 
 | Metrica | Valore |
 |---------|--------|
-| Esperimenti totali | **10** |
-| Completati | **7** |
+| Esperimenti totali | **12** |
+| Completati | **9** |
 | In corso | 0 |
 | Pianificati | **3** (EXP-008, EXP-009, EXP-010) |
 | Falliti | 0 |
@@ -119,7 +121,13 @@
 ├── 17/17 Brocardi dottrina (100%), 467 massime, 5 multivigenza
 ├── Fix RLCF module (config files, database.py, lazy imports)
 ├── Assessment documentazione completo
-└── Roadmap RQ1-RQ6 definita
+├── Roadmap RQ1-RQ6 definita
+├── Code cleanup: fix duplicazioni (BaseScraper, FalkorDBConfig, RetrieverConfig)
+├── Standardizzazione structlog in 12+ file
+├── EXP-011 completato - schema allineamento costituzione
+├── EXP-012 completato - multi-source embeddings implementati
+├── RAG validation baseline: Recall@5=100%, MRR=0.850
+└── Libro IV ingestion script pronto (887 articoli)
 ```
 
 ---
@@ -256,4 +264,24 @@
 
 ---
 
-*Ultimo aggiornamento: 2025-12-08*
+## Risultati Chiave EXP-012 (Multi-Source Embeddings)
+
+| Metrica | Valore |
+|---------|--------|
+| Articoli test | 5 (Art. 1173-1177 CC) |
+| Embeddings totali | 40 |
+| Embeddings per articolo | ~8 (norma + spiegazione + ratio + 5 massime) |
+| Source types | `norma`, `spiegazione`, `ratio`, `massima` |
+
+**RAG Validation Baseline (Costituzione):**
+| Metrica | Valore |
+|---------|--------|
+| Query test | 12 |
+| Recall@1 | 75% |
+| Recall@5 | **100%** |
+| Recall@10 | **100%** |
+| MRR | **0.850** |
+
+---
+
+*Ultimo aggiornamento: 2025-12-08 (notte)*

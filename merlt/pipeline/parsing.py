@@ -33,19 +33,19 @@ ArticleStructure(
 """
 
 import re
-import logging
+import structlog
 from dataclasses import dataclass, field
 from typing import List, Optional
 import tiktoken
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 # Token counter - use cl100k_base (GPT-4/Claude compatible)
 try:
     _tokenizer = tiktoken.get_encoding("cl100k_base")
 except Exception:
     _tokenizer = None
-    logger.warning("tiktoken not available, using word-based approximation for token counting")
+    log.warning("tiktoken not available, using word-based approximation for token counting")
 
 
 def count_tokens(text: str) -> int:
@@ -216,7 +216,7 @@ class CommaParser:
         content_text = '\n'.join(lines[content_start_idx:])
         commas = self._extract_commas(content_text)
 
-        logger.debug(
+        log.debug(
             f"Parsed article {numero_articolo}: rubrica='{rubrica}', "
             f"{len(commas)} commas, {sum(c.token_count for c in commas)} tokens"
         )
@@ -264,7 +264,7 @@ class CommaParser:
         # Last resort: extract any number from first line
         numbers = re.findall(r'\d+', first_line)
         if numbers:
-            logger.warning(f"Used fallback number extraction for: {first_line[:50]}")
+            log.warning(f"Used fallback number extraction for: {first_line[:50]}")
             return numbers[0]
 
         raise ValueError(f"Cannot extract article number from: {first_line[:100]}")

@@ -9,10 +9,64 @@
 
 | Campo | Valore |
 |-------|--------|
-| **Data ultimo aggiornamento** | 8 Dicembre 2025 |
-| **Fase progetto** | **Ingestion Completa + Assessment** - 7 esperimenti completati |
-| **Prossimo obiettivo** | Implementazione RQ5-RQ6 (Expert con Tools + RLCF Multilivello) |
+| **Data ultimo aggiornamento** | 8 Dicembre 2025 (notte) |
+| **Fase progetto** | **Multi-Source Embeddings** - RAG potenziato |
+| **Prossimo obiettivo** | Full ingestion Libro IV CC (887 articoli) |
 | **Blocchi attivi** | Nessuno |
+
+---
+
+## Cosa Abbiamo Fatto (Sessione Corrente - 8 Dic 2025, Notte)
+
+### Multi-Source Embeddings - COMPLETATO ✅
+
+- [x] **Implementazione** in `merlt/core/legal_knowledge_graph.py`:
+  - Nuovo metodo `_upsert_embeddings_multi_source()`
+  - Crea embedding per: norma, spiegazione, ratio, massime (top 5)
+  - Payload con `source_type` per filtraggio
+
+- [x] **Fix massime**: Campo corretto è `massima` (non `testo`)
+
+- [x] **Test con Art. 52 CP** (legittima difesa):
+  - 8 embeddings creati (1 norma + 1 spiegazione + 1 ratio + 5 massime)
+  - Funzionalità verificata end-to-end
+
+### Ingestion Libro IV CC - PRONTO ✅
+
+- [x] **Script aggiornato** `scripts/ingest_libro_iv_cc.py`:
+  - Naming convention EXPERIMENT_STRATEGY.md
+  - Graph: `merl_t_exp_libro_iv_cc`, Collection: `exp_libro_iv_cc`
+  - Supporto `--skip-brocardi`, `--skip-embeddings`, `--start-from`
+
+- [x] **Test sample** (5 articoli con Brocardi):
+  - 5/5 articoli (100% success)
+  - 40 embeddings multi-source
+  - 354 nodi, 356 relazioni
+
+### RAG Validation - COMPLETATO ✅
+
+- [x] **Script** `scripts/validate_rag.py`:
+  - 12 query test per Costituzione
+  - Metriche: Recall@K, MRR, by category
+
+- [x] **Baseline Costituzione** (single-source embeddings):
+  | Metrica | Valore |
+  |---------|--------|
+  | Recall@1 | 75% |
+  | Recall@5 | **100%** |
+  | Recall@10 | **100%** |
+  | MRR | **0.850** |
+
+- [x] **By Category**:
+  - `principle`: MRR 1.000 (perfetto)
+  - `institution`: MRR 1.000 (perfetto)
+  - `conceptual`: MRR 0.700
+
+### Documentazione Aggiornata
+
+- [x] `docs/architecture/EMBEDDING_STRATEGY.md` - Strategia multi-source
+- [x] `docs/architecture/EXPERIMENT_STRATEGY.md` - Stima embeddings
+- [x] `docs/experiments/rag_validation_costituzione.json` - Risultati baseline
 
 ---
 
@@ -24,6 +78,7 @@ merlt/                           # Package principale
 ├── __init__.py                  # from merlt import LegalKnowledgeGraph
 ├── config/                      # TEST_ENV, PROD_ENV
 ├── core/                        # LegalKnowledgeGraph, MerltConfig
+├── models/                      # BridgeMapping, altri dataclass condivisi
 ├── sources/                     # NormattivaScraper, BrocardiScraper
 │   └── utils/                   # norma, urn, tree, text, http
 ├── storage/                     # graph/, vectors/, bridge/, retriever/
@@ -51,7 +106,53 @@ from merlt.rlcf import OpenRouterService
 
 ---
 
-## Cosa Abbiamo Fatto (Sessione Corrente - 8 Dic 2025)
+## Cosa Abbiamo Fatto (Sessione Corrente - 8 Dic 2025, Sera)
+
+### Code Maintenance & Cleanup - COMPLETATO ✅
+
+- [x] **Analisi architettura** ✅:
+  - Mappate ~120+ dipendenze interne tra 45+ file Python
+  - Identificati 5 problemi critici/alti
+
+- [x] **Fix CRITICO: BaseScraper duplicato** ✅:
+  - Rimosso `BaseScraper` da `merlt/sources/utils/sys_op.py` (dead code)
+  - L'unico `BaseScraper` ora è in `merlt/sources/base.py`
+
+- [x] **Fix CRITICO: FalkorDBConfig duplicato** ✅:
+  - Consolidato in `merlt/storage/graph/config.py`
+  - Supporto variabili d'ambiente (`FALKORDB_HOST`, `FALKORDB_PORT`, etc.)
+  - Rimossa versione duplicata da `client.py`
+
+- [x] **Fix CRITICO: RetrieverConfig duplicato** ✅:
+  - Eliminato `merlt/storage/retriever/result_models.py` (100% duplicato)
+  - L'unico `RetrieverConfig` ora è in `merlt/storage/retriever/models.py`
+
+- [x] **Fix ALTO: Standardizzazione logging** ✅:
+  - Convertiti 12+ file da `import logging` a `import structlog`
+  - Pattern uniforme: `log = structlog.get_logger()`
+  - File modificati: legal_knowledge_graph.py, multivigenza.py, retriever.py,
+    ai_service.py, hybrid.py, visualex.py, bridge_builder.py, embeddings.py,
+    parsing.py, chunking.py, bridge_table.py, ingestion.py, eurlex.py
+
+- [x] **Fix MEDIO: Inversione dipendenze** ✅:
+  - Creato `merlt/models/` directory per dataclass condivisi
+  - Spostato `BridgeMapping` da `pipeline/ingestion.py` a `models/mappings.py`
+  - Storage non dipende più da Pipeline (corretto)
+
+### EXP-011: Ingestion Costituzione (Replica) - COMPLETATO ✅
+
+- [x] **Ingestion 139 articoli Costituzione** ✅:
+  - 139/139 nodi Norma in FalkorDB
+  - 134/134 chunks in Qdrant (collection `constitution_exp011`)
+  - Fix manuale: 5 embeddings mancanti (articoli 1-5) aggiunti
+
+- [x] **Verifica allineamento grafo-schema** ✅:
+  - Properties `numero_*` correttamente usate
+  - Struttura gerarchica (Parte I, Parte II) implementata
+
+---
+
+## Cosa Abbiamo Fatto (Sessione Precedente - 8 Dic 2025, Mattina)
 
 ### EXP-007: Full Ingestion con Brocardi + Bridge + Multivigenza - COMPLETATO ✅
 
@@ -79,8 +180,8 @@ from merlt.rlcf import OpenRouterService
 
 | RQ | Status | Esperimenti |
 |----|--------|-------------|
-| RQ1 (Chunking) | ✅ VERIFIED | EXP-001, EXP-006 |
-| RQ2 (Gerarchia) | ✅ VERIFIED | EXP-001 |
+| RQ1 (Chunking) | ✅ VERIFIED | EXP-001, EXP-006, EXP-011 |
+| RQ2 (Gerarchia) | ✅ VERIFIED | EXP-001, EXP-011 |
 | RQ3 (Brocardi) | ✅ VERIFIED | EXP-001, EXP-006, EXP-007 |
 | RQ4 (Bridge Table) | ⚠️ DATA READY | EXP-002, EXP-003 |
 | RQ5 (Expert Tools) | ❌ NOT STARTED | - |

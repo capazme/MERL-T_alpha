@@ -19,7 +19,7 @@ Usage:
     results = await pipeline.ingest_article(visualex_article)
 """
 
-import logging
+import structlog
 import re
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
@@ -29,6 +29,7 @@ from uuid import UUID
 from merlt.pipeline.parsing import CommaParser, ArticleStructure, Comma, Lettera, parse_article
 from merlt.pipeline.chunking import StructuralChunker, Chunk, chunk_article
 from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
+from merlt.models import BridgeMapping
 
 # Import hierarchical tree extraction for fallback when Brocardi not available
 from merlt.sources.utils.tree import (
@@ -36,7 +37,7 @@ from merlt.sources.utils.tree import (
     get_article_position,
 )
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 
 def _extract_number_from_urn(urn: str, level: str) -> Optional[int]:
@@ -106,25 +107,6 @@ class HierarchyURNs:
     def closest_parent(self, codice_urn: str) -> str:
         """Return the closest available parent URN."""
         return self.sezione or self.capo or self.titolo or self.libro or codice_urn
-
-
-@dataclass
-class BridgeMapping:
-    """
-    Prepared mapping for Bridge Table insertion.
-
-    Attributes:
-        chunk_id: UUID of the chunk (for Qdrant)
-        graph_node_urn: URN of the linked graph node
-        mapping_type: Type of mapping (PRIMARY, HIERARCHIC, CONCEPT, REFERENCE)
-        confidence: Confidence score [0-1]
-        metadata: Additional context
-    """
-    chunk_id: UUID
-    graph_node_urn: str
-    mapping_type: str  # PRIMARY, HIERARCHIC, CONCEPT, REFERENCE
-    confidence: float
-    metadata: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -203,7 +185,7 @@ class IngestionPipelineV2:
         self.parser = comma_parser or CommaParser()
         self.chunker = chunker or StructuralChunker()
 
-        logger.info("IngestionPipelineV2 initialized")
+        log.info("IngestionPipelineV2 initialized")
 
     async def ingest_article(
         self,
@@ -229,7 +211,7 @@ class IngestionPipelineV2:
         article_url = article.url  # Already correct from API
         codice_urn = meta.to_codice_urn()
 
-        logger.info(f"Ingesting article: {article_urn}")
+        log.info(f"Ingesting article: {article_urn}")
 
         # Step 1: Parse article text into commas
         article_structure = self.parser.parse(article.article_text)
@@ -243,7 +225,7 @@ class IngestionPipelineV2:
         if not brocardi_position and norm_tree:
             brocardi_position = get_article_position(norm_tree, meta.numero_articolo)
             if brocardi_position:
-                logger.info(f"Using treextractor position for {meta.numero_articolo}: {brocardi_position}")
+                log.info(f"Using treextractor position for {meta.numero_articolo}: {brocardi_position}")
 
         # Step 3: Create chunks (one per comma)
         chunks = self.chunker.chunk_article(
@@ -280,7 +262,7 @@ class IngestionPipelineV2:
                 result=result,
             )
 
-        logger.info(f"Ingestion complete: {result.summary()}")
+        log.info(f"Ingestion complete: {result.summary()}")
         return result
 
     def _prepare_bridge_mappings(
@@ -828,7 +810,7 @@ class IngestionPipelineV2:
                 )
                 result.relations_created.append(f"contiene:{comma_urn}->{lettera_urn}")
 
-        logger.info(
+        log.info(
             f"Created {len(article_structure.commas)} comma nodes with "
             f"{sum(len(c.lettere) for c in article_structure.commas)} lettere"
         )
@@ -981,7 +963,7 @@ class IngestionPipelineV2:
                 }
             )
             result.nodes_created.append(f"Dottrina:{dottrina_id}")
-            logger.info(f"Created Dottrina RelazioneCostituzione for {estremi}")
+            log.info(f"Created Dottrina RelazioneCostituzione for {estremi}")
 
             await self.falkordb.query(
                 """
@@ -1036,7 +1018,7 @@ class IngestionPipelineV2:
                     }
                 )
                 result.nodes_created.append(f"Dottrina:{dottrina_id}")
-                logger.info(f"Created Dottrina Relazione for {estremi}: {titolo}")
+                log.info(f"Created Dottrina Relazione for {estremi}: {titolo}")
 
                 await self.falkordb.query(
                     """

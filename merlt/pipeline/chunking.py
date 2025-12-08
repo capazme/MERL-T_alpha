@@ -20,7 +20,7 @@ Usage:
     chunks = chunker.chunk_article(article_structure, base_urn, metadata)
 """
 
-import logging
+import structlog
 import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 
 from merlt.pipeline.parsing import ArticleStructure, Comma, count_tokens
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 
 @dataclass
@@ -207,7 +207,7 @@ class StructuralChunker:
 
             chunks.append(chunk)
 
-        logger.info(
+        log.info(
             f"Created {len(chunks)} chunks for article {article_structure.numero_articolo} "
             f"(total tokens: {sum(c.token_count for c in chunks)})"
         )
@@ -298,7 +298,7 @@ class StructuralChunker:
             )
             all_chunks.extend(chunks)
 
-        logger.info(
+        log.info(
             f"Batch chunking complete: {len(articles)} articles -> {len(all_chunks)} chunks"
         )
 

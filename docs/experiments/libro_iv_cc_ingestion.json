@@ -1,0 +1,37 @@
+{
+  "experiment": "Libro IV CC Ingestion",
+  "description": "Ingestion isolata Libro IV CC con multi-source embeddings",
+  "config": {
+    "graph": "merl_t_exp_sample",
+    "collection": "exp_sample",
+    "limit": 5,
+    "skip_brocardi": false,
+    "skip_embeddings": false
+  },
+  "metrics": {
+    "timing": {
+      "start": "2025-12-08T22:18:15.610913",
+      "end": "2025-12-08T22:19:05.972088",
+      "duration_seconds": 50.1428759098053
+    },
+    "articles": {
+      "total": 5,
+      "processed": 5,
+      "failed": 0,
+      "success_rate": "100.0%"
+    },
+    "embeddings": {
+      "total": 40
+    },
+    "enrichment": {
+      "brocardi_enriched": 5,
+      "nodes_created": 373
+    },
+    "errors": []
+  },
+  "validation": {
+    "total_nodes": 354,
+    "article_nodes": 5,
+    "total_relationships": 356
+  }
+}

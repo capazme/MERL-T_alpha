@@ -18,13 +18,13 @@ Usage:
     inserted = await builder.insert_mappings(result.bridge_mappings)
 """
 
-import logging
+import structlog
 from typing import List, Dict, Any, Optional
 
 from merlt.storage.bridge.bridge_table import BridgeTable
-from merlt.pipeline.ingestion import BridgeMapping
+from merlt.models import BridgeMapping
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 
 class BridgeBuilder:
@@ -63,7 +63,7 @@ class BridgeBuilder:
             bridge_table: Connected BridgeTable instance
         """
         self.bridge = bridge_table
-        logger.info("BridgeBuilder initialized")
+        log.info("BridgeBuilder initialized")
 
     def convert_mapping(self, mapping: BridgeMapping) -> Dict[str, Any]:
         """
@@ -113,7 +113,7 @@ class BridgeBuilder:
         """
         converted = self.convert_mapping(mapping)
         entry_id = await self.bridge.add_mapping(**converted)
-        logger.debug(f"Inserted mapping: {entry_id}")
+        log.debug(f"Inserted mapping: {entry_id}")
         return entry_id
 
     async def insert_mappings(
@@ -142,12 +142,12 @@ class BridgeBuilder:
             batch = converted[i:i + batch_size]
             inserted = await self.bridge.add_mappings_batch(batch)
             total_inserted += inserted
-            logger.info(
+            log.info(
                 f"Inserted batch {i // batch_size + 1}: "
                 f"{inserted} mappings"
             )
 
-        logger.info(f"Total mappings inserted: {total_inserted}")
+        log.info(f"Total mappings inserted: {total_inserted}")
         return total_inserted
 
 

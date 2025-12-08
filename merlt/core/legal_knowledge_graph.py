@@ -42,7 +42,7 @@ Usage:
     await kg.close()
 """
 
-import logging
+import structlog
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
 from uuid import UUID
@@ -96,7 +96,7 @@ try:
 except ImportError:
     HAS_QDRANT = False
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 
 @dataclass
@@ -243,7 +243,7 @@ class LegalKnowledgeGraph:
 
         self._connected = False
 
-        logger.info(f"LegalKnowledgeGraph initialized with config: {self.config.graph_name}")
+        log.info(f"LegalKnowledgeGraph initialized with config: {self.config.graph_name}")
 
     async def connect(self) -> None:
         """
@@ -252,10 +252,10 @@ class LegalKnowledgeGraph:
         Must be called before any operations.
         """
         if self._connected:
-            logger.warning("Already connected")
+            log.warning("Already connected")
             return
 
-        logger.info("Connecting to storage backends...")
+        log.info("Connecting to storage backends...")
 
         # FalkorDB
         falkordb_config = FalkorDBConfig(
@@ -265,7 +265,7 @@ class LegalKnowledgeGraph:
         )
         self._falkordb = FalkorDBClient(falkordb_config)
         await self._falkordb.connect()
-        logger.info(f"FalkorDB connected: {self.config.graph_name}")
+        log.info(f"FalkorDB connected: {self.config.graph_name}")
 
         # Qdrant (optional)
         if HAS_QDRANT:
@@ -276,9 +276,9 @@ class LegalKnowledgeGraph:
                 )
                 # Ensure collection exists
                 await self._ensure_qdrant_collection()
-                logger.info(f"Qdrant connected: {self.config.qdrant_collection}")
+                log.info(f"Qdrant connected: {self.config.qdrant_collection}")
             except Exception as e:
-                logger.warning(f"Qdrant connection failed: {e}")
+                log.warning(f"Qdrant connection failed: {e}")
                 self._qdrant = None
 
         # Bridge Table
@@ -293,9 +293,9 @@ class LegalKnowledgeGraph:
             self._bridge_table = BridgeTable(bridge_config)
             await self._bridge_table.connect()
             self._bridge_builder = BridgeBuilder(self._bridge_table)
-            logger.info("Bridge Table connected")
+            log.info("Bridge Table connected")
         except Exception as e:
-            logger.warning(f"Bridge Table connection failed: {e}")
+            log.warning(f"Bridge Table connection failed: {e}")
             self._bridge_table = None
             self._bridge_builder = None
 
@@ -321,10 +321,10 @@ class LegalKnowledgeGraph:
                     model_name=self.config.embedding_model
                 )
             except Exception as e:
-                logger.warning(f"Embedding service initialization failed: {e}")
+                log.warning(f"Embedding service initialization failed: {e}")
 
         self._connected = True
-        logger.info("LegalKnowledgeGraph connected successfully")
+        log.info("LegalKnowledgeGraph connected successfully")
 
     async def close(self) -> None:
         """Close all connections."""
@@ -336,7 +336,7 @@ class LegalKnowledgeGraph:
             self._qdrant.close()
 
         self._connected = False
-        logger.info("LegalKnowledgeGraph connections closed")
+        log.info("LegalKnowledgeGraph connections closed")
 
     async def _ensure_qdrant_collection(self) -> None:
         """Ensure Qdrant collection exists with correct parameters."""
@@ -355,7 +355,7 @@ class LegalKnowledgeGraph:
                     distance=Distance.COSINE,
                 ),
             )
-            logger.info(f"Created Qdrant collection: {collection_name}")
+            log.info(f"Created Qdrant collection: {collection_name}")
 
     async def ingest_norm(
         self,
@@ -395,7 +395,7 @@ class LegalKnowledgeGraph:
         norma = Norma(tipo_atto=tipo_atto, data=None, numero_atto=None)
         nv = NormaVisitata(norma=norma, numero_articolo=articolo_norm)
 
-        logger.info(f"Ingesting: {tipo_atto} art. {articolo}")
+        log.info(f"Ingesting: {tipo_atto} art. {articolo}")
 
         # NormaVisitata ha solo .urn, l'URL viene recuperato dopo fetch
         result = UnifiedIngestionResult(
@@ -418,7 +418,7 @@ class LegalKnowledgeGraph:
                         brocardi_info = info_dict
                         result.brocardi_enriched = True
                 except Exception as e:
-                    logger.warning(f"Brocardi fetch failed: {e}")
+                    log.warning(f"Brocardi fetch failed: {e}")
                     result.errors.append(f"Brocardi: {str(e)[:100]}")
 
             # 3. Build VisualexArticle for pipeline
@@ -456,21 +456,21 @@ class LegalKnowledgeGraph:
                     )
                     result.bridge_mappings_inserted = inserted
                 except Exception as e:
-                    logger.warning(f"Bridge table insert failed: {e}")
+                    log.warning(f"Bridge table insert failed: {e}")
                     result.errors.append(f"Bridge: {str(e)[:100]}")
 
-            # 6. Generate and store embeddings (optional)
+            # 6. Generate and store embeddings (optional) - MULTI-SOURCE
             if include_embeddings and self._qdrant and self._embedding_service:
                 try:
-                    upserted = await self._upsert_embeddings(
+                    upserted = await self._upsert_embeddings_multi_source(
                         article_text=article_text,
                         article_urn=ingestion_result.article_urn,
-                        chunks=ingestion_result.chunks,
                         metadata=metadata,
+                        brocardi_info=brocardi_info,
                     )
                     result.embeddings_upserted = upserted
                 except Exception as e:
-                    logger.warning(f"Embedding upsert failed: {e}")
+                    log.warning(f"Embedding upsert failed: {e}")
                     result.errors.append(f"Embeddings: {str(e)[:100]}")
 
             # 7. Apply multivigenza (optional)
@@ -485,54 +485,137 @@ class LegalKnowledgeGraph:
                     result.atti_modificanti_created = mv_result.atti_modificanti_creati
                     result.multivigenza_relations = mv_result.relazioni_create
                 except Exception as e:
-                    logger.warning(f"Multivigenza failed: {e}")
+                    log.warning(f"Multivigenza failed: {e}")
                     result.errors.append(f"Multivigenza: {str(e)[:100]}")
 
-            logger.info(f"Ingestion complete: {result.summary()}")
+            log.info(f"Ingestion complete: {result.summary()}")
 
         except Exception as e:
-            logger.error(f"Ingestion failed: {e}", exc_info=True)
+            log.error(f"Ingestion failed: {e}", exc_info=True)
             result.errors.append(f"Fatal: {str(e)}")
 
         return result
 
-    async def _upsert_embeddings(
+    async def _upsert_embeddings_multi_source(
         self,
         article_text: str,
         article_urn: str,
-        chunks: List[Any],  # Chunk objects
         metadata: NormaMetadata,
+        brocardi_info: Optional[Dict[str, Any]] = None,
     ) -> int:
         """
-        Generate and upsert embeddings for article chunks.
+        Generate and upsert multi-source embeddings.
+
+        Creates embeddings for:
+        1. Article text (norma) - always
+        2. Spiegazione Brocardi - if available
+        3. Ratio legis - if available
+        4. Massime (top 5) - if available
+
+        This enables semantic search via explanation/ratio, not just exact text.
 
         Returns number of embeddings upserted.
         """
         if not self._qdrant or not self._embedding_service:
             return 0
 
-        # For simplicity, embed the full article text
-        # In production, you'd embed each chunk separately
-        embedding = await self._embedding_service.encode_document_async(article_text)
+        points_to_upsert = []
+        base_payload = {
+            "article_urn": article_urn,
+            "tipo_atto": metadata.tipo_atto,
+            "numero_articolo": metadata.numero_articolo,
+        }
 
-        # Create point for Qdrant
-        point = PointStruct(
-            id=hash(article_urn) % (2**63),  # Convert URN to integer ID
-            vector=embedding,
-            payload={
-                "urn": article_urn,
-                "tipo_atto": metadata.tipo_atto,
-                "numero_articolo": metadata.numero_articolo,
-                "text": article_text[:1000],  # Truncate for payload
-            },
-        )
+        # 1. Embedding del testo normativo (sempre)
+        if article_text and len(article_text.strip()) > 20:
+            embedding = await self._embedding_service.encode_document_async(article_text)
+            point_id = hash(f"{article_urn}:norma") % (2**63)
+            points_to_upsert.append(PointStruct(
+                id=point_id,
+                vector=embedding,
+                payload={
+                    **base_payload,
+                    "source_type": "norma",
+                    "text": article_text[:2000],
+                },
+            ))
+            log.debug(f"Created embedding for norma: {article_urn}")
 
-        self._qdrant.upsert(
-            collection_name=self.config.qdrant_collection,
-            points=[point],
-        )
+        # Process Brocardi info if available
+        if brocardi_info:
+            # 2. Embedding della Spiegazione
+            spiegazione = brocardi_info.get("Spiegazione", "")
+            if spiegazione and len(spiegazione.strip()) > 50:
+                embedding = await self._embedding_service.encode_document_async(spiegazione)
+                point_id = hash(f"{article_urn}:spiegazione") % (2**63)
+                points_to_upsert.append(PointStruct(
+                    id=point_id,
+                    vector=embedding,
+                    payload={
+                        **base_payload,
+                        "source_type": "spiegazione",
+                        "text": spiegazione[:2000],
+                    },
+                ))
+                log.debug(f"Created embedding for spiegazione: {article_urn}")
 
-        return 1
+            # 3. Embedding della Ratio legis
+            ratio = brocardi_info.get("Ratio", "")
+            if ratio and len(ratio.strip()) > 50:
+                embedding = await self._embedding_service.encode_document_async(ratio)
+                point_id = hash(f"{article_urn}:ratio") % (2**63)
+                points_to_upsert.append(PointStruct(
+                    id=point_id,
+                    vector=embedding,
+                    payload={
+                        **base_payload,
+                        "source_type": "ratio",
+                        "text": ratio[:2000],
+                    },
+                ))
+                log.debug(f"Created embedding for ratio: {article_urn}")
+
+            # 4. Embedding delle Massime (top 5)
+            massime = brocardi_info.get("Massime", [])
+            massime_added = 0
+            if isinstance(massime, list):
+                for i, massima in enumerate(massime[:5]):
+                    # Handle various formats from Brocardi
+                    # Field is "massima" from BrocardiScraper._parse_massima()
+                    if isinstance(massima, str):
+                        testo = massima
+                    elif isinstance(massima, dict):
+                        testo = massima.get("massima", massima.get("testo", massima.get("Testo", "")))
+                    else:
+                        continue
+
+                    if testo and len(testo.strip()) > 50:
+                        embedding = await self._embedding_service.encode_document_async(testo)
+                        point_id = hash(f"{article_urn}:massima:{i}") % (2**63)
+                        points_to_upsert.append(PointStruct(
+                            id=point_id,
+                            vector=embedding,
+                            payload={
+                                **base_payload,
+                                "source_type": "massima",
+                                "massima_index": i,
+                                "text": testo[:2000],
+                            },
+                        ))
+                        massime_added += 1
+
+                if massime_added:
+                    log.debug(f"Created {massime_added} massima embeddings for: {article_urn}")
+
+        # Upsert all points at once
+        if points_to_upsert:
+            self._qdrant.upsert(
+                collection_name=self.config.qdrant_collection,
+                points=points_to_upsert,
+            )
+            log.info(f"Upserted {len(points_to_upsert)} multi-source embeddings for {article_urn}")
+
+        return len(points_to_upsert)
 
     async def _get_cached_norm_tree(self, tipo_atto: str) -> Optional[NormTree]:
         """Get cached NormTree for act type, or fetch and cache it."""
@@ -545,7 +628,7 @@ class LegalKnowledgeGraph:
                     if status == 200 and isinstance(tree, NormTree):
                         self._norm_trees[tipo_atto] = tree
             except Exception as e:
-                logger.warning(f"Could not fetch NormTree for {tipo_atto}: {e}")
+                log.warning(f"Could not fetch NormTree for {tipo_atto}: {e}")
                 return None
 
         return self._norm_trees.get(tipo_atto)
@@ -603,7 +686,7 @@ class LegalKnowledgeGraph:
                     context = await self._get_graph_context(hit.payload.get("urn"))
                     result["graph_context"] = context
                 except Exception as e:
-                    logger.warning(f"Could not fetch graph context: {e}")
+                    log.warning(f"Could not fetch graph context: {e}")
 
             formatted.append(result)
 

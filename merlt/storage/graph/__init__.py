@@ -16,7 +16,8 @@ Esempio:
     await client.connect()
 """
 
-from merlt.storage.graph.client import FalkorDBClient, FalkorDBConfig
+from merlt.storage.graph.client import FalkorDBClient
+from merlt.storage.graph.config import FalkorDBConfig
 
 __all__ = [
     "FalkorDBClient",

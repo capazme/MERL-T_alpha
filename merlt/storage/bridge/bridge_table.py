@@ -13,7 +13,7 @@ Features:
 """
 
 import json
-import logging
+import structlog
 from typing import List, Optional, Dict, Any, Type
 from uuid import UUID
 from dataclasses import dataclass, field
@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 
 from .models import Base, get_bridge_table_model
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 
 @dataclass
@@ -119,7 +119,7 @@ class BridgeTable:
         # Modello specifico per la tabella configurata
         self._model_class = get_bridge_table_model(self.config.table_name)
 
-        logger.info(
+        log.info(
             f"BridgeTable initialized - "
             f"host={self.config.host}:{self.config.port}, "
             f"database={self.config.database}, "
@@ -129,7 +129,7 @@ class BridgeTable:
     async def connect(self):
         """Establish connection pool to PostgreSQL."""
         if self._connected:
-            logger.debug("Already connected to PostgreSQL")
+            log.debug("Already connected to PostgreSQL")
             return
 
         connection_string = self.config.get_connection_string()
@@ -147,7 +147,7 @@ class BridgeTable:
         )
 
         self._connected = True
-        logger.info(f"Connected to PostgreSQL at {self.config.host}:{self.config.port}, table={self.config.table_name}")
+        log.info(f"Connected to PostgreSQL at {self.config.host}:{self.config.port}, table={self.config.table_name}")
 
     async def ensure_table_exists(self):
         """
@@ -184,7 +184,7 @@ class BridgeTable:
                 if statement.strip():
                     await conn.execute(text(statement))
 
-        logger.info(f"Table {self.config.table_name} ensured to exist")
+        log.info(f"Table {self.config.table_name} ensured to exist")
 
     async def drop_table(self):
         """
@@ -198,7 +198,7 @@ class BridgeTable:
         async with self._engine.begin() as conn:
             await conn.execute(text(f"DROP TABLE IF EXISTS {self.config.table_name} CASCADE"))
 
-        logger.warning(f"Table {self.config.table_name} dropped")
+        log.warning(f"Table {self.config.table_name} dropped")
 
     async def truncate_table(self):
         """
@@ -212,7 +212,7 @@ class BridgeTable:
         async with self._engine.begin() as conn:
             await conn.execute(text(f"TRUNCATE TABLE {self.config.table_name}"))
 
-        logger.warning(f"Table {self.config.table_name} truncated")
+        log.warning(f"Table {self.config.table_name} truncated")
 
     async def count(self) -> int:
         """
@@ -237,7 +237,7 @@ class BridgeTable:
 
         await self._engine.dispose()
         self._connected = False
-        logger.info("Disconnected from PostgreSQL")
+        log.info("Disconnected from PostgreSQL")
 
     async def add_mapping(
         self,
@@ -298,7 +298,7 @@ class BridgeTable:
             await session.commit()
             entry_id = result.scalar()
 
-            logger.debug(
+            log.debug(
                 f"Added mapping: chunk_id={chunk_id} -> "
                 f"node_urn={graph_node_urn[:50]}..."
             )
@@ -369,7 +369,7 @@ class BridgeTable:
                 await session.execute(insert_sql, p)
             await session.commit()
 
-            logger.info(f"Batch inserted {len(params)} mappings into {self.config.table_name}")
+            log.info(f"Batch inserted {len(params)} mappings into {self.config.table_name}")
             return len(params)
 
     async def get_nodes_for_chunk(
@@ -410,7 +410,7 @@ class BridgeTable:
             result = await session.execute(text(query_sql), params)
             rows = result.fetchall()
 
-            logger.debug(f"Found {len(rows)} nodes for chunk_id={chunk_id}")
+            log.debug(f"Found {len(rows)} nodes for chunk_id={chunk_id}")
 
             return [
                 {
@@ -456,7 +456,7 @@ class BridgeTable:
             )
             rows = result.fetchall()
 
-            logger.debug(f"Found {len(rows)} chunks for node_urn={graph_node_urn[:50]}...")
+            log.debug(f"Found {len(rows)} chunks for node_urn={graph_node_urn[:50]}...")
 
             return [
                 {
@@ -494,7 +494,7 @@ class BridgeTable:
             await session.commit()
 
             count = result.rowcount
-            logger.debug(f"Deleted {count} mappings for chunk_id={chunk_id}")
+            log.debug(f"Deleted {count} mappings for chunk_id={chunk_id}")
             return count
 
     async def health_check(self) -> bool:
@@ -509,11 +509,11 @@ class BridgeTable:
                 await self.connect()
 
             async with self._session_maker() as session:
-                result = await session.execute(select(1))
+                result = await session.execute(text("SELECT 1"))
                 result.scalar()
 
             return True
 
         except Exception as e:
-            logger.error(f"Health check failed: {e}")
+            log.error(f"Health check failed: {e}")
             return False

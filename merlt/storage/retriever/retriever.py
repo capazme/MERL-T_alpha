@@ -14,7 +14,7 @@ Core algorithm:
 See docs/03-architecture/04-storage-layer.md for design details.
 """
 
-import logging
+import structlog
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
@@ -28,7 +28,7 @@ from merlt.storage.retriever.models import (
 from merlt.storage.bridge import BridgeTable
 from merlt.storage.graph import FalkorDBClient
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 
 class GraphAwareRetriever:
@@ -82,7 +82,7 @@ class GraphAwareRetriever:
         self.bridge = bridge_table
         self.config = config or RetrieverConfig()
 
-        logger.info(
+        log.info(
             f"GraphAwareRetriever initialized - "
             f"alpha={self.config.alpha}, "
             f"over_retrieve={self.config.over_retrieve_factor}x, "
@@ -121,7 +121,7 @@ class GraphAwareRetriever:
         if top_k is None:
             top_k = 20
 
-        logger.debug(
+        log.debug(
             f"retrieve() - context_nodes={len(context_nodes or [])}, "
             f"expert={expert_type}, top_k={top_k}"
         )
@@ -132,7 +132,7 @@ class GraphAwareRetriever:
             limit=top_k * self.config.over_retrieve_factor
         )
 
-        logger.debug(f"Vector search returned {len(vector_results)} candidates")
+        log.debug(f"Vector search returned {len(vector_results)} candidates")
 
         # STEP 2: Graph enrichment
         enriched_results = []
@@ -168,12 +168,12 @@ class GraphAwareRetriever:
 
         if top_results:
             avg_score = sum(r.final_score for r in top_results) / len(top_results)
-            logger.info(
+            log.info(
                 f"retrieve() - returned {len(top_results)} results "
                 f"(avg final_score={avg_score:.3f})"
             )
         else:
-            logger.info("retrieve() - returned 0 results")
+            log.info("retrieve() - returned 0 results")
 
         return top_results
 
@@ -193,7 +193,7 @@ class GraphAwareRetriever:
             List of VectorSearchResult with chunk_id, text, similarity_score
         """
         if self.vector_db is None:
-            logger.warning("vector_db not configured, returning empty results")
+            log.warning("vector_db not configured, returning empty results")
             return []
 
         # Qdrant search API
@@ -217,7 +217,7 @@ class GraphAwareRetriever:
             ]
 
         except Exception as e:
-            logger.error(f"Vector search failed: {e}")
+            log.error(f"Vector search failed: {e}")
             return []
 
     async def _compute_graph_score(
@@ -302,7 +302,7 @@ class GraphAwareRetriever:
             return None
 
         except Exception as e:
-            logger.debug(f"No path found {source} → {target}: {e}")
+            log.debug(f"No path found {source} → {target}: {e}")
             return None
 
     def _score_path(
@@ -387,7 +387,7 @@ class GraphAwareRetriever:
         # Update with bounds [0.3, 0.9]
         self.config.alpha = max(0.3, min(0.9, self.config.alpha + delta))
 
-        logger.info(
+        log.info(
             f"update_alpha() - new alpha={self.config.alpha:.3f} "
             f"(correlation={feedback_correlation:.3f}, authority={authority:.3f})"
         )

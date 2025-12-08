@@ -10,46 +10,15 @@ This is a drop-in replacement for Neo4j with 496x better performance.
 See docs/03-architecture/04-storage-layer.md for design details.
 """
 
-import logging
+import structlog
 import asyncio
-import os
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, field
 
 from falkordb import FalkorDB, Graph
 
-logger = logging.getLogger(__name__)
+from merlt.storage.graph.config import FalkorDBConfig
 
-
-def _get_env_str(key: str, default: str) -> str:
-    """Legge variabile ambiente come stringa."""
-    return os.environ.get(key, default)
-
-
-def _get_env_int(key: str, default: int) -> int:
-    """Legge variabile ambiente come intero."""
-    return int(os.environ.get(key, default))
-
-
-@dataclass
-class FalkorDBConfig:
-    """
-    Configuration for FalkorDB connection.
-
-    Configurabile via environment variables:
-    - FALKORDB_HOST: Host del server (default: localhost)
-    - FALKORDB_PORT: Porta del server (default: 6380)
-    - FALKORDB_GRAPH_NAME: Nome del grafo (default: merl_t_dev)
-    - FALKORDB_PASSWORD: Password (default: vuota)
-    - FALKORDB_MAX_CONNECTIONS: Max connessioni (default: 10)
-    - FALKORDB_TIMEOUT_MS: Timeout in ms (default: 5000)
-    """
-    host: str = field(default_factory=lambda: _get_env_str("FALKORDB_HOST", "localhost"))
-    port: int = field(default_factory=lambda: _get_env_int("FALKORDB_PORT", 6380))
-    graph_name: str = field(default_factory=lambda: _get_env_str("FALKORDB_GRAPH_NAME", "merl_t_dev"))
-    max_connections: int = field(default_factory=lambda: _get_env_int("FALKORDB_MAX_CONNECTIONS", 10))
-    timeout_ms: int = field(default_factory=lambda: _get_env_int("FALKORDB_TIMEOUT_MS", 5000))
-    password: Optional[str] = field(default_factory=lambda: _get_env_str("FALKORDB_PASSWORD", "") or None)
+log = structlog.get_logger()
 
 
 class FalkorDBClient:
@@ -77,7 +46,7 @@ class FalkorDBClient:
         self._graph: Optional[Graph] = None
         self._connected = False
 
-        logger.info(
+        log.info(
             f"FalkorDBClient initialized - "
             f"host={self.config.host}:{self.config.port}, "
             f"graph={self.config.graph_name}"
@@ -86,14 +55,14 @@ class FalkorDBClient:
     async def connect(self):
         """Establish connection to FalkorDB."""
         if self._connected:
-            logger.debug("Already connected to FalkorDB")
+            log.debug("Already connected to FalkorDB")
             return
 
         # Run in executor since falkordb-py is synchronous
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, self._connect_sync)
 
-        logger.info(f"Connected to FalkorDB at {self.config.host}:{self.config.port}")
+        log.info(f"Connected to FalkorDB at {self.config.host}:{self.config.port}")
 
     def _connect_sync(self):
         """Synchronous connection (called in executor)."""
@@ -115,7 +84,7 @@ class FalkorDBClient:
         self._connected = False
         self._db = None
         self._graph = None
-        logger.info("Disconnected from FalkorDB")
+        log.info("Disconnected from FalkorDB")
 
     async def query(
         self,
@@ -182,14 +151,14 @@ class FalkorDBClient:
 
                     records.append(record)
 
-            logger.debug(
+            log.debug(
                 f"Query executed: {cypher[:100]}... "
                 f"(params={list(params.keys())}) -> {len(records)} records"
             )
             return records
 
         except Exception as e:
-            logger.error(f"Query failed: {cypher[:100]}... Error: {e}")
+            log.error(f"Query failed: {cypher[:100]}... Error: {e}")
             raise
 
     async def shortest_path(
@@ -298,5 +267,5 @@ class FalkorDBClient:
             return True
 
         except Exception as e:
-            logger.error(f"Health check failed: {e}")
+            log.error(f"Health check failed: {e}")
             return False
