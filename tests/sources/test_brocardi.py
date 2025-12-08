@@ -13,7 +13,7 @@ from merlt.sources import BrocardiScraper
 from merlt.sources.utils.norma import Norma, NormaVisitata
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def scraper():
     """BrocardiScraper con configurazione default."""
     return BrocardiScraper()

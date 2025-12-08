@@ -64,12 +64,12 @@ async def reset_falkordb(env_config, dry_run: bool = False):
 
     try:
         # Conta nodi prima della cancellazione
-        count_result = await client.execute_query("MATCH (n) RETURN count(n) as count")
+        count_result = await client.query("MATCH (n) RETURN count(n) as count")
         node_count = count_result[0]["count"] if count_result else 0
         print(f"  [FalkorDB] Nodi esistenti: {node_count}")
 
         # Cancella tutto
-        await client.execute_query("MATCH (n) DETACH DELETE n")
+        await client.query("MATCH (n) DETACH DELETE n")
         print(f"  [FalkorDB] ✓ Cancellati {node_count} nodi")
 
         return {"status": "success", "graph": graph_name, "deleted_nodes": node_count}
