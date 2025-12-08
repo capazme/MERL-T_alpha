@@ -1,392 +1,292 @@
 #!/usr/bin/env python3
 """
-EXP-004: Ingestion Costituzione Italiana
+EXP-008: Ingestion Costituzione Italiana Completa
 
-Script che utilizza il BrocardiScraper esistente per l'ingestion
-della Costituzione italiana.
+Ingestion end-to-end della Costituzione Italiana (139 articoli) con:
+- Graph: Nodi articolo + relazioni gerarchiche (FalkorDB)
+- Embeddings: Vettori semantici (Qdrant)
+- Bridge Table: Mapping chunk <-> nodo (PostgreSQL)
+- Multivigenza: Tracking modifiche costituzionali
+
+Usa LegalKnowledgeGraph come entry point unificato.
+
+Usage:
+    python scripts/ingest_costituzione.py
+    python scripts/ingest_costituzione.py --dry-run
+    python scripts/ingest_costituzione.py --start 1 --end 12
 """
 
 import asyncio
-import sys
-sys.path.insert(0, '/Users/gpuzio/Desktop/CODE/MERL-T_alpha')
+import argparse
+import json
+import time
+from dataclasses import dataclass, field, asdict
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Any, Optional
 
-from dataclasses import dataclass
-from typing import Optional, Dict, Any, List
+from merlt import LegalKnowledgeGraph, MerltConfig
+from merlt.core.legal_knowledge_graph import UnifiedIngestionResult
+
 import structlog
-
-# Riutilizzo BrocardiScraper esistente
-from merlt.external_sources.visualex.scrapers.brocardi_scraper import BrocardiScraper
-from merlt.external_sources.visualex.tools.norma import NormaVisitata, Norma
-
 log = structlog.get_logger()
-
-# Struttura Costituzione su Brocardi (139 articoli)
-CONSTITUTION_STRUCTURE = {
-    "principi-fondamentali": list(range(1, 13)),
-    "parte-i/titolo-i": list(range(13, 29)),
-    "parte-i/titolo-ii": list(range(29, 35)),
-    "parte-i/titolo-iii": list(range(35, 48)),
-    "parte-i/titolo-iv": list(range(48, 55)),
-    "parte-ii/titolo-i/sezione-i": list(range(55, 70)),
-    "parte-ii/titolo-i/sezione-ii": list(range(70, 83)),
-    "parte-ii/titolo-ii": list(range(83, 92)),
-    "parte-ii/titolo-iii/sezione-i": list(range(92, 97)),
-    "parte-ii/titolo-iii/sezione-ii": list(range(97, 99)),
-    "parte-ii/titolo-iii/sezione-iii": list(range(99, 101)),
-    "parte-ii/titolo-iv/sezione-i": list(range(101, 111)),
-    "parte-ii/titolo-iv/sezione-ii": list(range(111, 114)),
-    "parte-ii/titolo-v": list(range(114, 134)),
-    "parte-ii/titolo-vi": list(range(134, 140)),
-}
 
 
 @dataclass
-class ArticoloCostituzione:
-    """Rappresenta un articolo della Costituzione."""
-    numero: int
-    dispositivo: str = ""
-    spiegazione: str = ""
-    ratio: str = ""
-    massime: List[Dict[str, Any]] = None
-    brocardi_url: str = ""
-    position: str = ""
+class ArticleMetrics:
+    """Metriche per singolo articolo."""
+    numero: str
+    success: bool = False
+    time_seconds: float = 0.0
+    nodes_created: int = 0
+    relations_created: int = 0
+    embeddings_upserted: int = 0
+    bridge_mappings: int = 0
+    modifiche_count: int = 0
+    brocardi_enriched: bool = False
+    errors: List[str] = field(default_factory=list)
 
-    def __post_init__(self):
-        if self.massime is None:
-            self.massime = []
-
-    @property
-    def urn(self) -> str:
-        return f"urn:nir:stato:costituzione~art{self.numero}"
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
-def get_all_article_numbers() -> List[int]:
-    """Restituisce tutti i numeri di articolo."""
-    all_nums = []
-    for articoli in CONSTITUTION_STRUCTURE.values():
-        all_nums.extend(articoli)
-    return sorted(all_nums)
+@dataclass
+class IngestionMetrics:
+    """Metriche complessive dell'ingestion."""
+    start_time: str
+    end_time: str = ""
+    total_articles: int = 139
+    articles_processed: int = 0
+    articles_success: int = 0
+    articles_with_errors: int = 0
+    total_nodes: int = 0
+    total_relations: int = 0
+    total_embeddings: int = 0
+    total_bridge_mappings: int = 0
+    articles_with_modifiche: int = 0
+    total_modifiche: int = 0
+    articles: List[Dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
-async def scrape_article(scraper: BrocardiScraper, art_num: int) -> Optional[ArticoloCostituzione]:
-    """Scarica un articolo usando BrocardiScraper."""
+async def ingest_article(
+    kg: LegalKnowledgeGraph,
+    articolo: str,
+    dry_run: bool = False
+) -> ArticleMetrics:
+    """
+    Ingest singolo articolo della Costituzione.
+
+    Args:
+        kg: LegalKnowledgeGraph connesso
+        articolo: Numero articolo (es. "1", "117")
+        dry_run: Se True, non scrive su storage
+
+    Returns:
+        ArticleMetrics con risultati
+    """
+    metrics = ArticleMetrics(numero=articolo)
+    start = time.time()
+
     try:
-        # Crea NormaVisitata per la Costituzione
-        norma = Norma(tipo_atto="costituzione")  # tipo_atto, non tipo_atto_str
-        norma_visitata = NormaVisitata(norma=norma, numero_articolo=str(art_num))
+        if dry_run:
+            log.info(f"[DRY-RUN] Art. {articolo} - skip ingestion")
+            metrics.success = True
+            metrics.time_seconds = time.time() - start
+            return metrics
 
-        # Usa BrocardiScraper per ottenere info
-        position, info, url = await scraper.get_info(norma_visitata)
-
-        if not url:
-            log.warning(f"Art. {art_num}: URL non trovato")
-            return None
-
-        articolo = ArticoloCostituzione(
-            numero=art_num,
-            brocardi_url=url,
-            position=position or ""
+        result = await kg.ingest_norm(
+            tipo_atto="costituzione",
+            articolo=articolo,
+            include_brocardi=True,
+            include_embeddings=True,
+            include_bridge=True,
+            include_multivigenza=True,
         )
 
-        # Estrai contenuti
-        if 'Spiegazione' in info:
-            articolo.spiegazione = info['Spiegazione']
-
-        if 'Ratio' in info:
-            articolo.ratio = info['Ratio']
-
-        if 'Massime' in info:
-            articolo.massime = info['Massime']
-
-        # Per il dispositivo devo fare fetch separato (non incluso in get_info)
-        # Lo recupereremo direttamente dalla pagina
-
-        return articolo
+        # Popola metriche
+        metrics.success = len(result.errors) == 0
+        metrics.nodes_created = len(result.nodes_created)
+        metrics.relations_created = len(result.relations_created)
+        metrics.embeddings_upserted = result.embeddings_upserted
+        metrics.bridge_mappings = result.bridge_mappings_inserted
+        metrics.modifiche_count = result.modifiche_count
+        metrics.brocardi_enriched = result.brocardi_enriched
+        metrics.errors = result.errors
 
     except Exception as e:
-        log.error(f"Art. {art_num}: Errore - {e}")
-        return None
+        log.error(f"Art. {articolo}: {e}")
+        metrics.errors.append(str(e))
+
+    metrics.time_seconds = time.time() - start
+    return metrics
 
 
-async def fetch_dispositivo(scraper: BrocardiScraper, articolo: ArticoloCostituzione) -> str:
-    """Recupera il dispositivo di un articolo."""
-    import aiohttp
-    from bs4 import BeautifulSoup
+async def ingest_costituzione(
+    start_article: int = 1,
+    end_article: int = 139,
+    dry_run: bool = False,
+    delay: float = 1.0,
+) -> IngestionMetrics:
+    """
+    Ingest della Costituzione Italiana completa.
 
-    if not articolo.brocardi_url:
-        return ""
+    Args:
+        start_article: Articolo iniziale (default 1)
+        end_article: Articolo finale (default 139)
+        dry_run: Se True, non scrive su storage
+        delay: Delay tra articoli in secondi
+
+    Returns:
+        IngestionMetrics con risultati completi
+    """
+    metrics = IngestionMetrics(
+        start_time=datetime.now().isoformat(),
+        total_articles=end_article - start_article + 1,
+    )
+
+    # Configura LegalKnowledgeGraph per ambiente test
+    config = MerltConfig(
+        graph_name="merl_t_test",
+        qdrant_collection="merl_t_test_chunks",
+        postgres_database="rlcf_dev",
+    )
+
+    kg = LegalKnowledgeGraph(config)
 
     try:
-        from merlt.external_sources.visualex.tools.http_client import http_client
-        session = await http_client.get_session()
+        print("=" * 60)
+        print("EXP-008: Ingestion Costituzione Italiana Completa")
+        print("=" * 60)
+        print(f"Articoli: {start_article} - {end_article}")
+        print(f"Dry run: {dry_run}")
+        print(f"Delay: {delay}s")
+        print("=" * 60)
 
-        async with session.get(articolo.brocardi_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-            if resp.status != 200:
-                return ""
-            html = await resp.text()
+        if not dry_run:
+            print("\nConnessione storage backends...")
+            await kg.connect()
+            print("Connesso a FalkorDB, Qdrant, PostgreSQL")
 
-        soup = BeautifulSoup(html, 'html.parser')
-        dispositivo_div = soup.find('div', class_='corpoDelTesto dispositivo')
-        if dispositivo_div:
-            import re
-            text = dispositivo_div.get_text()
-            return re.sub(r'\s+', ' ', text).strip()
+        print(f"\nIngestion di {metrics.total_articles} articoli...\n")
 
-    except Exception as e:
-        log.warning(f"Art. {articolo.numero}: Errore dispositivo - {e}")
+        for art_num in range(start_article, end_article + 1):
+            articolo = str(art_num)
 
-    return ""
+            # Progresso
+            progress = (art_num - start_article + 1) / metrics.total_articles * 100
+            print(f"[{progress:5.1f}%] Art. {articolo}...", end=" ", flush=True)
 
+            # Ingest
+            art_metrics = await ingest_article(kg, articolo, dry_run)
+            metrics.articles.append(art_metrics.to_dict())
+            metrics.articles_processed += 1
 
-async def scrape_constitution() -> List[ArticoloCostituzione]:
-    """Scarica tutti gli articoli della Costituzione."""
-    scraper = BrocardiScraper()
-    articoli = []
-    all_nums = get_all_article_numbers()
+            if art_metrics.success:
+                metrics.articles_success += 1
+                metrics.total_nodes += art_metrics.nodes_created
+                metrics.total_relations += art_metrics.relations_created
+                metrics.total_embeddings += art_metrics.embeddings_upserted
+                metrics.total_bridge_mappings += art_metrics.bridge_mappings
+                metrics.total_modifiche += art_metrics.modifiche_count
+                if art_metrics.modifiche_count > 0:
+                    metrics.articles_with_modifiche += 1
 
-    print(f"Scaricando {len(all_nums)} articoli...")
-
-    # Batch processing
-    batch_size = 5
-    for i in range(0, len(all_nums), batch_size):
-        batch = all_nums[i:i+batch_size]
-        tasks = [scrape_article(scraper, num) for num in batch]
-        results = await asyncio.gather(*tasks)
-
-        for result in results:
-            if result:
-                # Recupera dispositivo
-                result.dispositivo = await fetch_dispositivo(scraper, result)
-                articoli.append(result)
-
-        ok_count = len([r for r in results if r])
-        log.info(f"Batch {i//batch_size + 1}: {ok_count}/{len(batch)} articoli OK")
-
-        if i + batch_size < len(all_nums):
-            await asyncio.sleep(1)  # Rate limiting
-
-    return sorted(articoli, key=lambda a: a.numero)
-
-
-async def store_to_falkordb(articoli: List[ArticoloCostituzione]):
-    """Salva gli articoli in FalkorDB."""
-    from falkordb import FalkorDB
-
-    db = FalkorDB(host='localhost', port=6380)  # FalkorDB è su 6380, Redis su 6379
-    graph = db.select_graph('merl_t_legal')  # Stesso grafo del Libro IV
-
-    stats = {'norma': 0, 'dottrina': 0, 'massime': 0}
-
-    for art in articoli:
-        # Crea nodo Norma
-        graph.query("""
-        MERGE (n:Norma {urn: $urn})
-        SET n.tipo_atto = 'Costituzione',
-            n.numero_articolo = $numero,
-            n.testo_vigente = $dispositivo,
-            n.data_versione = date('1948-01-01'),
-            n.url_brocardi = $url,
-            n.posizione_struttura = $position
-        RETURN n
-        """, {
-            'urn': art.urn,
-            'numero': str(art.numero),
-            'dispositivo': art.dispositivo,
-            'url': art.brocardi_url,
-            'position': art.position
-        })
-        stats['norma'] += 1
-
-        # Dottrina (spiegazione)
-        if art.spiegazione:
-            dottrina_urn = f"{art.urn}~dottrina~spiegazione"
-            graph.query("""
-            MERGE (d:Dottrina {urn: $urn})
-            SET d.tipo = 'spiegazione', d.contenuto = $contenuto, d.fonte = 'Brocardi'
-            WITH d
-            MATCH (n:Norma {urn: $art_urn})
-            MERGE (d)-[:commenta]->(n)
-            """, {'urn': dottrina_urn, 'contenuto': art.spiegazione, 'art_urn': art.urn})
-            stats['dottrina'] += 1
-
-        # Massime
-        for idx, massima in enumerate(art.massime):
-            if massima.get('numero') and massima.get('anno'):
-                massima_urn = f"urn:nir:it:cassazione:sentenza:{massima['anno']};{massima['numero']}"
+                status = "OK"
+                if art_metrics.modifiche_count > 0:
+                    status += f" (modifiche: {art_metrics.modifiche_count})"
+                if art_metrics.brocardi_enriched:
+                    status += " [Brocardi]"
             else:
-                massima_urn = f"{art.urn}~massima~{idx}"
+                metrics.articles_with_errors += 1
+                status = f"ERROR: {art_metrics.errors[0][:50] if art_metrics.errors else 'unknown'}"
 
-            graph.query("""
-            MERGE (m:AttoGiudiziario {urn: $urn})
-            SET m.autorita = $autorita, m.numero = $numero, m.anno = $anno, m.massima = $massima
-            WITH m
-            MATCH (n:Norma {urn: $art_urn})
-            MERGE (m)-[:interpreta]->(n)
-            """, {
-                'urn': massima_urn,
-                'autorita': massima.get('autorita', ''),
-                'numero': massima.get('numero', ''),
-                'anno': massima.get('anno', ''),
-                'massima': massima.get('massima', ''),
-                'art_urn': art.urn
-            })
-            stats['massime'] += 1
+            print(f"{status} ({art_metrics.time_seconds:.1f}s)")
 
-    # Crea gerarchia
-    graph.query("""
-    MERGE (c:Norma {urn: 'urn:nir:stato:costituzione'})
-    SET c.tipo_atto = 'Costituzione',
-        c.rubrica = 'Costituzione della Repubblica Italiana',
-        c.data_versione = date('1948-01-01')
-    """)
+            # Rate limiting
+            if art_num < end_article and not dry_run:
+                await asyncio.sleep(delay)
 
-    for art in articoli:
-        graph.query("""
-        MATCH (root:Norma {urn: 'urn:nir:stato:costituzione'})
-        MATCH (art:Norma {urn: $art_urn})
-        MERGE (root)-[:contiene]->(art)
-        """, {'art_urn': art.urn})
+    finally:
+        if kg.is_connected:
+            await kg.close()
 
-    return stats
+    metrics.end_time = datetime.now().isoformat()
+    return metrics
 
 
-async def generate_embeddings(articoli: List[ArticoloCostituzione]):
-    """Genera embeddings per articoli e massime."""
-    import asyncpg
-    from qdrant_client import QdrantClient
-    from qdrant_client.models import PointStruct
-    import uuid
+def print_summary(metrics: IngestionMetrics):
+    """Stampa summary finale."""
+    print("\n" + "=" * 60)
+    print("SUMMARY")
+    print("=" * 60)
+    print(f"Tempo totale: {metrics.start_time} -> {metrics.end_time}")
+    print(f"Articoli processati: {metrics.articles_processed}/{metrics.total_articles}")
+    print(f"Articoli OK: {metrics.articles_success}")
+    print(f"Articoli con errori: {metrics.articles_with_errors}")
+    print(f"Error rate: {metrics.articles_with_errors / max(metrics.articles_processed, 1) * 100:.1f}%")
+    print()
+    print(f"Nodi FalkorDB: {metrics.total_nodes}")
+    print(f"Relazioni FalkorDB: {metrics.total_relations}")
+    print(f"Embeddings Qdrant: {metrics.total_embeddings}")
+    print(f"Bridge mappings: {metrics.total_bridge_mappings}")
+    print()
+    print(f"Articoli con modifiche: {metrics.articles_with_modifiche}")
+    print(f"Totale modifiche: {metrics.total_modifiche}")
+    print("=" * 60)
 
-    from merlt.orchestration.services.embedding_service import EmbeddingService
 
-    embedding_service = EmbeddingService()
-    qdrant = QdrantClient(host="localhost", port=6333)
-    pg = await asyncpg.connect("postgresql://dev:devpassword@localhost:5433/rlcf_dev")
-
-    # Embeddings articoli
-    log.info("Generando embeddings articoli...")
-    article_points = []
-    bridge_values = []
-
-    for art in articoli:
-        if not art.dispositivo:
-            continue
-
-        text = f"Art. {art.numero} Costituzione\n\n{art.dispositivo}"
-        if art.spiegazione:
-            text += f"\n\nSpiegazione: {art.spiegazione[:1000]}"
-
-        embedding = await embedding_service.get_embedding(text)
-        point_id = str(uuid.uuid4())
-
-        article_points.append(PointStruct(
-            id=point_id,
-            vector=embedding,
-            payload={
-                "urn": art.urn,
-                "tipo": "Norma",
-                "text_preview": art.dispositivo[:500],
-                "numero_articolo": str(art.numero),
-                "fonte": "Costituzione"
-            }
-        ))
-        bridge_values.append((point_id, art.urn, text[:2000], "Norma"))
-
-    if article_points:
-        qdrant.upsert(collection_name="merl_t_chunks", points=article_points)
-        log.info(f"Inseriti {len(article_points)} embeddings articoli")
-
-    # Embeddings massime
-    log.info("Generando embeddings massime...")
-    massima_points = []
-
-    for art in articoli:
-        for idx, massima in enumerate(art.massime):
-            if not massima.get('massima'):
-                continue
-
-            if massima.get('numero') and massima.get('anno'):
-                massima_urn = f"urn:nir:it:cassazione:sentenza:{massima['anno']};{massima['numero']}"
-            else:
-                massima_urn = f"{art.urn}~massima~{idx}"
-
-            text = massima['massima']
-            embedding = await embedding_service.get_embedding(text)
-            point_id = str(uuid.uuid4())
-
-            massima_points.append(PointStruct(
-                id=point_id,
-                vector=embedding,
-                payload={
-                    "urn": massima_urn,
-                    "tipo": "AttoGiudiziario",
-                    "autorita": massima.get('autorita', ''),
-                    "text_preview": text[:500],
-                    "articolo_riferimento": art.urn
-                }
-            ))
-
-    if massima_points:
-        qdrant.upsert(collection_name="merl_t_chunks", points=massima_points)
-        log.info(f"Inseriti {len(massima_points)} embeddings massime")
-
-    # Bridge table
-    if bridge_values:
-        await pg.executemany("""
-            INSERT INTO bridge_table (chunk_id, graph_node_urn, chunk_text, node_type)
-            VALUES ($1, $2, $3, $4) ON CONFLICT (chunk_id) DO NOTHING
-        """, bridge_values)
-
-    await pg.close()
-    return {'articoli': len(article_points), 'massime': len(massima_points)}
+def save_metrics(metrics: IngestionMetrics, output_path: str):
+    """Salva metriche in JSON."""
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(metrics.to_dict(), f, indent=2, ensure_ascii=False)
+    print(f"\nMetriche salvate in: {output_path}")
 
 
 async def main():
-    """Main entry point."""
-    print("=" * 60)
-    print("EXP-004: Ingestion Costituzione Italiana")
-    print("Utilizzando BrocardiScraper esistente")
-    print("=" * 60)
+    parser = argparse.ArgumentParser(
+        description="Ingestion Costituzione Italiana completa"
+    )
+    parser.add_argument(
+        "--start", type=int, default=1,
+        help="Articolo iniziale (default: 1)"
+    )
+    parser.add_argument(
+        "--end", type=int, default=139,
+        help="Articolo finale (default: 139)"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Esegui senza scrivere su storage"
+    )
+    parser.add_argument(
+        "--delay", type=float, default=1.0,
+        help="Delay tra articoli in secondi (default: 1.0)"
+    )
+    parser.add_argument(
+        "--output", type=str,
+        default="docs/experiments/costituzione_ingestion_metrics.json",
+        help="Path output metriche JSON"
+    )
 
-    # Fase 1: Scraping
-    print("\n[1/3] Scraping articoli...")
-    articoli = await scrape_constitution()
-    print(f"   Articoli scaricati: {len(articoli)}/139")
+    args = parser.parse_args()
 
-    total_massime = sum(len(a.massime) for a in articoli)
-    total_spiegazioni = sum(1 for a in articoli if a.spiegazione)
-    print(f"   Massime trovate: {total_massime}")
-    print(f"   Spiegazioni trovate: {total_spiegazioni}")
+    # Esegui ingestion
+    metrics = await ingest_costituzione(
+        start_article=args.start,
+        end_article=args.end,
+        dry_run=args.dry_run,
+        delay=args.delay,
+    )
 
-    if len(articoli) == 0:
-        print("\nNessun articolo scaricato. Verificare connettività.")
-        return
+    # Summary
+    print_summary(metrics)
 
-    # Fase 2: Store to FalkorDB
-    print("\n[2/3] Salvataggio in FalkorDB...")
-    try:
-        stats = await store_to_falkordb(articoli)
-        print(f"   Nodi Norma: {stats['norma']}")
-        print(f"   Nodi Dottrina: {stats['dottrina']}")
-        print(f"   Nodi Massime: {stats['massime']}")
-    except Exception as e:
-        print(f"   ERRORE FalkorDB: {e}")
-        print("   Verificare che FalkorDB sia attivo (non solo Redis)")
-        return
-
-    # Fase 3: Embeddings
-    print("\n[3/3] Generazione embeddings...")
-    try:
-        emb_stats = await generate_embeddings(articoli)
-        print(f"   Embeddings articoli: {emb_stats['articoli']}")
-        print(f"   Embeddings massime: {emb_stats['massime']}")
-    except Exception as e:
-        print(f"   ERRORE Embeddings: {e}")
-        return
-
-    print("\n" + "=" * 60)
-    print("INGESTION COMPLETATA")
-    print("=" * 60)
+    # Salva metriche
+    if not args.dry_run:
+        save_metrics(metrics, args.output)
 
 
 if __name__ == "__main__":

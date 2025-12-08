@@ -277,7 +277,7 @@ class BridgeTable:
         insert_sql = text(f"""
             INSERT INTO {self.config.table_name}
             (chunk_id, graph_node_urn, node_type, relation_type, confidence, chunk_text, source, metadata)
-            VALUES (:chunk_id, :graph_node_urn, :node_type, :relation_type, :confidence, :chunk_text, :source, :metadata::jsonb)
+            VALUES (:chunk_id, :graph_node_urn, :node_type, :relation_type, :confidence, :chunk_text, :source, CAST(:metadata AS jsonb))
             RETURNING id
         """)
 
@@ -346,7 +346,7 @@ class BridgeTable:
         insert_sql = text(f"""
             INSERT INTO {self.config.table_name}
             (chunk_id, graph_node_urn, node_type, relation_type, confidence, chunk_text, source, metadata)
-            VALUES (:chunk_id, :graph_node_urn, :node_type, :relation_type, :confidence, :chunk_text, :source, :metadata::jsonb)
+            VALUES (:chunk_id, :graph_node_urn, :node_type, :relation_type, :confidence, :chunk_text, :source, CAST(:metadata AS jsonb))
         """)
 
         # Prepara i parametri per ogni mapping
