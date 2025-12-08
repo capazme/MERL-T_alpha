@@ -15,8 +15,8 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from merlt.rlcf_framework import models, bias_analysis
-from merlt.rlcf_framework.models import TaskType
+from merlt.rlcf import models, bias_analysis
+from merlt.rlcf.models import TaskType
 
 
 class TestBiasCalculations:

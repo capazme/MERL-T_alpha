@@ -17,7 +17,7 @@ Test coverage:
 """
 
 import pytest
-from merlt.preprocessing.ner_module import (
+from merlt.pipeline.ner_module import (
     NormativeParser,
     ReferenceResolver,
     StructureBuilder,

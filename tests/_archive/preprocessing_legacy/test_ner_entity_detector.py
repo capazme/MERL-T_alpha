@@ -15,7 +15,7 @@ Test coverage:
 
 import pytest
 import logging
-from merlt.preprocessing.ner_module import (
+from merlt.pipeline.ner_module import (
     EntityDetector,
     TextSpan
 )

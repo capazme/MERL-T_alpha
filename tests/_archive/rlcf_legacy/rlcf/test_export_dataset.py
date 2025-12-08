@@ -14,8 +14,8 @@ Coverage:
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from merlt.rlcf_framework import models, export_dataset
-from merlt.rlcf_framework.models import TaskType
+from merlt.rlcf import models, export_dataset
+from merlt.rlcf.models import TaskType
 
 
 class TestSFTFormatters:

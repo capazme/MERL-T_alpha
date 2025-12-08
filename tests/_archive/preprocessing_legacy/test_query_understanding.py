@@ -23,7 +23,7 @@ import json
 from datetime import datetime
 from typing import List
 
-from merlt.preprocessing.query_understanding import (
+from merlt.pipeline.query_understanding import (
     QueryUnderstandingService,
     LegalPatterns,
     QueryIntentType,

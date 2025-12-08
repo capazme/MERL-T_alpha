@@ -445,6 +445,196 @@ Please provide a concise legal summary highlighting key points, obligations, and
             max_tokens=max_tokens
         )
 
+    async def generate_json_completion(
+        self,
+        prompt: str,
+        json_schema: Dict[str, Any],
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None,  # Default da LLM_PARSING_MODEL env
+        temperature: float = 0.0,
+        max_tokens: int = 500,
+        api_key: Optional[str] = None,
+        timeout: int = 30  # Timeout in secondi
+    ) -> Dict[str, Any]:
+        """
+        Genera una completion in formato JSON strutturato usando OpenRouter.
+
+        Usa json_object con prompt esplicito per garantire JSON valido.
+        Compatibile con tutti i modelli OpenRouter.
+
+        Args:
+            prompt: Prompt utente
+            json_schema: Schema JSON (usato nel prompt per guidare il modello)
+            system_prompt: Prompt di sistema opzionale
+            model: ID modello OpenRouter (default: gemini-2.0-flash-001)
+            temperature: Temperatura sampling (0.0-1.0)
+            max_tokens: Max tokens da generare
+            api_key: API key opzionale (default: env OPENROUTER_API_KEY)
+            timeout: Timeout in secondi per la richiesta HTTP (default: 30)
+
+        Returns:
+            Dict: Risposta JSON parsata
+
+        Raises:
+            Exception: Se la richiesta API fallisce o il JSON non è valido
+        """
+        import os
+        import json
+        import re
+        import aiohttp
+
+        try:
+            session = await self._get_session()
+
+            api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+            if not api_key:
+                raise ValueError("OpenRouter API key not provided")
+
+            # Usa modello da env se non specificato
+            model = model or os.getenv("LLM_PARSING_MODEL", "openai/gpt-4o-mini")
+
+            # Genera esempio JSON dallo schema
+            schema_example = self._generate_json_example(json_schema)
+
+            # Prompt esplicito per JSON
+            json_prompt = f"""{prompt}
+
+IMPORTANTE: Rispondi SOLO con un oggetto JSON valido, senza spiegazioni.
+Formato richiesto: {schema_example}
+
+JSON:"""
+
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt + " Rispondi sempre in formato JSON valido."})
+            messages.append({"role": "user", "content": json_prompt})
+
+            # Usa json_object (più compatibile) invece di json_schema
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "response_format": {"type": "json_object"}
+            }
+
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://rlcf-framework.com",
+                "X-Title": "RLCF Framework"
+            }
+
+            logger.info(f"Generating JSON completion with model: {model}")
+
+            # Timeout per la richiesta HTTP
+            request_timeout = aiohttp.ClientTimeout(total=timeout)
+
+            async with session.post(
+                f"{self.OPENROUTER_BASE_URL}/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=request_timeout
+            ) as response:
+
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"OpenRouter API error {response.status}: {error_text}")
+                    raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
+
+                data = await response.json()
+
+                if "choices" not in data or not data["choices"]:
+                    logger.error(f"Invalid OpenRouter response: {data}")
+                    raise Exception("Invalid response from OpenRouter API")
+
+                completion = data["choices"][0]["message"]["content"]
+                logger.info(f"Raw completion: {completion[:200]}...")
+
+                # Prova a parsare direttamente
+                try:
+                    result = json.loads(completion)
+                    logger.info(f"Successfully parsed JSON directly ({len(completion)} chars)")
+                    return result
+                except json.JSONDecodeError:
+                    pass  # Prova estrazione
+
+                # Estrai JSON dalla risposta (supporta oggetti nested)
+                # Prima cerca un oggetto {...} che può contenere nested
+                brace_count = 0
+                start_idx = None
+                for i, char in enumerate(completion):
+                    if char == '{':
+                        if brace_count == 0:
+                            start_idx = i
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                        if brace_count == 0 and start_idx is not None:
+                            json_str = completion[start_idx:i+1]
+                            try:
+                                result = json.loads(json_str)
+                                logger.info(f"Successfully extracted nested JSON ({len(json_str)} chars)")
+                                return result
+                            except json.JSONDecodeError:
+                                continue
+
+                # Fallback: prova con array [...]
+                bracket_count = 0
+                start_idx = None
+                for i, char in enumerate(completion):
+                    if char == '[':
+                        if bracket_count == 0:
+                            start_idx = i
+                        bracket_count += 1
+                    elif char == ']':
+                        bracket_count -= 1
+                        if bracket_count == 0 and start_idx is not None:
+                            json_str = completion[start_idx:i+1]
+                            try:
+                                result = json.loads(json_str)
+                                logger.info(f"Successfully extracted array JSON ({len(json_str)} chars)")
+                                return {"results": result}  # Wrap array in object
+                            except json.JSONDecodeError:
+                                continue
+
+                # Se tutto fallisce, prova il vecchio regex semplice
+                json_match = re.search(r'\{[^{}]*\}', completion, re.DOTALL)
+                if json_match:
+                    completion = json_match.group()
+
+                logger.info(f"Successfully generated JSON completion ({len(completion)} chars)")
+
+                result = json.loads(completion)
+                return result
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response: {e}. Raw: {completion[:500] if 'completion' in dir() else 'N/A'}")
+            raise
+        except Exception as e:
+            logger.error(f"Error generating JSON completion: {str(e)}")
+            raise
+
+    def _generate_json_example(self, schema: Dict[str, Any]) -> str:
+        """Genera un esempio JSON dallo schema per il prompt."""
+        import json
+
+        if "properties" in schema:
+            example = {}
+            for key, value in schema["properties"].items():
+                if value.get("type") == "string":
+                    example[key] = "valore"
+                elif value.get("type") == "integer":
+                    example[key] = 0
+                elif value.get("type") == "number":
+                    example[key] = 0.0
+                elif value.get("type") == "boolean":
+                    example[key] = True
+                else:
+                    example[key] = None
+            return json.dumps(example, ensure_ascii=False)
+        return "{}"
+
     def _get_fallback_response(self, task_type: str, error_msg: str) -> Dict[str, Any]:
         """
         Generate fallback response when AI generation fails.

@@ -22,19 +22,19 @@ from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime
 
 # Backend imports
-from merlt.orchestration.pipeline_orchestrator import (
+from merlt.core.pipeline_orchestrator import (
     PipelineOrchestrator,
     PipelineContext,
     PipelineExecutionStatus
 )
-from merlt.orchestration.intent_classifier import IntentClassifier, IntentResult, IntentType
-from merlt.preprocessing.kg_enrichment_service import KGEnrichmentService, EnrichedContext
-from merlt.preprocessing.intent_mapping import (
+from merlt.core.intent_classifier import IntentClassifier, IntentResult, IntentType
+from merlt.pipeline.kg_enrichment_service import KGEnrichmentService, EnrichedContext
+from merlt.pipeline.intent_mapping import (
     convert_query_intent_to_intent_type,
     prepare_query_understanding_for_kg_enrichment,
     QUERY_INTENT_TO_INTENT_TYPE
 )
-from merlt.preprocessing.query_understanding import QueryIntentType
+from merlt.pipeline.query_understanding import QueryIntentType
 
 
 # ===========================================
@@ -162,7 +162,7 @@ async def test_query_understanding_integration(pipeline_orchestrator):
         "confidence": 0.90
     }
 
-    with patch("backend.orchestration.pipeline_orchestrator.integrate_query_understanding_with_kg",
+    with patch("merlt.core.pipeline_orchestrator.integrate_query_understanding_with_kg",
                new=AsyncMock(return_value=mock_qu_result)):
         # Execute pipeline
         context, status = await pipeline_orchestrator.execute_pipeline(
@@ -192,7 +192,7 @@ async def test_query_understanding_fallback_on_failure(pipeline_orchestrator):
     query = "Test query"
 
     # Mock integrate_query_understanding_with_kg to raise exception
-    with patch("backend.orchestration.pipeline_orchestrator.integrate_query_understanding_with_kg",
+    with patch("merlt.core.pipeline_orchestrator.integrate_query_understanding_with_kg",
                side_effect=Exception("Query understanding unavailable")):
         # Execute pipeline
         context, status = await pipeline_orchestrator.execute_pipeline(
@@ -325,7 +325,7 @@ async def test_full_pipeline_execution(pipeline_orchestrator):
         "confidence": 0.93
     }
 
-    with patch("backend.orchestration.pipeline_orchestrator.integrate_query_understanding_with_kg",
+    with patch("merlt.core.pipeline_orchestrator.integrate_query_understanding_with_kg",
                new=AsyncMock(return_value=mock_qu_result)):
         # Execute pipeline
         context, status = await pipeline_orchestrator.execute_pipeline(
@@ -384,7 +384,7 @@ async def test_pipeline_context_entity_merging(pipeline_orchestrator):
         norm_references=[]
     ))
 
-    with patch("backend.orchestration.pipeline_orchestrator.integrate_query_understanding_with_kg",
+    with patch("merlt.core.pipeline_orchestrator.integrate_query_understanding_with_kg",
                new=AsyncMock(return_value=mock_qu_result)):
         # Execute pipeline
         context, status = await pipeline_orchestrator.execute_pipeline(
@@ -427,7 +427,7 @@ async def test_pipeline_error_handling_intent_failure(pipeline_orchestrator):
         side_effect=Exception("Intent classification service unavailable")
     )
 
-    with patch("backend.orchestration.pipeline_orchestrator.integrate_query_understanding_with_kg",
+    with patch("merlt.core.pipeline_orchestrator.integrate_query_understanding_with_kg",
                new=AsyncMock(return_value=mock_qu_result)):
         # Execute pipeline (should fail gracefully)
         context, status = await pipeline_orchestrator.execute_pipeline(

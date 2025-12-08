@@ -1,9 +1,0 @@
-{
-  "query": "Cosa dice articolo 1321 codice civile?",
-  "options": {
-    "enable_kg_enrichment": true,
-    "enable_vectordb": false,
-    "enable_api_agent": false,
-    "max_experts": 2
-  }
-}

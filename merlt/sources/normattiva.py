@@ -71,39 +71,51 @@ Testo: "{content}"
 
 Devi identificare COSA viene modificato/abrogato/inserito (non da chi).
 
-Rispondi SOLO con un JSON valido:
-{{
-    "articolo": "2" o "2-bis" o null,
-    "comma": "1" o "1-bis" o null,
-    "lettera": "a" o null,
-    "numero": "1" o null
-}}
-
 Esempi:
-- "l'abrogazione del comma 2 dell'art. 3-bis" → {{"articolo": "3-bis", "comma": "2", "lettera": null, "numero": null}}
-- "la modifica dell'art. 1, comma 1, lettera a)" → {{"articolo": "1", "comma": "1", "lettera": "a", "numero": null}}
-- "l'abrogazione dell'art. 5" → {{"articolo": "5", "comma": null, "lettera": null, "numero": null}}
+- "l'abrogazione del comma 2 dell'art. 3-bis" -> articolo="3-bis", comma="2"
+- "la modifica dell'art. 1, comma 1, lettera a)" -> articolo="1", comma="1", lettera="a"
+- "l'abrogazione dell'art. 5" -> articolo="5"
 
 Se non riesci a identificare, usa null."""
 
+    # JSON Schema per structured output
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "articolo": {
+                "type": ["string", "null"],
+                "description": "Numero articolo (es. '2', '2-bis') o null"
+            },
+            "comma": {
+                "type": ["string", "null"],
+                "description": "Numero comma (es. '1', '1-bis') o null"
+            },
+            "lettera": {
+                "type": ["string", "null"],
+                "description": "Lettera (es. 'a', 'b') o null"
+            },
+            "numero": {
+                "type": ["string", "null"],
+                "description": "Numero (es. '1', '2') o null"
+            }
+        },
+        "required": ["articolo", "comma", "lettera", "numero"],
+        "additionalProperties": False
+    }
+
     try:
-        response = await llm_service.generate(
+        import os
+        model = os.getenv("LLM_PARSING_MODEL", "mistralai/mistral-7b-instruct")
+
+        # Usa generate_json_completion con structured output
+        result = await llm_service.generate_json_completion(
             prompt=prompt,
-            model="google/gemini-2.0-flash-001",  # Fast and cheap
-            max_tokens=150,
+            json_schema=json_schema,
+            system_prompt="Sei un parser di testi normativi italiani. Converti ordinali in numeri (primo=1, secondo=2).",
+            model=model,
             temperature=0.0,
+            max_tokens=150,
         )
-
-        # Parse JSON response
-        import json
-        # Extract JSON from response (might have markdown)
-        text = response.strip()
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0]
-
-        result = json.loads(text.strip())
 
         # Build normalized destinazione string
         if not result.get("articolo"):
@@ -128,6 +140,117 @@ Se non riesci a identificare, usa null."""
     except Exception as e:
         log.warning(f"LLM parsing failed: {e}")
         return None
+
+
+async def parse_destinazioni_batch_with_llm(
+    contents: List[str],
+    use_llm: bool = True,
+) -> List[Optional[Dict[str, Any]]]:
+    """
+    Parse multiple destinazioni in un'unica chiamata LLM (batch).
+
+    Molto più efficiente di chiamare parse_destinazione_with_llm N volte.
+    Invia tutti i testi in un singolo prompt e riceve un array di risultati.
+
+    Args:
+        contents: Lista di testi da parsare
+        use_llm: Se usare LLM (default True)
+
+    Returns:
+        Lista di Dict (stesso ordine dell'input), None per entries non parsabili
+    """
+    if not use_llm or not contents:
+        return [None] * len(contents)
+
+    llm_service = _get_llm_service()
+    if llm_service is None:
+        return [None] * len(contents)
+
+    # Costruisci prompt batch con tutti i testi numerati
+    numbered_entries = "\n".join(
+        f"{i+1}. \"{content}\""
+        for i, content in enumerate(contents)
+    )
+
+    prompt = f"""Estrai le destinazioni da queste {len(contents)} modifiche normative italiane.
+
+{numbered_entries}
+
+Per ogni entry, identifica COSA viene modificato/abrogato/inserito.
+Se non riesci a identificare l'articolo, usa null per quel campo.
+
+FORMATO RISPOSTA OBBLIGATORIO:
+{{"results": [{{"articolo": "...", "comma": "...", "lettera": null, "numero": null}}, ...]}}
+
+Deve contenere esattamente {len(contents)} oggetti nell'array "results", uno per ogni entry."""
+
+    # Schema per array di risultati
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "results": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "articolo": {"type": ["string", "null"]},
+                        "comma": {"type": ["string", "null"]},
+                        "lettera": {"type": ["string", "null"]},
+                        "numero": {"type": ["string", "null"]}
+                    }
+                }
+            }
+        }
+    }
+
+    try:
+        import os
+        model = os.getenv("LLM_PARSING_MODEL", "openai/gpt-4o-mini")
+
+        result = await llm_service.generate_json_completion(
+            prompt=prompt,
+            json_schema=json_schema,
+            system_prompt="Sei un parser di testi normativi italiani. Converti ordinali in numeri.",
+            model=model,
+            temperature=0.0,
+            max_tokens=2000,  # Più tokens per batch
+            timeout=60  # Timeout più lungo per batch
+        )
+
+        results_array = result.get("results", [])
+
+        # Normalizza risultati
+        parsed_results = []
+        for i, content in enumerate(contents):
+            if i < len(results_array):
+                r = results_array[i]
+                if r and r.get("articolo"):
+                    destinazione = f"art. {r['articolo']}"
+                    if r.get("comma"):
+                        destinazione += f", comma {r['comma']}"
+                    if r.get("lettera"):
+                        destinazione += f", lettera {r['lettera']}"
+                    if r.get("numero"):
+                        destinazione += f", numero {r['numero']}"
+
+                    parsed_results.append({
+                        "target_article": r["articolo"],
+                        "comma": r.get("comma"),
+                        "lettera": r.get("lettera"),
+                        "numero": r.get("numero"),
+                        "destinazione": destinazione,
+                    })
+                else:
+                    parsed_results.append(None)
+            else:
+                parsed_results.append(None)
+
+        log.info(f"Batch LLM parsed {sum(1 for r in parsed_results if r)} of {len(contents)} entries")
+        return parsed_results
+
+    except Exception as e:
+        log.warning(f"Batch LLM parsing failed: {e}")
+        return [None] * len(contents)
 
 
 class NormattivaScraper(BaseScraper):
@@ -393,16 +516,21 @@ class NormattivaScraper(BaseScraper):
                 html_mod, normavisitata, filter_article
             )
 
-            # 4. Se ci sono fallimenti e use_llm=True, prova con LLM
+            # 4. Se ci sono fallimenti e use_llm=True, prova con LLM (batch per efficienza)
             if failed_contents:
-                log.info(f"Regex failed for {len(failed_contents)} entries, trying LLM fallback")
-                for failed in failed_contents:
-                    try:
-                        llm_result = await parse_destinazione_with_llm(
-                            failed["content"], use_llm=True
-                        )
+                log.info(f"Regex failed for {len(failed_contents)} entries, trying LLM batch fallback")
+                try:
+                    # Estrai tutti i contenuti per batch processing
+                    contents_to_parse = [f["content"] for f in failed_contents]
+
+                    # Una singola chiamata LLM per tutti i contenuti
+                    llm_results = await parse_destinazioni_batch_with_llm(
+                        contents_to_parse, use_llm=True
+                    )
+
+                    # Processa i risultati
+                    for failed, llm_result in zip(failed_contents, llm_results):
                         if llm_result and llm_result.get("target_article"):
-                            # Crea Modifica con risultato LLM
                             mod = Modifica(
                                 tipo_modifica=failed["tipo"],
                                 atto_modificante_urn=failed["act_info"].get("urn", "") if failed["act_info"] else "",
@@ -424,8 +552,8 @@ class NormattivaScraper(BaseScraper):
                                         modifiche.append(mod)
                             else:
                                 modifiche.append(mod)
-                    except Exception as e:
-                        log.debug(f"LLM fallback failed for entry: {e}")
+                except Exception as e:
+                    log.warning(f"LLM batch fallback failed: {e}")
 
             # Riordina per data
             modifiche.sort(key=lambda m: m.data_efficacia)

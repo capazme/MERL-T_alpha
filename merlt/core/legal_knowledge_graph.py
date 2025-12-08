@@ -74,6 +74,7 @@ from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
 from merlt.sources.normattiva import NormattivaScraper
 from merlt.sources.brocardi import BrocardiScraper
 from merlt.sources.utils.norma import NormaVisitata, Norma
+from merlt.sources.utils.urn import generate_urn
 from merlt.sources.utils.tree import (
     NormTree,
     get_article_position,
@@ -537,10 +538,12 @@ class LegalKnowledgeGraph:
         """Get cached NormTree for act type, or fetch and cache it."""
         if tipo_atto not in self._norm_trees:
             try:
-                norma = Norma(tipo_atto=tipo_atto, data=None, numero_atto=None)
-                tree, status = await get_hierarchical_tree(norma.urn)
-                if status == 200 and isinstance(tree, NormTree):
-                    self._norm_trees[tipo_atto] = tree
+                # Genera URN direttamente (Norma non ha property .urn)
+                urn = generate_urn(act_type=tipo_atto, urn_flag=True)
+                if urn:
+                    tree, status = await get_hierarchical_tree(urn)
+                    if status == 200 and isinstance(tree, NormTree):
+                        self._norm_trees[tipo_atto] = tree
             except Exception as e:
                 logger.warning(f"Could not fetch NormTree for {tipo_atto}: {e}")
                 return None

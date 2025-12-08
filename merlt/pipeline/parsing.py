@@ -71,18 +71,42 @@ def count_tokens(text: str) -> int:
 
 
 @dataclass
+class Lettera:
+    """
+    Represents a single lettera (sub-paragraph) within a comma.
+
+    Italian legal structure: Articolo → Comma → Lettera → Numero
+    Example: Art. 117 Cost., comma 2, lettera a)
+
+    Attributes:
+        lettera: Letter identifier (e.g., "a", "b", "c")
+        testo: Full text of the lettera
+        token_count: Number of tokens
+    """
+    lettera: str
+    testo: str
+    token_count: int = field(default=0)
+
+    def __post_init__(self):
+        if self.token_count == 0 and self.testo:
+            self.token_count = count_tokens(self.testo)
+
+
+@dataclass
 class Comma:
     """
     Represents a single comma (paragraph) within an article.
 
     Attributes:
         numero: Comma number (1-indexed)
-        testo: Full text of the comma
+        testo: Full text of the comma (includes lettere text)
         token_count: Number of tokens in the comma text
+        lettere: List of lettere (sub-paragraphs) if present
     """
     numero: int
     testo: str
     token_count: int = field(default=0)
+    lettere: List['Lettera'] = field(default_factory=list)
 
     def __post_init__(self):
         if self.token_count == 0 and self.testo:
@@ -145,6 +169,14 @@ class CommaParser:
 
     # Maximum gap between paragraphs (more than 2 newlines = new comma)
     COMMA_SEPARATOR = re.compile(r'\n\s*\n+')
+
+    # Pattern for lettere (sub-paragraphs): a), b), c)... or a., b., c....
+    # Matches: "a) testo" or "a. testo" at beginning of line or after newline
+    # Letters can be a-z, including bis/ter variants: a-bis), a-ter)
+    LETTERA_PATTERN = re.compile(
+        r'(?:^|\n)\s*([a-z](?:-(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?)\s*[).]\s*',
+        re.IGNORECASE
+    )
 
     def __init__(self, min_comma_length: int = MIN_COMMA_LENGTH):
         """
@@ -310,21 +342,104 @@ class CommaParser:
 
         return True
 
+    # Pattern per identificare inizio di una lettera: a), b), c)... o a., b., c....
+    # Include anche bis/ter variants
+    LETTERA_START_PATTERN = re.compile(
+        r'^\s*([a-z](?:-(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?)\s*[).]\s*',
+        re.IGNORECASE
+    )
+
+    def _merge_lettere_paragraphs(self, content_text: str) -> str:
+        """
+        Merge consecutive paragraphs that are lettere (a), b), c)...) into single comma.
+
+        Normattiva often separates each lettera with double newlines, but they should
+        be part of the same comma. This method detects consecutive lettere and merges
+        them with single newlines to keep them together.
+
+        Example:
+            Input:
+                "materie:\\n\\na) politica estera;\\n\\nb) immigrazione;\\n\\nc) difesa;"
+            Output:
+                "materie:\\na) politica estera;\\nb) immigrazione;\\nc) difesa;"
+
+        Args:
+            content_text: Raw article text
+
+        Returns:
+            Text with consecutive lettere merged into same paragraph
+        """
+        # Split on double newlines
+        paragraphs = self.COMMA_SEPARATOR.split(content_text.strip())
+
+        if len(paragraphs) < 2:
+            return content_text
+
+        merged = []
+        i = 0
+
+        while i < len(paragraphs):
+            current = paragraphs[i].strip()
+
+            # Check if this is a lettera
+            is_lettera = bool(self.LETTERA_START_PATTERN.match(current))
+
+            if is_lettera:
+                # Start collecting consecutive lettere
+                lettera_group = [current]
+                j = i + 1
+
+                while j < len(paragraphs):
+                    next_para = paragraphs[j].strip()
+                    if self.LETTERA_START_PATTERN.match(next_para):
+                        lettera_group.append(next_para)
+                        j += 1
+                    else:
+                        break
+
+                # If we found multiple consecutive lettere, merge them
+                if len(lettera_group) > 1:
+                    # Check if the paragraph before the lettere introduces them
+                    # (e.g., "Lo Stato ha legislazione esclusiva nelle seguenti materie:")
+                    if merged and merged[-1].strip().endswith(':'):
+                        # Merge intro + lettere
+                        intro = merged.pop()
+                        merged.append(intro + '\n' + '\n'.join(lettera_group))
+                    else:
+                        # Just merge the lettere together
+                        merged.append('\n'.join(lettera_group))
+                    i = j
+                    continue
+
+            # Not a lettera or single lettera - keep as is
+            merged.append(current)
+            i += 1
+
+        # Rejoin with double newlines
+        return '\n\n'.join(merged)
+
     def _extract_commas(self, content_text: str) -> List[Comma]:
         """
         Extract comma paragraphs from content text.
 
         Commas are separated by double newlines (blank lines).
         Each comma is numbered sequentially.
+        Lettere within commas are also extracted.
+
+        Special handling for lettere: consecutive paragraphs that start with
+        letter patterns (a), b), c)...) are merged into a single comma.
 
         Args:
             content_text: Article content after numero and rubrica
 
         Returns:
-            List of Comma objects
+            List of Comma objects with optional lettere
         """
         if not content_text.strip():
             return []
+
+        # Pre-process: merge consecutive lettere into single comma
+        content_text = self._merge_lettere_paragraphs(content_text)
 
         # Split on double newlines (one or more blank lines)
         raw_paragraphs = self.COMMA_SEPARATOR.split(content_text.strip())
@@ -345,12 +460,69 @@ class CommaParser:
                 continue
 
             comma_num += 1
+
+            # Extract lettere from this comma
+            lettere = self._extract_lettere(cleaned)
+
             commas.append(Comma(
                 numero=comma_num,
-                testo=cleaned
+                testo=cleaned,
+                lettere=lettere
             ))
 
         return commas
+
+    def _extract_lettere(self, comma_text: str) -> List[Lettera]:
+        """
+        Extract lettere (sub-paragraphs) from a comma text.
+
+        Lettere are identified by patterns like:
+        - a) testo della lettera
+        - b) altro testo
+        - a-bis) variante
+
+        Args:
+            comma_text: Full text of a comma paragraph
+
+        Returns:
+            List of Lettera objects, empty if no lettere found
+        """
+        lettere = []
+
+        # Find all lettera markers
+        matches = list(self.LETTERA_PATTERN.finditer(comma_text))
+
+        if not matches:
+            return lettere
+
+        # Check if this looks like a list of lettere (at least 2)
+        # Single match might be a false positive
+        if len(matches) < 2:
+            return lettere
+
+        for i, match in enumerate(matches):
+            letter = match.group(1).lower()
+            start = match.end()
+
+            # Find end: either next lettera or end of text
+            if i + 1 < len(matches):
+                end = matches[i + 1].start()
+            else:
+                end = len(comma_text)
+
+            # Extract lettera text
+            lettera_text = comma_text[start:end].strip()
+
+            # Clean trailing semicolon/period if present
+            lettera_text = lettera_text.rstrip(';.')
+
+            if lettera_text:  # Only add if there's actual content
+                lettere.append(Lettera(
+                    lettera=letter,
+                    testo=lettera_text
+                ))
+
+        return lettere
 
     def _is_metadata(self, text: str) -> bool:
         """
@@ -395,6 +567,7 @@ def parse_article(article_text: str, min_comma_length: int = 15) -> ArticleStruc
 
 # Exports
 __all__ = [
+    'Lettera',
     'Comma',
     'ArticleStructure',
     'CommaParser',

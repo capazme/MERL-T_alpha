@@ -336,3 +336,124 @@ class TestNormattivaRetry:
 
         assert text1 == text2, "Risultati cache dovrebbero essere identici"
         assert urn1 == urn2, "URN cache dovrebbero essere identici"
+
+
+class TestParseDestinazioneWithLLM:
+    """
+    Test per parse_destinazione_with_llm.
+
+    Verifica che la funzione usi structured output JSON
+    e legga il modello dalla variabile d'ambiente LLM_PARSING_MODEL.
+    """
+
+    @pytest.mark.asyncio
+    async def test_llm_model_from_env(self):
+        """Test che il modello LLM venga letto dalla variabile d'ambiente."""
+        import os
+        from unittest.mock import AsyncMock, patch
+        from merlt.sources.normattiva import parse_destinazione_with_llm, _get_llm_service
+
+        # Mock del servizio LLM
+        mock_service = AsyncMock()
+        mock_service.generate_json_completion = AsyncMock(
+            return_value={"articolo": "5", "comma": "2", "lettera": None, "numero": None}
+        )
+
+        # Imposta variabile d'ambiente
+        original_value = os.environ.get("LLM_PARSING_MODEL")
+        os.environ["LLM_PARSING_MODEL"] = "custom-model/test-v1"
+
+        # Clear cache prima del test
+        _get_llm_service.cache_clear()
+
+        try:
+            with patch("merlt.sources.normattiva._get_llm_service", return_value=mock_service):
+                result = await parse_destinazione_with_llm(
+                    "ha disposto l'abrogazione del comma 2 dell'art. 5"
+                )
+
+                # Verifica risultato
+                assert result is not None
+                assert result["target_article"] == "5"
+                assert result["comma"] == "2"
+
+                # Verifica che il modello dall'env sia stato usato
+                call_kwargs = mock_service.generate_json_completion.call_args.kwargs
+                assert call_kwargs["model"] == "custom-model/test-v1"
+
+        finally:
+            # Ripristina
+            _get_llm_service.cache_clear()
+            if original_value is not None:
+                os.environ["LLM_PARSING_MODEL"] = original_value
+            else:
+                os.environ.pop("LLM_PARSING_MODEL", None)
+
+    @pytest.mark.asyncio
+    async def test_llm_model_default(self):
+        """Test che il modello di default sia mistral quando env non è impostato."""
+        import os
+        from unittest.mock import AsyncMock, patch
+        from merlt.sources.normattiva import parse_destinazione_with_llm, _get_llm_service
+
+        # Mock del servizio LLM
+        mock_service = AsyncMock()
+        mock_service.generate_json_completion = AsyncMock(
+            return_value={"articolo": "5", "comma": None, "lettera": None, "numero": None}
+        )
+
+        # Rimuovi variabile d'ambiente
+        original_value = os.environ.pop("LLM_PARSING_MODEL", None)
+
+        # Clear cache
+        _get_llm_service.cache_clear()
+
+        try:
+            with patch("merlt.sources.normattiva._get_llm_service", return_value=mock_service):
+                await parse_destinazione_with_llm("abrogazione art. 5")
+
+                # Verifica modello di default
+                call_kwargs = mock_service.generate_json_completion.call_args.kwargs
+                assert call_kwargs["model"] == "mistralai/mistral-7b-instruct"
+
+        finally:
+            _get_llm_service.cache_clear()
+            if original_value is not None:
+                os.environ["LLM_PARSING_MODEL"] = original_value
+
+    @pytest.mark.asyncio
+    async def test_structured_output_json_schema(self):
+        """Test che venga usato generate_json_completion con schema JSON."""
+        from unittest.mock import AsyncMock, patch
+        from merlt.sources.normattiva import parse_destinazione_with_llm, _get_llm_service
+
+        mock_service = AsyncMock()
+        mock_service.generate_json_completion = AsyncMock(
+            return_value={"articolo": "10", "comma": "1", "lettera": "a", "numero": None}
+        )
+
+        _get_llm_service.cache_clear()
+
+        try:
+            with patch("merlt.sources.normattiva._get_llm_service", return_value=mock_service):
+                result = await parse_destinazione_with_llm(
+                    "modifica art. 10, comma 1, lettera a)"
+                )
+
+                # Verifica che generate_json_completion sia stato chiamato
+                mock_service.generate_json_completion.assert_called_once()
+
+                # Verifica che sia passato un json_schema
+                call_kwargs = mock_service.generate_json_completion.call_args.kwargs
+                assert "json_schema" in call_kwargs
+                schema = call_kwargs["json_schema"]
+                assert "articolo" in schema["properties"]
+                assert "comma" in schema["properties"]
+                assert "lettera" in schema["properties"]
+                assert "numero" in schema["properties"]
+
+                # Verifica risultato formattato
+                assert result["destinazione"] == "art. 10, comma 1, lettera a"
+
+        finally:
+            _get_llm_service.cache_clear()

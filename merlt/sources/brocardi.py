@@ -29,6 +29,41 @@ RETRY_ATTEMPTS = 2  # Numero di retry per richiesta fallita
 RETRY_DELAY = 1.0  # Delay tra i retry in secondi
 
 
+# Autorità giudiziarie italiane per parsing massime
+# Pattern regex per riconoscere le varie autorità
+AUTORITA_GIUDIZIARIE = {
+    # Corte Costituzionale
+    'corte_cost': r'(?:Corte\s+cost\.?|C\.\s*cost\.?|Corte\s+Costituzionale)',
+
+    # Corte di Cassazione (civile, penale, lavoro, sezioni unite)
+    'cassazione': r'(?:Cass\.?\s*(?:civ|pen|lav|sez\.?\s*un)?\.?)',
+
+    # Consiglio di Stato
+    'cons_stato': r'(?:Cons\.?\s*(?:St\.?|Stato)|Consiglio\s+di\s+Stato)',
+
+    # TAR (Tribunale Amministrativo Regionale)
+    'tar': r'(?:TAR\s*(?:Lazio|Lombardia|Campania|Sicilia|Veneto|Piemonte|Emilia[\s-]?Romagna|Toscana|Puglia|Calabria|Liguria|Marche|Abruzzo|Sardegna|Friuli|Umbria|Basilicata|Molise|Valle\s*d\'?Aosta|Trentino)?)',
+
+    # Corte dei Conti
+    'corte_conti': r'(?:Corte\s+(?:dei\s+)?[Cc]onti|C\.\s*conti)',
+
+    # Corte d'Appello
+    'appello': r'(?:App\.?|C\.\s*App\.?|Corte\s+(?:d\'?)?[Aa]ppello)',
+
+    # Tribunale ordinario
+    'tribunale': r'(?:Trib\.?|Tribunale)',
+
+    # Corte di Giustizia UE
+    'cgue': r'(?:CGUE|Corte\s+[Gg]iust\.?\s*(?:UE|CE)?|C\.\s*Giust\.?\s*UE)',
+
+    # Corte Europea Diritti dell'Uomo
+    'cedu': r'(?:CEDU|Corte\s+EDU|Corte\s+[Ee]uropea\s+[Dd]iritti)',
+}
+
+# Pattern combinato per tutte le autorità (per il parsing)
+AUTORITA_PATTERN = '|'.join(f'({pattern})' for pattern in AUTORITA_GIUDIZIARIE.values())
+
+
 @dataclass
 class RequestConfig:
     """Configurazione per le richieste HTTP"""
@@ -75,9 +110,20 @@ class BrocardiScraper(BaseScraper):
         """
         Parsa una singola massima giurisprudenziale dalla struttura HTML Brocardi.
 
+        Supporta tutte le autorità giudiziarie italiane:
+        - Corte Costituzionale (Corte cost., C. cost.)
+        - Corte di Cassazione (Cass. civ., Cass. pen., Cass. lav., Cass. sez. un.)
+        - Consiglio di Stato (Cons. St., Cons. Stato)
+        - TAR (TAR Lazio, TAR Lombardia, etc.)
+        - Corte dei Conti (Corte conti, C. conti)
+        - Corte d'Appello (App., C. App.)
+        - Tribunale (Trib.)
+        - CGUE (Corte giust. UE)
+        - CEDU (Corte EDU)
+
         HTML structure:
         <div class="sentenza corpoDelTesto">
-            <p><strong>Cass. civ. n. 36918/2021</strong></p>
+            <p><strong>Corte cost. n. 123/2021</strong></p>
             <p>Testo della massima...</p>
         </div>
 
@@ -98,36 +144,54 @@ class BrocardiScraper(BaseScraper):
             if header:
                 header_text = header.get_text(strip=True)
 
-                # Parse "Cass. civ. n. 36918/2021" or "Cass. pen. n. 1234/2020"
-                # Pattern: (Autorita) n. (Numero)/(Anno)
+                # Pattern generico: (Autorita) n. (Numero)/(Anno)
+                # Supporta tutte le autorità definite in AUTORITA_GIUDIZIARIE
                 match = re.match(
-                    r'^(Cass\.\s*(?:civ|pen|lav|sez\.\s*un)?\.?)\s*n\.\s*(\d+)/(\d{4})',
+                    rf'^({AUTORITA_PATTERN})\s*n\.\s*(\d+)/(\d{{4}})',
                     header_text,
                     re.IGNORECASE
                 )
                 if match:
-                    result['autorita'] = match.group(1).strip()
-                    result['numero'] = match.group(2)
-                    result['anno'] = match.group(3)
+                    # Trova il primo gruppo non-None (l'autorità matchata)
+                    groups = match.groups()
+                    # I primi N gruppi sono le autorità, poi numero e anno
+                    num_autorita = len(AUTORITA_GIUDIZIARIE)
+                    for i in range(num_autorita):
+                        if groups[i]:
+                            result['autorita'] = groups[i].strip()
+                            break
+                    # Numero e anno sono gli ultimi due gruppi
+                    result['numero'] = groups[-2]
+                    result['anno'] = groups[-1]
                 else:
                     # Fallback: try to extract any number/year pattern
                     num_match = re.search(r'n\.\s*(\d+)/(\d{4})', header_text)
                     if num_match:
                         result['numero'] = num_match.group(1)
                         result['anno'] = num_match.group(2)
-                    # Extract autorita from beginning
-                    auth_match = re.match(r'^(Cass[^\d]*)', header_text)
+
+                    # Extract autorita from beginning usando pattern generico
+                    auth_match = re.match(rf'^({AUTORITA_PATTERN})', header_text, re.IGNORECASE)
                     if auth_match:
-                        result['autorita'] = auth_match.group(1).strip().rstrip('.')
+                        # Trova il primo gruppo non-None
+                        for g in auth_match.groups():
+                            if g:
+                                result['autorita'] = g.strip().rstrip('.')
+                                break
+                    elif not result['autorita']:
+                        # Ultimo fallback: prendi tutto prima di "n."
+                        fallback_match = re.match(r'^([^n]+?)(?:\s*n\.|\s*$)', header_text)
+                        if fallback_match:
+                            result['autorita'] = fallback_match.group(1).strip().rstrip('.')
 
             # Get full text (excluding the header)
             full_text = self._clean_text(sentenza_div.get_text())
 
             # Remove the header part from the text to get just the massima
             if result['numero'] and result['anno']:
-                # Pattern to remove: "Cass. civ. n. 36918/2021"
-                pattern = rf'Cass[^n]*n\.\s*{result["numero"]}/{result["anno"]}\s*'
-                massima_text = re.sub(pattern, '', full_text, count=1).strip()
+                # Pattern generico per rimuovere l'header
+                pattern = rf'(?:{AUTORITA_PATTERN})[^n]*n\.\s*{result["numero"]}/{result["anno"]}\s*'
+                massima_text = re.sub(pattern, '', full_text, count=1, flags=re.IGNORECASE).strip()
                 result['massima'] = massima_text if massima_text else full_text
             else:
                 result['massima'] = full_text
@@ -467,6 +531,23 @@ class BrocardiScraper(BaseScraper):
                         log.debug(f"Extracted {len(info['Massime'])} massime")
             except Exception as e:
                 log.warning(f"Error extracting Massime section: {e}")
+
+            # Estrazione Relazione al Progetto della Costituzione (direttamente nell'HTML)
+            # Usato per la Costituzione - diverso dalle Relazioni del Guardasigilli (AJAX)
+            try:
+                relazione_cost_header = corpo.find('h3', string=lambda text: text and "Relazione al Progetto della Costituzione" in text)
+                if relazione_cost_header:
+                    relazione_content = relazione_cost_header.find_next_sibling('div', class_='text')
+                    if relazione_content:
+                        info['RelazioneCostituzione'] = {
+                            'titolo': 'Relazione al Progetto della Costituzione',
+                            'autore': 'Meuccio Ruini',
+                            'anno': 1947,
+                            'testo': self._clean_text(relazione_content.get_text())
+                        }
+                        log.info("Extracted Relazione al Progetto della Costituzione")
+            except Exception as e:
+                log.warning(f"Error extracting Relazione Costituzione: {e}")
                 
         except Exception as e:
             log.error(f"Unexpected error in _extract_sections: {e}")

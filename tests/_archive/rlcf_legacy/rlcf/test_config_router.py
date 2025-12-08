@@ -18,8 +18,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
-from merlt.rlcf_framework.main import app
-from merlt.rlcf_framework.config_manager import ConfigManager
+from merlt.rlcf.main import app
+from merlt.rlcf.config_manager import ConfigManager
 
 
 # Test client fixture

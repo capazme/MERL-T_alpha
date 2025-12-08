@@ -14,7 +14,7 @@ import pytest
 import os
 from typing import List
 
-from merlt.orchestration.services.embedding_service import EmbeddingService
+from merlt.storage.vectors.embeddings import EmbeddingService
 
 
 # ============================================================================

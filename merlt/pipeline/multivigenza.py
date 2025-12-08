@@ -75,6 +75,50 @@ TIPO_ATTO_MAPPING = {
     "direttiva ue": "direttiva ue",
 }
 
+# Mapping tipo atto -> autorità emanante
+AUTORITA_EMANANTE_MAPPING = {
+    "legge": "Parlamento",
+    "legge costituzionale": "Parlamento",
+    "decreto-legge": "Governo",
+    "decreto legislativo": "Governo",
+    "decreto del presidente della repubblica": "Presidente della Repubblica",
+    "decreto ministeriale": "Ministero",
+    "regolamento": "Governo",
+    "direttiva": "Unione Europea",
+    "regolamento ue": "Unione Europea",
+    "direttiva ue": "Unione Europea",
+    "costituzione": "Assemblea Costituente",
+    "regio decreto": "Re d'Italia",
+}
+
+
+def _build_normattiva_url(urn: str) -> str:
+    """
+    Costruisce URL Normattiva da URN.
+
+    Args:
+        urn: URN nel formato urn:nir:...
+
+    Returns:
+        URL completo per Normattiva
+    """
+    return f"https://www.normattiva.it/uri-res/N2Ls?{urn}"
+
+
+def _derive_autorita_emanante(tipo_documento: str) -> str:
+    """
+    Deriva autorità emanante dal tipo documento.
+
+    Args:
+        tipo_documento: Tipo di atto normativo
+
+    Returns:
+        Autorità emanante (default: "Stato")
+    """
+    if not tipo_documento:
+        return "Stato"
+    return AUTORITA_EMANANTE_MAPPING.get(tipo_documento.lower(), "Stato")
+
 
 def parse_estremi(estremi: str) -> Dict[str, Optional[str]]:
     """
@@ -264,45 +308,59 @@ Atto: {estremi_atto}
 
 Gerarchia: Articolo -> Comma -> Lettera -> Numero
 
-Rispondi SOLO con un JSON valido nel seguente formato:
-{{
-    "numero_articolo": "12" o "12-bis" o null,
-    "commi": ["1", "3", "4"] o [],
-    "lettere": ["a", "b"] o [],
-    "numeri": ["1", "2"] o []
-}}
+Esempi:
+- "art. 117, comma 2, lettera b)" -> numero_articolo="117", commi=["2"], lettere=["b"]
+- "articolo 5-bis, commi 1 e 3" -> numero_articolo="5-bis", commi=["1", "3"]
+- "l'articolo 48, primo comma" -> numero_articolo="48", commi=["1"]"""
 
-Se non riesci a identificare una componente, usa null o lista vuota."""
+    # JSON Schema per structured output
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "numero_articolo": {
+                "type": ["string", "null"],
+                "description": "Numero articolo (es. '12', '12-bis') o null"
+            },
+            "commi": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Lista dei commi (es. ['1', '3'])"
+            },
+            "lettere": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Lista delle lettere (es. ['a', 'b'])"
+            },
+            "numeri": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Lista dei numeri (es. ['1', '2'])"
+            }
+        },
+        "required": ["numero_articolo", "commi", "lettere", "numeri"],
+        "additionalProperties": False
+    }
 
     try:
         import os
-        from dataclasses import dataclass
+        model = os.getenv("LLM_PARSING_MODEL", "mistralai/mistral-7b-instruct")
 
-        @dataclass
-        class TempConfig:
-            name: str = "gemini-2.0-flash"
-            api_key: str = os.environ.get("OPENROUTER_API_KEY", "")
-            temperature: float = 0.0
-            max_tokens: int = 200
-
-        response = await llm_service.generate_response(
-            config=TempConfig(),
-            system_prompt="Sei un parser di testi normativi italiani. Rispondi solo con JSON valido.",
-            user_prompt=prompt,
+        # Usa generate_json_completion con structured output
+        parsed = await llm_service.generate_json_completion(
+            prompt=prompt,
+            json_schema=json_schema,
+            system_prompt="Sei un parser di testi normativi italiani. Converti ordinali in numeri (primo=1, secondo=2).",
+            model=model,
+            temperature=0.0,
+            max_tokens=200,
         )
 
-        # Parse JSON response
-        import json
-        # Cerca JSON nella risposta
-        json_match = re.search(r'\{[^}]+\}', response, re.DOTALL)
-        if json_match:
-            parsed = json.loads(json_match.group())
-            return {
-                "numero_articolo": parsed.get("numero_articolo"),
-                "commi": parsed.get("commi", []),
-                "lettere": parsed.get("lettere", []),
-                "numeri": parsed.get("numeri", []),
-            }
+        return {
+            "numero_articolo": parsed.get("numero_articolo"),
+            "commi": parsed.get("commi", []),
+            "lettere": parsed.get("lettere", []),
+            "numeri": parsed.get("numeri", []),
+        }
 
     except Exception as e:
         logger.warning(f"LLM parsing failed: {e}, using regex result")
@@ -611,27 +669,38 @@ class MultivigenzaPipeline:
         # ========================================
         # 1. Create/merge ATTO MODIFICANTE (livello documento)
         # ========================================
+        tipo_doc = parsed_estremi["tipo_documento"] or "atto normativo"
+        autorita = _derive_autorita_emanante(tipo_doc)
+        atto_url = _build_normattiva_url(atto_urn)
+
         await self.falkordb.query(
             """
             MERGE (atto:Norma {URN: $urn})
             ON CREATE SET
                 atto.node_id = $urn,
+                atto.url = $url,
                 atto.estremi = $estremi,
                 atto.tipo_documento = $tipo_documento,
                 atto.titolo = $titolo,
                 atto.stato = 'vigente',
+                atto.vigenza = 'vigente',
                 atto.efficacia = 'permanente',
                 atto.data_pubblicazione = $data_gu,
+                atto.data_entrata_vigore = $data_gu,
+                atto.autorita_emanante = $autorita,
                 atto.ambito_territoriale = 'nazionale',
                 atto.fonte = 'Normattiva',
-                atto.created_at = $timestamp
+                atto.created_at = $timestamp,
+                atto.updated_at = $timestamp
             """,
             {
                 "urn": atto_urn,
+                "url": atto_url,
                 "estremi": modifica.atto_modificante_estremi,
-                "tipo_documento": parsed_estremi["tipo_documento"] or "atto normativo",
+                "tipo_documento": tipo_doc,
                 "titolo": parsed_estremi["titolo"] or modifica.atto_modificante_estremi,
                 "data_gu": modifica.data_pubblicazione_gu,
+                "autorita": autorita,
                 "timestamp": self._timestamp,
             }
         )
@@ -650,6 +719,7 @@ class MultivigenzaPipeline:
             art_num = parsed_disp["numero_articolo"]
             art_num_normalized = art_num.replace("-", "")
             articolo_urn = f"{atto_urn}~art{art_num_normalized}"
+            articolo_url = _build_normattiva_url(articolo_urn)
 
             # Costruisci estremi articolo
             articolo_estremi = f"Art. {art_num} {modifica.atto_modificante_estremi}"
@@ -659,17 +729,26 @@ class MultivigenzaPipeline:
                 MERGE (art:Norma {URN: $urn})
                 ON CREATE SET
                     art.node_id = $urn,
+                    art.url = $url,
                     art.tipo_documento = 'articolo',
                     art.numero_articolo = $numero,
                     art.estremi = $estremi,
                     art.stato = 'vigente',
+                    art.vigenza = 'vigente',
+                    art.autorita_emanante = $autorita,
+                    art.data_pubblicazione = $data_gu,
+                    art.data_entrata_vigore = $data_gu,
                     art.fonte = 'Normattiva',
-                    art.created_at = $timestamp
+                    art.created_at = $timestamp,
+                    art.updated_at = $timestamp
                 """,
                 {
                     "urn": articolo_urn,
+                    "url": articolo_url,
                     "numero": art_num,
                     "estremi": articolo_estremi,
+                    "autorita": autorita,
+                    "data_gu": modifica.data_pubblicazione_gu,
                     "timestamp": self._timestamp,
                 }
             )

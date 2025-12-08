@@ -12,9 +12,9 @@ from unittest.mock import MagicMock, AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from merlt.rlcf_framework import models
-from merlt.rlcf_framework.config import ModelConfig, TaskConfig
-from merlt.rlcf_framework.database import Base
+from merlt.rlcf import models
+from merlt.rlcf.config import ModelConfig, TaskConfig
+from merlt.rlcf.database import Base
 
 
 @pytest.fixture(scope="session")

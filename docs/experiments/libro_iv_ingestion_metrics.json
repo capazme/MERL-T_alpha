@@ -1,0 +1,33 @@
+{
+  "experiment": "Libro IV CC Ingestion",
+  "description": "Ingestion Libro IV Codice Civile con LegalKnowledgeGraph API",
+  "config": {
+    "graph": "merl_t_libro_iv",
+    "limit": 100,
+    "skip_brocardi": true
+  },
+  "metrics": {
+    "timing": {
+      "start": "2025-12-07T21:35:07.359830",
+      "end": "2025-12-07T21:43:08.259171",
+      "duration_seconds": 480.7737720012665
+    },
+    "articles": {
+      "total": 100,
+      "processed": 100,
+      "failed": 0,
+      "success_rate": "100.0%"
+    },
+    "enrichment": {
+      "brocardi_enriched": 0,
+      "nodes_created": 200,
+      "chunks_created": 295
+    },
+    "errors": []
+  },
+  "validation": {
+    "total_nodes": 103,
+    "article_nodes": 100,
+    "contiene_relations": 201
+  }
+}

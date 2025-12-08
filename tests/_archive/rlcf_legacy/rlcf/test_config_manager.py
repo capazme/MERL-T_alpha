@@ -19,8 +19,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch, PropertyMock
 from watchdog.events import FileModifiedEvent
 
-from merlt.rlcf_framework.config_manager import ConfigManager, ConfigFileHandler
-from merlt.rlcf_framework.config import ModelConfig, TaskConfig
+from merlt.rlcf.config_manager import ConfigManager, ConfigFileHandler
+from merlt.rlcf.config import ModelConfig, TaskConfig
 
 
 class TestConfigManagerSingleton:

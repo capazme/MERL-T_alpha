@@ -272,6 +272,11 @@ NORMATTIVA = {
         "l": "legge",
         "l.": "legge",
         "legge": "legge",
+        # Legge costituzionale - formato URN Normattiva usa il punto
+        "legge costituzionale": "legge.costituzionale",
+        "leggecostituzionale": "legge.costituzionale",
+        "l.cost.": "legge.costituzionale",
+        "l. cost.": "legge.costituzionale",
         "c.c.": "codice civile",
         "c.p.": "codice penale",
         "c.p.c": "codice di procedura civile",

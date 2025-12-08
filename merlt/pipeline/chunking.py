@@ -128,11 +128,20 @@ class StructuralChunker:
     """
 
     # Patterns to extract structural info from Brocardi position
-    # Example: "Libro IV - Delle obbligazioni, Titolo II - Dei contratti in generale, Capo XIV - ..."
-    LIBRO_PATTERN = re.compile(r'Libro\s+([IVX]+)', re.IGNORECASE)
-    TITOLO_PATTERN = re.compile(r'Titolo\s+([IVX]+)', re.IGNORECASE)
-    CAPO_PATTERN = re.compile(r'Capo\s+([IVX]+)', re.IGNORECASE)
-    SEZIONE_PATTERN = re.compile(r'Sezione\s+([IVX]+)', re.IGNORECASE)
+    # Codici: "Libro IV - Delle obbligazioni, Titolo II - Dei contratti in generale, Capo XIV - ..."
+    # Codice Penale: "Libro primo - Dei reati..." (usa parole invece di romani)
+    # Costituzione: "Parte II - Ordinamento della repubblica, Titolo V - Le regioni..."
+    # Principi fondamentali: nessuna Parte/Titolo (Art. 1-12)
+    #
+    # Pattern supporta sia numeri romani (I, II, IV, XIV) che parole ordinali italiane (primo...cinquantesimo)
+    # Importa il pattern completo da ordinals.py
+    from merlt.sources.utils.ordinals import ROMAN_OR_ORDINAL_PATTERN
+    _ROMAN_OR_ORDINAL = f'({ROMAN_OR_ORDINAL_PATTERN})'
+    LIBRO_PATTERN = re.compile(rf'Libro\s+{_ROMAN_OR_ORDINAL}', re.IGNORECASE)
+    PARTE_PATTERN = re.compile(rf'Parte\s+{_ROMAN_OR_ORDINAL}', re.IGNORECASE)  # Costituzione usa "Parte" invece di "Libro"
+    TITOLO_PATTERN = re.compile(rf'Titolo\s+{_ROMAN_OR_ORDINAL}', re.IGNORECASE)
+    CAPO_PATTERN = re.compile(rf'Capo\s+{_ROMAN_OR_ORDINAL}', re.IGNORECASE)
+    SEZIONE_PATTERN = re.compile(rf'Sezione\s+{_ROMAN_OR_ORDINAL}', re.IGNORECASE)
 
     def __init__(self):
         """Initialize the chunker."""
@@ -227,23 +236,33 @@ class StructuralChunker:
         """
         Parse Brocardi position string to extract structural identifiers.
 
+        Supporta sia Codici (Libro) che Costituzione (Parte).
+
         Args:
-            position: Brocardi position string (e.g., "Libro IV - ..., Titolo II - ...")
+            position: Brocardi position string
+                - Codici: "Libro IV - Delle obbligazioni, Titolo II - ..."
+                - Costituzione: "Parte II - Ordinamento..., Titolo V - Le regioni..."
 
         Returns:
-            Tuple of (libro, titolo, capo, sezione) - each may be None
+            Tuple of (libro_o_parte, titolo, capo, sezione) - each may be None
+            Il primo elemento e' "Libro" per i Codici o "Parte" per la Costituzione.
         """
         if not position:
             return None, None, None, None
 
         # Extract each component separately for robustness
+        # Libro (Codici) o Parte (Costituzione) - sono equivalenti nella gerarchia
         libro_match = self.LIBRO_PATTERN.search(position)
+        parte_match = self.PARTE_PATTERN.search(position)
         titolo_match = self.TITOLO_PATTERN.search(position)
         capo_match = self.CAPO_PATTERN.search(position)
         sezione_match = self.SEZIONE_PATTERN.search(position)
 
+        # Usa Libro se presente, altrimenti Parte (sono mutuamente esclusivi)
+        libro_o_parte = libro_match.group(1) if libro_match else (parte_match.group(1) if parte_match else None)
+
         return (
-            libro_match.group(1) if libro_match else None,
+            libro_o_parte,
             titolo_match.group(1) if titolo_match else None,
             capo_match.group(1) if capo_match else None,
             sezione_match.group(1) if sezione_match else None,

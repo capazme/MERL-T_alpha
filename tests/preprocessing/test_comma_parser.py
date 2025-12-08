@@ -11,6 +11,7 @@ from merlt.pipeline.parsing import (
     CommaParser,
     ArticleStructure,
     Comma,
+    Lettera,
     parse_article,
     count_tokens,
 )
@@ -366,3 +367,197 @@ Alla parte inadempiente l'altra può intimare..."""
 
         assert result1.numero_articolo == "1453"
         assert result2.numero_articolo == "1454"
+
+
+class TestLettera:
+    """Test Lettera dataclass."""
+
+    def test_auto_token_count(self):
+        lettera = Lettera(lettera="a", testo="Testo della lettera a")
+        assert lettera.token_count > 0
+
+    def test_explicit_token_count(self):
+        lettera = Lettera(lettera="b", testo="Test", token_count=50)
+        assert lettera.token_count == 50
+
+    def test_empty_text(self):
+        lettera = Lettera(lettera="c", testo="")
+        assert lettera.token_count == 0
+
+
+class TestLetteraExtraction:
+    """Test lettere extraction from commas."""
+
+    def test_extract_lettere_from_art_117(self):
+        """Test lettere extraction from Art. 117 Costituzione."""
+        parser = CommaParser()
+        text = """Art. 117
+
+La potestà legislativa è esercitata dallo Stato e dalle Regioni.
+
+Lo Stato ha legislazione esclusiva nelle seguenti materie:
+a) politica estera e rapporti internazionali dello Stato;
+b) immigrazione;
+c) rapporti tra la Repubblica e le confessioni religiose;
+d) difesa e Forze armate; sicurezza dello Stato;
+e) moneta, tutela del risparmio e mercati finanziari."""
+
+        result = parser.parse(text)
+
+        # Dovremmo avere 2 commi: primo senza lettere, secondo con lettere
+        assert len(result.commas) == 2
+
+        # Primo comma senza lettere
+        assert len(result.commas[0].lettere) == 0
+
+        # Secondo comma con 5 lettere
+        assert len(result.commas[1].lettere) == 5
+        assert result.commas[1].lettere[0].lettera == "a"
+        assert result.commas[1].lettere[1].lettera == "b"
+        assert result.commas[1].lettere[4].lettera == "e"
+
+    def test_extract_lettere_with_bis_suffix(self):
+        """Test lettere con suffisso bis/ter."""
+        parser = CommaParser()
+        content = """Testo introduttivo:
+a) prima lettera;
+a-bis) lettera aggiunta;
+b) seconda lettera."""
+
+        lettere = parser._extract_lettere(content)
+
+        assert len(lettere) == 3
+        assert lettere[0].lettera == "a"
+        assert lettere[1].lettera == "a-bis"
+        assert lettere[2].lettera == "b"
+
+    def test_no_lettere_single_match(self):
+        """Test che una singola lettera non viene estratta (falso positivo)."""
+        parser = CommaParser()
+        # "a" nel testo non dovrebbe essere estratta come lettera
+        content = "Il contratto a prestazioni corrispettive si risolve..."
+
+        lettere = parser._extract_lettere(content)
+
+        assert len(lettere) == 0
+
+    def test_no_lettere_in_normal_text(self):
+        """Test che testo normale senza lettere ritorna lista vuota."""
+        parser = CommaParser()
+        content = "Nei contratti con prestazioni corrispettive, quando uno dei contraenti non adempie le sue obbligazioni."
+
+        lettere = parser._extract_lettere(content)
+
+        assert len(lettere) == 0
+
+    def test_lettere_with_period_delimiter(self):
+        """Test lettere con delimitatore punto invece di parentesi."""
+        parser = CommaParser()
+        content = """Elenco:
+a. prima voce;
+b. seconda voce;
+c. terza voce."""
+
+        lettere = parser._extract_lettere(content)
+
+        assert len(lettere) == 3
+        assert lettere[0].lettera == "a"
+        assert lettere[1].lettera == "b"
+        assert lettere[2].lettera == "c"
+
+    def test_comma_has_lettere_field(self):
+        """Test che Comma ha il campo lettere."""
+        comma = Comma(numero=1, testo="Test")
+        assert hasattr(comma, 'lettere')
+        assert isinstance(comma.lettere, list)
+        assert len(comma.lettere) == 0  # Default empty
+
+    def test_comma_with_lettere(self):
+        """Test Comma con lettere esplicite."""
+        lettere = [
+            Lettera(lettera="a", testo="Prima"),
+            Lettera(lettera="b", testo="Seconda"),
+        ]
+        comma = Comma(numero=1, testo="Test", lettere=lettere)
+
+        assert len(comma.lettere) == 2
+        assert comma.lettere[0].lettera == "a"
+        assert comma.lettere[1].lettera == "b"
+
+
+class TestFullArticleWithLettere:
+    """Test full article parsing with lettere."""
+
+    def test_art_117_costituzione(self):
+        """Test completo Art. 117 Costituzione con commi e lettere."""
+        parser = CommaParser()
+        text = """Art. 117
+
+La potestà legislativa è esercitata dallo Stato e dalle Regioni nel rispetto della Costituzione, nonché dei vincoli derivanti dall'ordinamento comunitario e dagli obblighi internazionali.
+
+Lo Stato ha legislazione esclusiva nelle seguenti materie:
+a) politica estera e rapporti internazionali dello Stato; rapporti dello Stato con l'Unione europea;
+b) immigrazione;
+c) rapporti tra la Repubblica e le confessioni religiose;
+d) difesa e Forze armate; sicurezza dello Stato;
+e) moneta, tutela del risparmio e mercati finanziari;
+
+Sono materie di legislazione concorrente quelle relative a: rapporti internazionali."""
+
+        result = parser.parse(text)
+
+        # Articolo numero corretto
+        assert result.numero_articolo == "117"
+
+        # 3 commi
+        assert len(result.commas) == 3
+
+        # Comma 1: senza lettere
+        assert len(result.commas[0].lettere) == 0
+        assert "potestà legislativa" in result.commas[0].testo
+
+        # Comma 2: con 5 lettere
+        assert len(result.commas[1].lettere) == 5
+        assert "legislazione esclusiva" in result.commas[1].testo
+
+        # Comma 3: senza lettere
+        assert len(result.commas[2].lettere) == 0
+        assert "legislazione concorrente" in result.commas[2].testo
+
+    def test_art_119_costituzione(self):
+        """Test Art. 119 Costituzione (finanza regionale) - altro esempio con lettere."""
+        parser = CommaParser()
+        text = """Art. 119
+
+I Comuni, le Province, le Città metropolitane e le Regioni hanno autonomia finanziaria di entrata e di spesa.
+
+I Comuni, le Province, le Città metropolitane e le Regioni hanno risorse autonome.
+
+La legge dello Stato istituisce un fondo perequativo, senza vincoli di destinazione, per i territori con minore capacità fiscale per abitante.
+
+Le risorse derivanti dalle fonti di cui ai commi precedenti consentono ai Comuni, alle Province, alle Città metropolitane e alle Regioni di finanziare integralmente le funzioni pubbliche loro attribuite."""
+
+        result = parser.parse(text)
+
+        # 4 commi, nessuno con lettere
+        assert len(result.commas) == 4
+        for comma in result.commas:
+            assert len(comma.lettere) == 0
+
+    def test_codice_civile_art_2054(self):
+        """Test Art. 2054 c.c. (circolazione veicoli) - articolo con lettere nel CC."""
+        parser = CommaParser()
+        text = """Art. 2054
+Circolazione di veicoli
+
+Il conducente di un veicolo senza guida di rotaie è obbligato a risarcire il danno prodotto a persone o a cose dalla circolazione del veicolo.
+
+Il proprietario del veicolo, o in sua vece l'usufruttuario o l'acquirente con patto di riservato dominio, è responsabile in solido col conducente."""
+
+        result = parser.parse(text)
+
+        assert result.numero_articolo == "2054"
+        assert "Circolazione" in result.rubrica
+        # Nessuna lettera in questo articolo
+        for comma in result.commas:
+            assert len(comma.lettere) == 0

@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
 """
-EXP-008: Ingestion Costituzione Italiana Completa
+EXP-009: Full Ingestion Costituzione Italiana con Comma/Lettera
 
-Ingestion end-to-end della Costituzione Italiana (139 articoli) con:
-- Graph: Nodi articolo + relazioni gerarchiche (FalkorDB)
-- Embeddings: Vettori semantici (Qdrant)
-- Bridge Table: Mapping chunk <-> nodo (PostgreSQL)
-- Multivigenza: Tracking modifiche costituzionali
+Ingestion end-to-end della Costituzione Italiana (139 articoli) con struttura completa:
+
+Componenti creati:
+- **FalkorDB Graph**:
+  - Norma (codice, parte, titolo, articolo)
+  - Comma (paragrafi numerati)
+  - Lettera (sub-paragrafi: a), b), c)...)
+  - Dottrina (ratio, spiegazione da Brocardi)
+  - AttoGiudiziario (massime giurisprudenziali)
+  - Relazioni: contiene, commenta, interpreta, modifica
+
+- **Qdrant Vectors**: Embeddings semantici per ricerca
+
+- **PostgreSQL Bridge Table**: Mapping chunk <-> nodo grafo
+
+- **Multivigenza**: Tracking modifiche costituzionali
 
 Usa LegalKnowledgeGraph come entry point unificato.
 
@@ -24,6 +35,9 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+
+from dotenv import load_dotenv
+load_dotenv()  # Carica variabili da .env (inclusa OPENROUTER_API_KEY)
 
 from merlt import LegalKnowledgeGraph, MerltConfig
 from merlt.core.legal_knowledge_graph import UnifiedIngestionResult
@@ -147,18 +161,29 @@ async def ingest_costituzione(
         total_articles=end_article - start_article + 1,
     )
 
-    # Configura LegalKnowledgeGraph per ambiente test
+    # Configura LegalKnowledgeGraph per ambiente dev
     config = MerltConfig(
-        graph_name="merl_t_test",
-        qdrant_collection="merl_t_test_chunks",
+        # FalkorDB (porta 6380 per FalkorDB container, 6379 per Redis standard)
+        falkordb_host="localhost",
+        falkordb_port=6380,  # FalkorDB container maps 6380 -> internal 6379
+        graph_name="merl_t_dev",
+        # Qdrant
+        qdrant_host="localhost",
+        qdrant_port=6333,
+        qdrant_collection="merl_t_dev_chunks",
+        # PostgreSQL
+        postgres_host="localhost",
+        postgres_port=5432,
         postgres_database="rlcf_dev",
+        postgres_user="dev",
+        postgres_password="devpassword",
     )
 
     kg = LegalKnowledgeGraph(config)
 
     try:
         print("=" * 60)
-        print("EXP-008: Ingestion Costituzione Italiana Completa")
+        print("EXP-009: Full Ingestion Costituzione con Comma/Lettera")
         print("=" * 60)
         print(f"Articoli: {start_article} - {end_article}")
         print(f"Dry run: {dry_run}")
@@ -267,7 +292,7 @@ async def main():
     )
     parser.add_argument(
         "--output", type=str,
-        default="docs/experiments/costituzione_ingestion_metrics.json",
+        default="docs/experiments/EXP-009_costituzione_full_metrics.json",
         help="Path output metriche JSON"
     )
 
