@@ -87,6 +87,9 @@ config_backups/
 docs/_build/
 site/
 
+# Archive
+_archive/
+
 # Jupyter Notebooks
 .ipynb_checkpoints/
 *.ipynb_checkpoints

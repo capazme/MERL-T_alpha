@@ -260,3 +260,4 @@ python -c "from merlt import LegalKnowledgeGraph; print('OK')"
 - quando viene aggiunta una feature o un fix, aggiungilo ai test per evitare regression
 - esternalizziamo sempre i modelli nell'env in modo da poter usare sempre il migliore per il caso d'uso specifico
 - **CONVENZIONE DATABASE**: ogni database deve avere versione `_dev` e `_prod`. FalkorDB usa `merl_t_dev` per sviluppo e `merl_t_prod` per produzione. Stessa logica per Redis e altri storage.
+- esternalizziamo sempre i prompt e i parametri di ogni elemento della pipeline in file yaml di config
