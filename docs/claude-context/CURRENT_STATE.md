@@ -10,103 +10,134 @@
 | Campo | Valore |
 |-------|--------|
 | **Data ultimo aggiornamento** | 20 Dicembre 2025 |
-| **Fase progetto** | **Expert/Tools Implementation** - Preparazione architettura |
-| **Prossimo obiettivo** | Weight System Foundation + Tool Framework |
+| **Fase progetto** | **Expert System Integration** - kg.interpret() implementato |
+| **Prossimo obiettivo** | Esecuzione esperimenti con API key, documentazione finale |
 | **Blocchi attivi** | Nessuno |
 
 ---
 
 ## Cosa Abbiamo Fatto (Sessione Corrente - 20 Dic 2025)
 
-### Riallineamento Documentazione - COMPLETATO ✅
+### Expert System - COMPLETATO
 
-- Aggiornato INDEX.md esperimenti con EXP-013, 014, 015, 016
-- Convertito EXP-008/009 in cartelle standard
-- Spostati planning docs in claude-context/PLANNING/
-- Corrette statistiche (18 esperimenti, 15 completati)
-- Rinumerati esperimenti pianificati (EXP-017, EXP-018)
+Implementazione completa del sistema multi-expert basato sui canoni ermeneutici delle Preleggi (artt. 12-14):
 
-### Weight System - COMPLETATO ✅
+#### 4 Expert Specializzati
 
-Implementato modulo `merlt/weights/`:
-- **WeightStore**: Persistenza pesi con fallback YAML, caching, versioning
-- **WeightLearner**: Aggiornamento pesi via RLCF feedback loop
-- **ExperimentTracker**: A/B testing con assegnazione deterministica
-
-**File creati:**
-| File | Descrizione |
-|------|-------------|
-| `merlt/weights/config.py` | Pydantic models (WeightConfig, LearnableWeight, etc.) |
-| `merlt/weights/store.py` | WeightStore con fallback YAML |
-| `merlt/weights/learner.py` | WeightLearner per RLCF feedback |
-| `merlt/weights/experiment.py` | ExperimentTracker per A/B testing |
-| `merlt/weights/config/weights.yaml` | Config unificata (4 Expert + RLCF + Gating) |
-| `tests/weights/*.py` | 50 test per il modulo |
-
-### Piano Expert/Tools In Corso
-
-Prossimi step:
-- STEP 3: Tool Framework Base (BaseTool, ToolRegistry)
-- STEP 4: SemanticSearchTool
-- STEP 5: LiteralExpert completo
-
----
-
-## Cosa Abbiamo Fatto (Sessioni Precedenti - 15 Dic 2025)
-
-### EXP-014: Full Ingestion Libro IV - COMPLETATO ✅
-
-Ingestion completa del Libro IV del Codice Civile (887 articoli) con ottimizzazioni.
-
-#### Risultati Chiave
-
-| Metrica | Valore | Note |
-|---------|--------|------|
-| Articoli processati | 887/887 | 100% copertura |
-| Nodi grafo totali | 27,740 | +103% vs baseline |
-| Relazioni totali | 43,935 | +1137% vs baseline |
-| Embeddings multi-source | 5,926 | norma+spiegazione+ratio+massime |
-| Entità estratte | 3,049 | +2,233 merge |
-| Durata totale | 2h 43m | 7.2s/articolo backbone |
-
-#### Distribuzione Nodi
-
-```
-AttoGiudiziario:    9,917   (giurisprudenza)
-Dottrina:           2,609   (chunk enrichment)
-ConcettoGiuridico:  2,571   (entità estratte)
-Comma:              1,798   (struttura normativa)
-ModalitaGiuridica:  1,610   (entità estratte)
-Norma:              1,538   (articoli + gerarchie)
-+ altri 16 tipi di entità...
-─────────────────────────────
-TOTALE:            27,740
-```
-
-#### Nuova Feature: BatchIngestionPipeline
-
-Implementata ottimizzazione per parallelizzazione:
-
-| Aspetto | Prima | Dopo | Speedup |
-|---------|-------|------|---------|
-| HTTP Fetches | Sequenziali | 8 paralleli | ~5x |
-| Embeddings | 1 per volta | Batch 32 | ~10x |
-| Singolo articolo | ~15-20s | 7.2s | **2-3x** |
+| Expert | Canone | Focus |
+|--------|--------|-------|
+| **LiteralExpert** | Art. 12, I | "significato proprio delle parole" |
+| **SystemicExpert** | Art. 12, I + Art. 14 | "connessione di esse" + storico |
+| **PrinciplesExpert** | Art. 12, II | "intenzione del legislatore" |
+| **PrecedentExpert** | Prassi | Giurisprudenza applicativa |
 
 #### File Creati
 
 | File | Descrizione |
 |------|-------------|
-| `merlt/pipeline/batch_ingestion.py` | BatchIngestionPipeline |
-| `tests/pipeline/test_batch_ingestion.py` | 16 test validazione |
+| `merlt/experts/base.py` | BaseExpert, ExpertContext, ExpertResponse |
+| `merlt/experts/literal.py` | LiteralExpert |
+| `merlt/experts/systemic.py` | SystemicExpert |
+| `merlt/experts/principles.py` | PrinciplesExpert |
+| `merlt/experts/precedent.py` | PrecedentExpert |
+| `merlt/experts/router.py` | ExpertRouter per query classification |
+| `merlt/experts/gating.py` | GatingNetwork per aggregazione risposte |
+| `merlt/experts/orchestrator.py` | MultiExpertOrchestrator |
+| `merlt/experts/config/experts.yaml` | Config Expert (weights, prompts) |
 
-#### File Modificati
+### Tool System - COMPLETATO
 
-| File | Modifica |
-|------|----------|
-| `merlt/core/legal_knowledge_graph.py` | Aggiunto `ingest_batch()` |
-| `merlt/pipeline/ingestion.py` | Fix chunk_text in BridgeMapping |
-| `scripts/exp014_full_ingestion.py` | Supporto `--batch-size`, `--max-concurrent` |
+| File | Descrizione |
+|------|-------------|
+| `merlt/tools/base.py` | BaseTool, ToolResult, ToolChain |
+| `merlt/tools/registry.py` | ToolRegistry, get_tool_registry() |
+| `merlt/tools/search.py` | SemanticSearchTool, GraphSearchTool |
+
+### kg.interpret() - COMPLETATO
+
+Nuovo metodo in `LegalKnowledgeGraph` per interpretazione multi-expert:
+
+```python
+from merlt import LegalKnowledgeGraph, InterpretationResult
+
+kg = LegalKnowledgeGraph()
+await kg.connect()
+
+# Interpretazione multi-expert
+result = await kg.interpret("Cos'è la legittima difesa?")
+print(result.synthesis)
+print(f"Confidence: {result.confidence}")
+print(f"Experts: {list(result.expert_contributions.keys())}")
+```
+
+#### InterpretationResult Fields
+
+```python
+@dataclass
+class InterpretationResult:
+    query: str
+    synthesis: str
+    expert_contributions: Dict[str, Dict[str, Any]]
+    combined_legal_basis: List[Dict[str, Any]]
+    confidence: float
+    routing_decision: Optional[Dict[str, Any]]
+    aggregation_method: str
+    execution_time_ms: float
+    trace_id: str
+    errors: List[str]
+```
+
+### Esperimenti - CREATI
+
+| Esperimento | Descrizione | Stato |
+|-------------|-------------|-------|
+| **EXP-018** | Expert Comparison (50 query) | Script creato, eseguito senza AI |
+| **EXP-019** | E2E Pipeline (20 query) | Script creato, eseguito senza AI |
+
+#### EXP-018 Risultati (senza API key)
+
+- 50/50 query processate
+- Routing accuracy: 74%
+- 5 categorie: definitional, interpretive, procedural, constitutional, jurisprudential
+
+#### EXP-019 Risultati (senza API key)
+
+- 20/20 query processate
+- Expert Utilization: literal, systemic, principles, precedent
+- Pipeline success rate: 100%
+
+### Test - 175 test passing
+
+| Suite | Test |
+|-------|------|
+| `tests/experts/` | 99 test |
+| `tests/tools/` | 61 test |
+| `tests/core/test_interpret.py` | 15 test |
+
+---
+
+## Architettura Expert System
+
+```
+kg.interpret(query)
+    │
+    ├─1─> Pre-retrieval (SemanticSearch)
+    │
+    ├─2─> ExpertRouter
+    │         └── Query classification (definitional, constitutional, etc.)
+    │
+    ├─3─> MultiExpertOrchestrator
+    │         └── Parallel execution of selected Experts
+    │             ├── LiteralExpert
+    │             ├── SystemicExpert
+    │             ├── PrinciplesExpert
+    │             └── PrecedentExpert
+    │
+    ├─4─> GatingNetwork
+    │         └── Response aggregation (weighted_average, best_confidence, ensemble)
+    │
+    └─5─> InterpretationResult
+```
 
 ---
 
@@ -115,44 +146,15 @@ Implementata ottimizzazione per parallelizzazione:
 | Storage | Nome | Contenuto |
 |---------|------|-----------|
 | **FalkorDB** | `merl_t_dev` | 27,740 nodi, 43,935 relazioni |
-| **Qdrant** | `merl_t_dev_chunks` | 5,926 vectors (multi-source) |
-| **Bridge Table** | `bridge_table` | 27,114 mappings (100% chunk_text) |
-
-### Copertura Libro IV
-
-- 887/887 articoli (100%)
-- 1,798 commi
-- 17,227 relazioni DISCIPLINA
-- 5,926 embeddings (norma + spiegazione + ratio + massime)
-
----
-
-## Cosa Abbiamo Fatto (Sessioni Precedenti)
-
-### 14 Dicembre 2025
-
-- Fix bug rubrica tra parentesi (`parsing.py`)
-- Implementazione validation framework EXP-014
-- Backup baseline pre-ingestion
-
-### 13 Dicembre 2025
-
-- Integrazione iusgraph → merlt/rlcf
-- Database cleanup (eliminati Dottrina generici)
-- Task handlers per RLCF
-
-### 10 Dicembre 2025
-
-- Enrichment Pipeline Core implementata
-- 17 tipi entità estraibili
-- 35 tipi relazioni
+| **Qdrant** | `merl_t_dev` | 5,926 vectors (multi-source) |
+| **Bridge Table** | `bridge_table` | 27,114 mappings |
 
 ---
 
 ## API Disponibili
 
 ```python
-from merlt import LegalKnowledgeGraph, MerltConfig
+from merlt import LegalKnowledgeGraph, MerltConfig, InterpretationResult
 
 kg = LegalKnowledgeGraph()
 await kg.connect()
@@ -160,38 +162,45 @@ await kg.connect()
 # Ingestion singolo articolo
 result = await kg.ingest_norm("codice civile", "1453")
 
-# Ingestion batch (NUOVO - ottimizzato)
+# Ingestion batch (ottimizzato)
 result = await kg.ingest_batch(
     tipo_atto="codice civile",
     article_range=(1173, 2059),
     batch_size=15,
-    max_concurrent_fetches=8,
 )
+
+# Search
+results = await kg.search("responsabilità contrattuale")
+
+# Interpretazione multi-expert (NUOVO)
+interpretation = await kg.interpret("Cos'è la legittima difesa?")
+print(interpretation.synthesis)
 
 # Enrichment LLM
 config = EnrichmentConfig(...)
 result = await kg.enrich(config)
-
-# Search
-results = await kg.search("responsabilità contrattuale")
 ```
 
 ---
 
 ## Prossimi Passi
 
-### Priorità 1: RAG Validation
-- [ ] Benchmark semantic search su Libro IV
-- [ ] Test multi-source embeddings (spiegazione vs norma)
-- [ ] Metriche Recall@K, MRR
+### Priorità 1: Validazione con API
 
-### Priorità 2: RQ4 Benchmark (Bridge Table)
-- [ ] Script benchmark latenza Bridge vs join
-- [ ] Misurazioni formali
+- [ ] Eseguire EXP-018 con OPENROUTER_API_KEY
+- [ ] Eseguire EXP-019 con AI reale
+- [ ] Valutare qualità risposte
 
-### Priorità 3: RQ5 Expert con Tools
-- [ ] Interfaccia ExpertWithTools
-- [ ] Expert specializzati (Literal, Systemic, Principles, Precedent)
+### Priorità 2: Documentazione
+
+- [x] Aggiornare CURRENT_STATE.md
+- [ ] Aggiornare LIBRARY_ARCHITECTURE.md con interpret()
+- [ ] Aggiornare experiments/INDEX.md
+
+### Priorità 3: Test Integration
+
+- [ ] Test con database popolati
+- [ ] Benchmark latenza
 
 ---
 
@@ -206,19 +215,13 @@ source .venv/bin/activate
 docker-compose -f docker-compose.dev.yml up -d
 
 # Test
-pytest tests/ -v  # 397+ test
+pytest tests/ -v  # 700+ test
 
-# Status grafo
-python3 -c "
-from falkordb import FalkorDB
-db = FalkorDB(host='localhost', port=6380)
-g = db.select_graph('merl_t_dev')
-print('Nodi:', g.query('MATCH (n) RETURN count(n)').result_set[0][0])
-print('Relazioni:', g.query('MATCH ()-[r]->() RETURN count(r)').result_set[0][0])
-"
+# Run Expert Comparison
+python scripts/exp018_expert_comparison.py
 
-# Ingestion batch
-python scripts/exp014_full_ingestion.py --full --batch-size 15 --max-concurrent 8
+# Run E2E Pipeline
+python scripts/exp019_e2e_pipeline.py
 ```
 
 ---
@@ -227,28 +230,33 @@ python scripts/exp014_full_ingestion.py --full --batch-size 15 --max-concurrent 
 
 | Data | Decisione | Motivazione |
 |------|-----------|-------------|
-| 2025-12-15 | BatchIngestionPipeline | Parallelizzazione per M4 16GB, 2-3x speedup |
-| 2025-12-15 | Multi-source embeddings | Semantic search via spiegazione/ratio, non solo testo |
-| 2025-12-15 | chunk_text in Bridge | 100% per RAG debugging |
+| 2025-12-20 | 4 Expert basati su Preleggi | Mapping diretto ai canoni ermeneutici |
+| 2025-12-20 | GatingNetwork con 4 metodi | Flessibilità aggregazione |
+| 2025-12-20 | kg.interpret() come API | UX pulita, integrazione naturale |
+| 2025-12-20 | InterpretationResult | Dataclass per output strutturato |
 
 ---
 
 ## Contesto per Claude
 
 ### Cosa devi sapere per riprendere:
+
 - L'utente è uno studente di giurisprudenza (non programmatore)
 - Sta facendo una tesi sulla "sociologia computazionale del diritto"
-- **EXP-014 COMPLETATO**: Knowledge Graph Libro IV pronto
-- 27,740 nodi, 43,935 relazioni, 5,926 embeddings
+- **Expert System COMPLETATO**: 4 Expert + Router + Gating + Orchestrator
+- **kg.interpret() implementato**: API pulita per interpretazione
+- EXP-018 e EXP-019 pronti per esecuzione con API key
 - Preferisce comunicare in italiano
 
 ### File chiave da leggere:
+
 1. `CLAUDE.md` - Istruzioni generali progetto
 2. `docs/claude-context/LIBRARY_VISION.md` - Principi guida
-3. `docs/experiments/EXP-014_full_ingestion/README.md` - Ultimo esperimento
-4. `docs/experiments/INDEX.md` - Stato esperimenti
+3. `merlt/experts/__init__.py` - Export Expert System
+4. `merlt/core/legal_knowledge_graph.py` - interpret() method
 
 ### Pattern da seguire:
+
 - Documentare prima di implementare
 - Reality-check frequenti
 - Test incrementali

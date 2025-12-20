@@ -1,1 +1,1 @@
-"""Tests for merlt.core package."""
+"""Tests for merlt.core module."""

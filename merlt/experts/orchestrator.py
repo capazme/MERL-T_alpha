@@ -305,9 +305,9 @@ class MultiExpertOrchestrator:
         """
         context = ExpertContext(
             query_text=query,
-            entities=kwargs.get("entities", {}),
-            retrieved_chunks=kwargs.get("retrieved_chunks", []),
-            metadata=kwargs.get("metadata", {}),
+            entities=kwargs.get("entities") or {},
+            retrieved_chunks=kwargs.get("retrieved_chunks") or [],
+            metadata=kwargs.get("metadata") or {},
             trace_id=datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         )
 
@@ -345,9 +345,9 @@ class MultiExpertOrchestrator:
 
         context = ExpertContext(
             query_text=query,
-            entities=kwargs.get("entities", {}),
-            retrieved_chunks=kwargs.get("retrieved_chunks", []),
-            metadata=kwargs.get("metadata", {}),
+            entities=kwargs.get("entities") or {},
+            retrieved_chunks=kwargs.get("retrieved_chunks") or [],
+            metadata=kwargs.get("metadata") or {},
             trace_id=datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         )
 

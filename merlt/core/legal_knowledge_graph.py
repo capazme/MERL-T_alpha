@@ -7,6 +7,7 @@ Core orchestration class that coordinates all MERL-T components:
 - Qdrant (vector embeddings)
 - PostgreSQL Bridge Table (chunk <-> node mapping)
 - Multivigenza Pipeline (amendment tracking)
+- Multi-Expert Interpreter (legal hermeneutics)
 
 This class provides a unified API for legal knowledge management,
 integrating components that were previously managed by separate scripts.
@@ -38,6 +39,10 @@ Usage:
 
     # Search with hybrid retrieval
     results = await kg.search("Cos'è la legittima difesa?", top_k=5)
+
+    # Interpret a legal question with multi-expert system
+    interpretation = await kg.interpret("Cos'è la legittima difesa?")
+    print(interpretation.synthesis)
 
     await kg.close()
 """
@@ -192,6 +197,70 @@ class UnifiedIngestionResult:
         }
 
 
+@dataclass
+class InterpretationResult:
+    """
+    Risultato dell'interpretazione multi-expert di una query giuridica.
+
+    Questa dataclass contiene la sintesi interpretativa prodotta dal sistema
+    multi-expert basato sui canoni ermeneutici delle Preleggi (artt. 12-14).
+
+    Attributes:
+        query: Query originale
+        synthesis: Sintesi interpretativa aggregata
+        expert_contributions: Contributi individuali degli expert
+        combined_legal_basis: Fonti giuridiche combinate (norme, massime)
+        confidence: Confidenza aggregata [0-1]
+        routing_decision: Info sul routing (query_type, pesi)
+        aggregation_method: Metodo di aggregazione usato
+        execution_time_ms: Tempo di esecuzione in ms
+        trace_id: ID per tracciamento
+        errors: Eventuali errori durante l'esecuzione
+
+    Example:
+        >>> result = await kg.interpret("Cos'è la legittima difesa?")
+        >>> print(result.synthesis)
+        >>> for expert, contrib in result.expert_contributions.items():
+        ...     print(f"{expert}: {contrib['interpretation'][:100]}")
+    """
+    query: str
+    synthesis: str
+    expert_contributions: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    combined_legal_basis: List[Dict[str, Any]] = field(default_factory=list)
+    confidence: float = 0.0
+    routing_decision: Optional[Dict[str, Any]] = None
+    aggregation_method: str = "weighted_average"
+    execution_time_ms: float = 0.0
+    trace_id: str = ""
+    errors: List[str] = field(default_factory=list)
+
+    def summary(self) -> Dict[str, Any]:
+        """Ritorna sommario per logging."""
+        return {
+            "query": self.query[:50] + "..." if len(self.query) > 50 else self.query,
+            "experts_used": list(self.expert_contributions.keys()),
+            "confidence": round(self.confidence, 3),
+            "sources": len(self.combined_legal_basis),
+            "execution_ms": round(self.execution_time_ms, 1),
+            "has_errors": len(self.errors) > 0,
+        }
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serializza in dizionario per JSON."""
+        return {
+            "query": self.query,
+            "synthesis": self.synthesis,
+            "expert_contributions": self.expert_contributions,
+            "combined_legal_basis": self.combined_legal_basis,
+            "confidence": self.confidence,
+            "routing_decision": self.routing_decision,
+            "aggregation_method": self.aggregation_method,
+            "execution_time_ms": self.execution_time_ms,
+            "trace_id": self.trace_id,
+            "errors": self.errors,
+        }
+
+
 class LegalKnowledgeGraph:
     """
     Unified orchestration layer for MERL-T legal knowledge graph.
@@ -242,6 +311,10 @@ class LegalKnowledgeGraph:
 
         # Services
         self._embedding_service: Optional[Any] = None  # EmbeddingService
+        self._ai_service: Optional[Any] = None  # OpenRouterService
+
+        # Expert System (lazy initialized)
+        self._orchestrator: Optional[Any] = None  # MultiExpertOrchestrator
 
         # Hierarchies cache
         self._norm_trees: Dict[str, NormTree] = {}
@@ -730,6 +803,225 @@ class LegalKnowledgeGraph:
 
         return {}
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    #                           INTERPRETATION API
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    async def interpret(
+        self,
+        query: str,
+        include_search: bool = True,
+        max_experts: int = 4,
+        aggregation_method: str = "weighted_average",
+        timeout_seconds: float = 30.0,
+    ) -> InterpretationResult:
+        """
+        Interpreta una domanda giuridica usando il sistema multi-expert.
+
+        Coordina 4 Expert basati sui canoni ermeneutici delle Preleggi:
+        - LiteralExpert: "significato proprio delle parole" (art. 12, I)
+        - SystemicExpert: "connessione di esse" + storico (art. 12, I + art. 14)
+        - PrinciplesExpert: "intenzione del legislatore" (art. 12, II)
+        - PrecedentExpert: Prassi applicativa giurisprudenziale
+
+        Il sistema:
+        1. Classifica la query (definitional, constitutional, jurisprudential, etc.)
+        2. Seleziona gli Expert più appropriati
+        3. Esegue gli Expert in parallelo
+        4. Aggrega le risposte con il GatingNetwork
+
+        Args:
+            query: Domanda in linguaggio naturale
+            include_search: Se True, esegue pre-retrieval semantico
+            max_experts: Numero massimo di Expert da invocare
+            aggregation_method: Metodo aggregazione (weighted_average, best_confidence, ensemble)
+            timeout_seconds: Timeout per ogni Expert
+
+        Returns:
+            InterpretationResult con sintesi, contributi expert, fonti
+
+        Example:
+            >>> result = await kg.interpret("Cos'è la legittima difesa?")
+            >>> print(result.synthesis)
+            >>> print(f"Confidenza: {result.confidence:.2f}")
+            >>> for expert, contrib in result.expert_contributions.items():
+            ...     print(f"- {expert}: {contrib['interpretation'][:50]}...")
+
+        Note:
+            - Richiede connessione (chiamare connect() prima)
+            - Richiede OPENROUTER_API_KEY in env per analisi LLM
+            - Senza AI service, usa fallback rule-based
+        """
+        if not self._connected:
+            raise RuntimeError("Not connected. Call connect() first.")
+
+        errors: List[str] = []
+
+        # Lazy init del MultiExpertOrchestrator
+        if self._orchestrator is None:
+            try:
+                self._orchestrator = await self._init_orchestrator(
+                    max_experts=max_experts,
+                    aggregation_method=aggregation_method,
+                    timeout_seconds=timeout_seconds,
+                )
+            except Exception as e:
+                log.warning(f"Could not initialize orchestrator with AI: {e}")
+                errors.append(f"Orchestrator init: {str(e)[:100]}")
+                # Fallback: orchestrator senza AI
+                self._orchestrator = await self._init_orchestrator(
+                    max_experts=max_experts,
+                    aggregation_method=aggregation_method,
+                    timeout_seconds=timeout_seconds,
+                    skip_ai=True,
+                )
+
+        # Pre-retrieval semantico (opzionale)
+        retrieved_chunks = []
+        entities: Dict[str, List[str]] = {"norm_references": [], "legal_concepts": []}
+
+        if include_search and self._qdrant and self._embedding_service:
+            try:
+                search_results = await self.search(query, top_k=5)
+                for sr in search_results:
+                    retrieved_chunks.append({
+                        "text": sr.get("text", ""),
+                        "urn": sr.get("urn", ""),
+                        "score": sr.get("score", 0.0),
+                    })
+                    # Estrai URN come norm_references
+                    if sr.get("urn"):
+                        entities["norm_references"].append(sr["urn"])
+            except Exception as e:
+                log.warning(f"Pre-retrieval failed: {e}")
+                errors.append(f"Pre-retrieval: {str(e)[:100]}")
+
+        # Esegui interpretazione
+        try:
+            response, routing = await self._orchestrator.process_with_routing(
+                query=query,
+                entities=entities if entities["norm_references"] else None,
+                retrieved_chunks=retrieved_chunks if retrieved_chunks else None,
+            )
+
+            # Mappa AggregatedResponse → InterpretationResult
+            result = InterpretationResult(
+                query=query,
+                synthesis=response.synthesis,
+                expert_contributions=response.expert_contributions,
+                combined_legal_basis=[
+                    source.to_dict() if hasattr(source, 'to_dict') else {
+                        "source_type": source.source_type,
+                        "source_id": source.source_id,
+                        "citation": source.citation,
+                    }
+                    for source in response.combined_legal_basis
+                ],
+                confidence=response.confidence,
+                routing_decision={
+                    "query_type": routing.query_type,
+                    "expert_weights": routing.expert_weights,
+                    "confidence": routing.confidence,
+                    "reasoning": routing.reasoning,
+                },
+                aggregation_method=response.aggregation_method,
+                execution_time_ms=response.execution_time_ms,
+                trace_id=response.trace_id,
+                errors=errors + (response.conflicts or []),
+            )
+
+            log.info(f"Interpretation complete: {result.summary()}")
+            return result
+
+        except Exception as e:
+            log.error(f"Interpretation failed: {e}", exc_info=True)
+            return InterpretationResult(
+                query=query,
+                synthesis=f"Errore durante l'interpretazione: {str(e)}",
+                confidence=0.0,
+                errors=errors + [str(e)],
+            )
+
+    async def _init_orchestrator(
+        self,
+        max_experts: int = 4,
+        aggregation_method: str = "weighted_average",
+        timeout_seconds: float = 30.0,
+        skip_ai: bool = False,
+    ) -> Any:
+        """
+        Inizializza il MultiExpertOrchestrator con tools e AI service.
+
+        Args:
+            max_experts: Numero massimo Expert
+            aggregation_method: Metodo aggregazione
+            timeout_seconds: Timeout per Expert
+            skip_ai: Se True, non inizializza AI service
+
+        Returns:
+            MultiExpertOrchestrator configurato
+        """
+        from merlt.experts import MultiExpertOrchestrator, OrchestratorConfig
+        from merlt.tools import SemanticSearchTool, GraphSearchTool
+
+        # Configura tools
+        tools = []
+
+        # SemanticSearchTool (richiede retriever + embeddings)
+        if self._qdrant and self._embedding_service:
+            # Crea retriever se non esiste
+            if not hasattr(self, '_retriever') or self._retriever is None:
+                try:
+                    retriever_config = RetrieverConfig()
+                    self._retriever = GraphAwareRetriever(
+                        vector_db=self._qdrant,
+                        graph_db=self._falkordb,
+                        bridge_table=self._bridge_table,
+                        config=retriever_config,
+                    )
+                except Exception as e:
+                    log.warning(f"Could not create GraphAwareRetriever: {e}")
+                    self._retriever = None
+
+            if self._retriever:
+                tools.append(SemanticSearchTool(
+                    retriever=self._retriever,
+                    embeddings=self._embedding_service,
+                ))
+
+        # GraphSearchTool
+        if self._falkordb:
+            tools.append(GraphSearchTool(graph_db=self._falkordb))
+
+        # AI Service (OpenRouter)
+        ai_service = None
+        if not skip_ai:
+            try:
+                from merlt.rlcf.ai_service import OpenRouterService
+                ai_service = OpenRouterService()
+                self._ai_service = ai_service
+            except Exception as e:
+                log.warning(f"Could not initialize OpenRouterService: {e}")
+
+        # Config
+        config = OrchestratorConfig(
+            max_experts=max_experts,
+            aggregation_method=aggregation_method,
+            timeout_seconds=timeout_seconds,
+            parallel_execution=True,
+        )
+
+        log.info(
+            f"Initializing MultiExpertOrchestrator: "
+            f"tools={len(tools)}, has_ai={ai_service is not None}"
+        )
+
+        return MultiExpertOrchestrator(
+            tools=tools,
+            ai_service=ai_service,
+            config=config,
+        )
+
     @property
     def is_connected(self) -> bool:
         """Check if connected to backends."""
@@ -944,6 +1236,7 @@ __all__ = [
     "LegalKnowledgeGraph",
     "MerltConfig",
     "UnifiedIngestionResult",
+    "InterpretationResult",
     "EnrichmentConfig",
     "EnrichmentResult",
 ]
