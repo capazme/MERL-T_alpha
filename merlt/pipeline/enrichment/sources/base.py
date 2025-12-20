@@ -40,10 +40,19 @@ class BaseEnrichmentSource(ABC):
 
     Attributes:
         _initialized: Flag per inizializzazione lazy
+        phase: Fase di esecuzione (1 = primaria, 2 = arricchimento)
     """
 
-    def __init__(self):
+    def __init__(self, phase: int = 1):
+        """
+        Inizializza la fonte base.
+
+        Args:
+            phase: Fase di esecuzione. Le fonti vengono eseguite in ordine
+                   di fase (1 prima, poi 2, etc.). Default: 1.
+        """
         self._initialized = False
+        self.phase = phase
 
     @property
     @abstractmethod

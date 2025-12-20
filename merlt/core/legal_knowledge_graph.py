@@ -44,7 +44,7 @@ Usage:
 
 import structlog
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from uuid import UUID
 
 # Storage
@@ -667,12 +667,13 @@ class LegalKnowledgeGraph:
         # Encode query
         query_embedding = await self._embedding_service.encode_query_async(query)
 
-        # Search Qdrant
-        results = self._qdrant.search(
+        # Search Qdrant (using query_points API)
+        response = self._qdrant.query_points(
             collection_name=self.config.qdrant_collection,
-            query_vector=query_embedding,
+            query=query_embedding,
             limit=top_k,
         )
+        results = response.points
 
         # Format results
         formatted = []
@@ -818,12 +819,17 @@ class LegalKnowledgeGraph:
         llm_service = OpenRouterService()
 
         try:
-            # Crea pipeline
+            # Crea pipeline con integrazione completa:
+            # - Qdrant per storage vettoriale dei chunk
+            # - BridgeBuilder per collegamento chunk ↔ entità
             pipeline = EnrichmentPipeline(
                 graph_client=self._falkordb,
                 embedding_service=self._embedding_service,
                 llm_service=llm_service,
                 config=config,
+                qdrant_client=self._qdrant,
+                bridge_builder=self._bridge_builder,
+                qdrant_collection=self.config.qdrant_collection,
             )
 
             # Esegui enrichment
@@ -861,6 +867,78 @@ class LegalKnowledgeGraph:
         writer = EnrichmentGraphWriter(self._falkordb)
         return await writer.cleanup_old_dottrina(min_version=min_version)
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    #                           BATCH INGESTION API
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    async def ingest_batch(
+        self,
+        tipo_atto: str,
+        article_range: Tuple[int, int],
+        batch_size: int = 10,
+        max_concurrent_fetches: int = 5,
+        include_brocardi: bool = True,
+        include_multivigenza: bool = True,
+    ) -> "BatchIngestionResult":
+        """
+        Ingest batch di articoli con ottimizzazioni per performance.
+
+        Parallelizza:
+        - HTTP fetches (Normattiva + Brocardi)
+        - Embedding generation (batch encoding)
+        - Database operations (batch upserts)
+
+        Performance: 5-10x più veloce di ingest_norm sequenziale.
+
+        Args:
+            tipo_atto: Tipo atto (es. "codice civile")
+            article_range: Range articoli (start, end) inclusi
+            batch_size: Articoli per batch (default: 10)
+            max_concurrent_fetches: Max fetch HTTP paralleli (default: 5)
+            include_brocardi: Include enrichment Brocardi
+            include_multivigenza: Include tracking modifiche
+
+        Returns:
+            BatchIngestionResult con statistiche complete
+
+        Example:
+            >>> # Ingest Libro IV (artt. 1173-2059)
+            >>> result = await kg.ingest_batch(
+            ...     tipo_atto="codice civile",
+            ...     article_range=(1173, 2059),
+            ...     batch_size=10,
+            ... )
+            >>> print(result.summary())
+        """
+        if not self._connected:
+            raise RuntimeError("Not connected. Call connect() first.")
+
+        from merlt.pipeline.batch_ingestion import BatchIngestionPipeline
+
+        # Create article numbers list
+        start, end = article_range
+        article_numbers = [str(n) for n in range(start, end + 1)]
+
+        # Create and run batch pipeline
+        pipeline = BatchIngestionPipeline(
+            kg=self,
+            batch_size=batch_size,
+            max_concurrent_fetches=max_concurrent_fetches,
+        )
+
+        return await pipeline.ingest_batch(
+            tipo_atto=tipo_atto,
+            article_numbers=article_numbers,
+            include_brocardi=include_brocardi,
+            include_multivigenza=include_multivigenza,
+        )
+
+
+# Type hint for return type
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from merlt.pipeline.batch_ingestion import BatchIngestionResult
+    from typing import Tuple
 
 __all__ = [
     "LegalKnowledgeGraph",

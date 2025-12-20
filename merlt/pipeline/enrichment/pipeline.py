@@ -26,8 +26,9 @@ Esempio:
 import asyncio
 import hashlib
 import logging
+from collections import defaultdict
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from merlt.pipeline.enrichment.checkpoint import CheckpointManager
 from merlt.pipeline.enrichment.config import EnrichmentConfig
@@ -41,7 +42,9 @@ from merlt.pipeline.enrichment.models import (
 if TYPE_CHECKING:
     from merlt.storage.graph import FalkorDBClient
     from merlt.storage.vectors import EmbeddingService
+    from merlt.storage.bridge import BridgeBuilder
     from merlt.sources.llm import OpenRouterService
+    from qdrant_client import QdrantClient
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +60,8 @@ class EnrichmentPipeline:
         embeddings: Servizio embeddings
         llm: Servizio LLM per estrazione
         config: Configurazione enrichment
+        qdrant: Client Qdrant per storage vettori (opzionale)
+        bridge_builder: Builder per Bridge Table (opzionale)
 
     Example:
         >>> pipeline = EnrichmentPipeline(graph, embeddings, llm, config)
@@ -70,6 +75,9 @@ class EnrichmentPipeline:
         embedding_service: "EmbeddingService",
         llm_service: "OpenRouterService",
         config: EnrichmentConfig,
+        qdrant_client: Optional["QdrantClient"] = None,
+        bridge_builder: Optional["BridgeBuilder"] = None,
+        qdrant_collection: Optional[str] = None,
     ):
         """
         Inizializza la pipeline.
@@ -79,11 +87,17 @@ class EnrichmentPipeline:
             embedding_service: Servizio per embeddings (dedup semantico)
             llm_service: Servizio LLM per estrazione entità
             config: Configurazione dell'enrichment
+            qdrant_client: Client Qdrant per storage chunk vettoriali (opzionale)
+            bridge_builder: Builder per Bridge Table mappings (opzionale)
+            qdrant_collection: Nome collection Qdrant (default: config-based)
         """
         self.graph = graph_client
         self.embeddings = embedding_service
         self.llm = llm_service
         self.config = config
+        self.qdrant = qdrant_client
+        self.bridge_builder = bridge_builder
+        self.qdrant_collection = qdrant_collection
 
         # Componenti (inizializzati lazy)
         self._extractors = None
@@ -112,20 +126,18 @@ class EnrichmentPipeline:
     async def _init_components(self) -> None:
         """Inizializza componenti lazy."""
         if self._extractors is None:
-            from merlt.pipeline.enrichment.extractors import (
-                ConceptExtractor,
-                PrincipleExtractor,
-                DefinitionExtractor,
-            )
-            from merlt.pipeline.enrichment.models import EntityType
+            from merlt.pipeline.enrichment.extractors import create_extractor
 
+            # Usa la factory per creare l'extractor appropriato per ogni tipo
+            # Questo supporta tutti i 17 tipi di entità dello schema
             self._extractors = {}
-            if EntityType.CONCETTO in self.config.entity_types:
-                self._extractors[EntityType.CONCETTO] = ConceptExtractor(self.llm)
-            if EntityType.PRINCIPIO in self.config.entity_types:
-                self._extractors[EntityType.PRINCIPIO] = PrincipleExtractor(self.llm)
-            if EntityType.DEFINIZIONE in self.config.entity_types:
-                self._extractors[EntityType.DEFINIZIONE] = DefinitionExtractor(self.llm)
+            for entity_type in self.config.entity_types:
+                self._extractors[entity_type] = create_extractor(self.llm, entity_type)
+
+            logger.info(
+                f"Inizializzati {len(self._extractors)} extractors: "
+                f"{[t.value for t in self._extractors.keys()]}"
+            )
 
         if self._linker is None:
             from merlt.pipeline.enrichment.linkers import EntityLinker
@@ -171,32 +183,48 @@ class EnrichmentPipeline:
         processed = self.checkpoint.load()
         result.contents_skipped = len(processed)
 
+        # Raggruppa fonti per fase
+        sources_by_phase: Dict[int, List] = defaultdict(list)
+        for source in self.config.sources:
+            sources_by_phase[source.phase].append(source)
+
+        total_phases = len(sources_by_phase)
         logger.info(
-            f"Avvio enrichment: {len(self.config.sources)} fonti, "
+            f"Avvio enrichment: {len(self.config.sources)} fonti in {total_phases} fasi, "
             f"{len(processed)} già processati"
         )
 
-        # Processa ogni fonte
-        for source in self.config.sources:
-            logger.info(f"Processing fonte: {source.source_name}")
+        # Esegui fase per fase (ordine crescente)
+        for phase_num in sorted(sources_by_phase.keys()):
+            phase_sources = sources_by_phase[phase_num]
+            logger.info(
+                f"=== FASE {phase_num}/{total_phases}: "
+                f"{[s.source_name for s in phase_sources]} ==="
+            )
 
-            try:
-                async for content in source.fetch(self.config.scope):
-                    # Skip se già processato
-                    if content.id in processed:
-                        continue
+            # Processa ogni fonte nella fase
+            for source in phase_sources:
+                logger.info(f"Processing fonte: {source.source_name}")
 
-                    # Processa content
-                    await self._process_content(content, result)
-                    result.contents_processed += 1
+                try:
+                    async for content in source.fetch(self.config.scope):
+                        # Skip se già processato
+                        if content.id in processed:
+                            continue
 
-            except Exception as e:
-                logger.error(f"Errore fonte {source.source_name}: {e}")
-                result.add_error(
-                    content_id=f"source:{source.source_name}",
-                    phase="fetch",
-                    error=e,
-                )
+                        # Processa content
+                        await self._process_content(content, result)
+                        result.contents_processed += 1
+
+                except Exception as e:
+                    logger.error(f"Errore fonte {source.source_name}: {e}")
+                    result.add_error(
+                        content_id=f"source:{source.source_name}",
+                        phase="fetch",
+                        error=e,
+                    )
+
+            logger.info(f"=== FASE {phase_num} completata ===")
 
         # Finalizza
         result.completed_at = datetime.now()
@@ -213,12 +241,27 @@ class EnrichmentPipeline:
         """
         Processa un singolo contenuto.
 
+        Flow:
+        1. Embed chunk → Qdrant (se configurato)
+        2. Estrai entità → FalkorDB
+        3. Link e dedup
+        4. Scrivi nel grafo
+        5. Crea bridge entries → chunk_id ↔ entity_node_id
+
         Args:
             content: Contenuto da processare
             result: Risultato da aggiornare
         """
         try:
-            # 1. Estrai entità
+            chunk_id = None
+
+            # 1. Embed chunk in Qdrant (se configurato)
+            if self.qdrant and self.embeddings and not self.config.dry_run:
+                chunk_id = await self._embed_chunk(content)
+                if self.config.verbose:
+                    logger.debug(f"Chunk {content.id} embedded: {chunk_id}")
+
+            # 2. Estrai entità
             entities = await self._extract_entities(content)
 
             if self.config.verbose:
@@ -226,19 +269,27 @@ class EnrichmentPipeline:
                     f"Estratte {len(entities)} entità da {content.id}"
                 )
 
-            # 2. Link e dedup
+            # 3. Link e dedup
             linked = await self._linker.link_batch(entities)
 
-            # 3. Scrivi nel grafo (se non dry_run)
+            # 4. Scrivi nel grafo (se non dry_run)
             if not self.config.dry_run:
                 written = await self._writer.write_batch(linked, content)
                 self._update_stats(result, written)
+
+                # 5. Crea bridge entries (se configurato)
+                if chunk_id and self.bridge_builder:
+                    await self._create_bridge_entries(chunk_id, written, content)
+                    if self.config.verbose:
+                        logger.debug(
+                            f"Bridge entries create per {len(written)} entità"
+                        )
             else:
                 # Dry run: simula scrittura
                 for le in linked:
                     result.entities_created.append(le.node_id)
 
-            # 4. Checkpoint
+            # 6. Checkpoint
             self.checkpoint.mark_done(
                 content.id,
                 stats_update={"processed": 1}
@@ -305,6 +356,120 @@ class EnrichmentPipeline:
                     result.stats.definitions_created += 1
                 else:
                     result.stats.definitions_merged += 1
+
+    async def _embed_chunk(
+        self,
+        content: EnrichmentContent,
+    ) -> Optional[str]:
+        """
+        Embed chunk text e store in Qdrant.
+
+        Args:
+            content: Contenuto da embeddare
+
+        Returns:
+            chunk_id (UUID string) se successo, None altrimenti
+        """
+        from uuid import uuid4
+        from qdrant_client.models import PointStruct
+
+        try:
+            # Genera embedding (usa "passage: " prefix per documenti)
+            embedding = self.embeddings.encode_document(content.text)
+
+            # Genera UUID per chunk
+            chunk_id = str(uuid4())
+
+            # Prepara metadata
+            metadata = {
+                "content_id": content.id,
+                "source": content.source,
+                "content_type": content.content_type,
+                "article_refs": content.article_refs[:10],  # Limita per size
+                "text_preview": content.text[:500],
+                "source_type": "enrichment",
+            }
+
+            # Upsert in Qdrant
+            self.qdrant.upsert(
+                collection_name=self.qdrant_collection,
+                points=[
+                    PointStruct(
+                        id=chunk_id,
+                        vector=embedding,  # encode_document già ritorna lista
+                        payload=metadata,
+                    )
+                ],
+            )
+
+            logger.debug(f"Chunk embedded: {chunk_id}")
+            return chunk_id
+
+        except Exception as e:
+            logger.error(f"Errore embedding chunk {content.id}: {e}")
+            return None
+
+    async def _create_bridge_entries(
+        self,
+        chunk_id: str,
+        entities: List[LinkedEntity],
+        content: EnrichmentContent,
+    ) -> int:
+        """
+        Crea bridge table entries linking chunk → entities.
+
+        Args:
+            chunk_id: UUID del chunk in Qdrant
+            entities: Entità scritte nel grafo
+            content: Contenuto originale
+
+        Returns:
+            Numero di entries create
+        """
+        from uuid import UUID
+        from merlt.models import BridgeMapping
+
+        mappings = []
+
+        for entity in entities:
+            # Determina mapping_type in base al tipo entità
+            if entity.entity.tipo.value == "concetto":
+                mapping_type = "CONCEPT"
+            elif entity.entity.tipo.value == "principio":
+                mapping_type = "CONCEPT"
+            elif entity.entity.tipo.value == "definizione":
+                mapping_type = "CONCEPT"
+            elif entity.entity.tipo.value == "dottrina":
+                mapping_type = "DOCTRINE"
+            else:
+                mapping_type = "CONCEPT"
+
+            mapping = BridgeMapping(
+                chunk_id=UUID(chunk_id),
+                graph_node_urn=entity.node_id,  # Il node_id è l'URN/identificatore
+                mapping_type=mapping_type,
+                confidence=entity.entity.confidence,
+                chunk_text=content.text[:2000] if content.text else None,  # Primi 2000 char
+                metadata={
+                    "source": content.source,
+                    "content_id": content.id,
+                    "entity_name": entity.entity.nome,
+                    "entity_type": entity.entity.tipo.value,
+                    "extraction_source": "enrichment_pipeline",
+                },
+            )
+            mappings.append(mapping)
+
+        if mappings:
+            try:
+                inserted = await self.bridge_builder.insert_mappings(mappings)
+                logger.debug(f"Bridge entries create: {inserted}")
+                return inserted
+            except Exception as e:
+                logger.error(f"Errore bridge entries: {e}")
+                return 0
+
+        return 0
 
     async def cleanup_existing_dottrina(self) -> int:
         """

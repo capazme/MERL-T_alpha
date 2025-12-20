@@ -54,11 +54,12 @@ class ManualEnrichmentSource(BaseEnrichmentSource):
     Attributes:
         path: Path alla directory contenente i PDF
         manual_name: Nome del manuale (per tracking)
+        act_type: Tipo di atto giuridico (es. "codice civile", "codice penale")
         chunk_size: Dimensione target dei chunk in caratteri
         overlap: Sovrapposizione tra chunk
 
     Example:
-        >>> source = ManualSource("data/manuali/libro_iv/", "Torrente")
+        >>> source = ManualSource("data/manuali/libro_iv/", "Torrente", act_type="codice civile")
         >>> async for content in source.fetch():
         ...     print(f"Articoli citati: {content.article_refs}")
     """
@@ -67,8 +68,10 @@ class ManualEnrichmentSource(BaseEnrichmentSource):
         self,
         path: str,
         manual_name: str = "unknown",
+        act_type: str = "codice civile",
         chunk_size: int = 4000,
         overlap: int = 200,
+        phase: int = 2,
     ):
         """
         Inizializza la fonte manuale.
@@ -76,12 +79,15 @@ class ManualEnrichmentSource(BaseEnrichmentSource):
         Args:
             path: Path alla directory con i PDF
             manual_name: Nome del manuale per identificazione
+            act_type: Tipo di atto (es. "codice civile", "codice penale")
             chunk_size: Dimensione target chunk in caratteri
             overlap: Caratteri di sovrapposizione tra chunk
+            phase: Fase di esecuzione (default: 2, arricchimento)
         """
-        super().__init__()
+        super().__init__(phase=phase)
         self.path = Path(path)
         self.manual_name = manual_name
+        self.act_type = act_type
         self.chunk_size = chunk_size
         self.overlap = overlap
         self._fitz = None
@@ -126,13 +132,21 @@ class ManualEnrichmentSource(BaseEnrichmentSource):
         if not self._initialized:
             await self.initialize()
 
-        # Trova tutti i PDF
-        pdf_files = list(self.path.glob("*.pdf"))
+        # Trova PDF: supporta sia file singolo che directory
+        if self.path.is_file() and self.path.suffix.lower() == ".pdf":
+            # Path è un file PDF singolo
+            pdf_files = [self.path]
+        elif self.path.is_dir():
+            # Path è una directory, cerca tutti i PDF
+            pdf_files = list(self.path.glob("*.pdf"))
+        else:
+            pdf_files = []
+
         if not pdf_files:
             logger.warning(f"Nessun PDF trovato in: {self.path}")
             return
 
-        logger.info(f"Trovati {len(pdf_files)} PDF in {self.path}")
+        logger.info(f"Trovati {len(pdf_files)} PDF")
 
         for pdf_path in pdf_files:
             try:
@@ -327,8 +341,13 @@ class ManualEnrichmentSource(BaseEnrichmentSource):
         return urns
 
     def _article_to_urn(self, article_num: int) -> str:
-        """Converte numero articolo in URN."""
-        return f"urn:nir:stato:legge:1942-03-16;262~art{article_num}"
+        """
+        Converte numero articolo in URN usando generate_urn.
+
+        Supporta qualsiasi tipo di atto configurato (codice civile, penale, ecc.)
+        """
+        from merlt.sources.utils.urn import generate_urn
+        return generate_urn(self.act_type, article=str(article_num))
 
     def _ref_matches_scope(
         self,

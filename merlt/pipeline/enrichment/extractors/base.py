@@ -199,6 +199,7 @@ Estrai entità giuridiche strutturate. Rispondi SEMPRE in formato JSON valido.""
                 prompt=prompt,
                 json_schema=self.response_schema,
                 system_prompt=self._get_system_prompt(),
+                model=llm_config["model"],
                 temperature=llm_config["temperature"],
                 max_tokens=llm_config["max_tokens"],
                 timeout=llm_config["timeout"],
@@ -234,7 +235,8 @@ Estrai entità giuridiche strutturate. Rispondi SEMPRE in formato JSON valido.""
         from merlt.pipeline.enrichment.models import ExtractedEntity
 
         entities = []
-        raw_entities = response.get("entities", [])
+        # Gemini può restituire null invece di [], gestiamo entrambi i casi
+        raw_entities = response.get("entities") or []
 
         for raw in raw_entities:
             try:
@@ -270,7 +272,7 @@ Estrai entità giuridiche strutturate. Rispondi SEMPRE in formato JSON valido.""
                 match = re.search(r'\d+', art)
                 if match:
                     num = match.group()
-                    urn = f"urn:nir:stato:legge:1942-03-16;262~art{num}"
+                    urn = f"https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art{num}"
                     urns.append(urn)
         return urns
 

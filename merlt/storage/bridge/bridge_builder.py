@@ -85,6 +85,7 @@ class BridgeBuilder:
                 mapping.mapping_type, "unknown"
             ),
             "confidence": mapping.confidence,
+            "chunk_text": mapping.chunk_text,  # Testo del chunk per debug/RAG
             "source": "ingestion_v2",
             "metadata": mapping.metadata,
         }

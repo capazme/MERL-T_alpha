@@ -233,6 +233,7 @@ async def preview_test(test_num: int) -> Dict[str, Any]:
     source = LimitedManualSource(
         path=str(PDF_PATH),
         manual_name=MANUAL_NAME,
+        act_type="codice civile",  # Libro IV = Obbligazioni del Codice Civile
         max_chunks=min(max_chunks, 5),  # Preview solo primi 5
     )
     await source.initialize()
@@ -308,6 +309,7 @@ async def run_enrichment(
     source = LimitedManualSource(
         path=str(PDF_PATH),
         manual_name=MANUAL_NAME,
+        act_type="codice civile",  # Libro IV = Obbligazioni del Codice Civile
         max_chunks=max_chunks,
     )
 

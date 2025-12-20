@@ -491,7 +491,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
                 raise ValueError("OpenRouter API key not provided")
 
             # Usa modello da env se non specificato
-            model = model or os.getenv("LLM_PARSING_MODEL", "openai/gpt-4o-mini")
+            model = model or os.getenv("LLM_PARSING_MODEL", "google/gemini-2.5-flash")
 
             # Genera esempio JSON dallo schema
             schema_example = self._generate_json_example(json_schema)

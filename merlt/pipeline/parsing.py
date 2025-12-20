@@ -311,6 +311,7 @@ class CommaParser:
         Heuristics:
         - Relatively short (< 150 chars)
         - Doesn't end with period (titles usually don't)
+        - BUT: text in parentheses IS a rubrica (Codice Civile style)
         - Doesn't start with lowercase (content usually starts with "La", "Il", etc.)
         - Not a full sentence structure
 
@@ -319,12 +320,23 @@ class CommaParser:
 
         Returns:
             True if likely a rubrica
+
+        Examples:
+            "(Fonti delle obbligazioni)." -> True (rubrica tra parentesi)
+            "(Carattere patrimoniale della prestazione)." -> True
+            "Le obbligazioni derivano da contratto..." -> False (contenuto)
         """
         # Too long for a title
         if len(text) > 150:
             return False
 
-        # Ends with period = likely content
+        # Check for rubrica in parentheses (Codice Civile style)
+        # Pattern: (Titolo). or (Titolo)
+        # Questo cattura le rubriche del tipo "(Fonti delle obbligazioni)."
+        if re.match(r'^\([^)]+\)\.?$', text):
+            return True
+
+        # Ends with period = likely content (but not if it's in parentheses - handled above)
         if text.endswith('.'):
             return False
 

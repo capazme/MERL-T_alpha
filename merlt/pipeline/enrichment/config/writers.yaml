@@ -53,13 +53,13 @@ cypher_create:
       p.livello = $livello,
       p.fonti = [$fonte],
       p.schema_version = $schema_version,
-      p.created_at = datetime()
+      p.created_at = timestamp()
     ON MATCH SET
       p.fonti = CASE
         WHEN $fonte IN p.fonti THEN p.fonti
         ELSE p.fonti + $fonte
       END,
-      p.updated_at = datetime()
+      p.updated_at = timestamp()
     RETURN p.node_id as node_id, p.fonti as fonti
 
   # Crea o merge DefinizioneLegale
@@ -72,13 +72,13 @@ cypher_create:
       d.tipo_definizione = $tipo_definizione,
       d.fonti = [$fonte],
       d.schema_version = $schema_version,
-      d.created_at = datetime()
+      d.created_at = timestamp()
     ON MATCH SET
       d.fonti = CASE
         WHEN $fonte IN d.fonti THEN d.fonti
         ELSE d.fonti + $fonte
       END,
-      d.updated_at = datetime()
+      d.updated_at = timestamp()
     RETURN d.node_id as node_id, d.fonti as fonti
 
   # Crea nodo Dottrina (ristrutturato)
@@ -92,7 +92,7 @@ cypher_create:
       concetti_trattati: $concetti_trattati,
       principi_trattati: $principi_trattati,
       schema_version: $schema_version,
-      created_at: datetime()
+      created_at: timestamp()
     })
     RETURN d.node_id as node_id
 
@@ -110,10 +110,10 @@ cypher_create:
       s.tipo_soggetto = $tipo_soggetto,
       s.fonti = [$fonte],
       s.schema_version = $schema_version,
-      s.created_at = datetime()
+      s.created_at = timestamp()
     ON MATCH SET
       s.fonti = CASE WHEN $fonte IN s.fonti THEN s.fonti ELSE s.fonti + $fonte END,
-      s.updated_at = datetime()
+      s.updated_at = timestamp()
     RETURN s.node_id as node_id, s.fonti as fonti
 
   # Crea o merge Ruolo
@@ -126,10 +126,10 @@ cypher_create:
       r.contesto = $contesto,
       r.fonti = [$fonte],
       r.schema_version = $schema_version,
-      r.created_at = datetime()
+      r.created_at = timestamp()
     ON MATCH SET
       r.fonti = CASE WHEN $fonte IN r.fonti THEN r.fonti ELSE r.fonti + $fonte END,
-      r.updated_at = datetime()
+      r.updated_at = timestamp()
     RETURN r.node_id as node_id, r.fonti as fonti
 
   # Crea o merge ModalitaGiuridica
@@ -143,10 +143,10 @@ cypher_create:
       m.correlativo = $correlativo,
       m.fonti = [$fonte],
       m.schema_version = $schema_version,
-      m.created_at = datetime()
+      m.created_at = timestamp()
     ON MATCH SET
       m.fonti = CASE WHEN $fonte IN m.fonti THEN m.fonti ELSE m.fonti + $fonte END,
-      m.updated_at = datetime()
+      m.updated_at = timestamp()
     RETURN m.node_id as node_id, m.fonti as fonti
 
   # ─────────────────────────────────────────────────────────────────────────
@@ -164,10 +164,10 @@ cypher_create:
       f.effetti = $effetti,
       f.fonti = [$fonte],
       f.schema_version = $schema_version,
-      f.created_at = datetime()
+      f.created_at = timestamp()
     ON MATCH SET
       f.fonti = CASE WHEN $fonte IN f.fonti THEN f.fonti ELSE f.fonti + $fonte END,
-      f.updated_at = datetime()
+      f.updated_at = timestamp()
     RETURN f.node_id as node_id, f.fonti as fonti
 
   # Crea o merge AttoGiuridico (entità, non sentenza)
@@ -181,10 +181,10 @@ cypher_create:
       a.forma = $forma,
       a.fonti = [$fonte],
       a.schema_version = $schema_version,
-      a.created_at = datetime()
+      a.created_at = timestamp()
     ON MATCH SET
       a.fonti = CASE WHEN $fonte IN a.fonti THEN a.fonti ELSE a.fonti + $fonte END,
-      a.updated_at = datetime()
+      a.updated_at = timestamp()
     RETURN a.node_id as node_id, a.fonti as fonti
 
   # Crea o merge Procedura
@@ -198,10 +198,10 @@ cypher_create:
       p.fasi = $fasi,
       p.fonti = [$fonte],
       p.schema_version = $schema_version,
-      p.created_at = datetime()
+      p.created_at = timestamp()
     ON MATCH SET
       p.fonti = CASE WHEN $fonte IN p.fonti THEN p.fonti ELSE p.fonti + $fonte END,
-      p.updated_at = datetime()
+      p.updated_at = timestamp()
     RETURN p.node_id as node_id, p.fonti as fonti
 
   # Crea o merge Termine
@@ -216,10 +216,10 @@ cypher_create:
       t.decorrenza = $decorrenza,
       t.fonti = [$fonte],
       t.schema_version = $schema_version,
-      t.created_at = datetime()
+      t.created_at = timestamp()
     ON MATCH SET
       t.fonti = CASE WHEN $fonte IN t.fonti THEN t.fonti ELSE t.fonti + $fonte END,
-      t.updated_at = datetime()
+      t.updated_at = timestamp()
     RETURN t.node_id as node_id, t.fonti as fonti
 
   # Crea o merge EffettoGiuridico
@@ -232,10 +232,10 @@ cypher_create:
       e.tipo_effetto = $tipo_effetto,
       e.fonti = [$fonte],
       e.schema_version = $schema_version,
-      e.created_at = datetime()
+      e.created_at = timestamp()
     ON MATCH SET
       e.fonti = CASE WHEN $fonte IN e.fonti THEN e.fonti ELSE e.fonti + $fonte END,
-      e.updated_at = datetime()
+      e.updated_at = timestamp()
     RETURN e.node_id as node_id, e.fonti as fonti
 
   # Crea o merge Responsabilita
@@ -248,10 +248,10 @@ cypher_create:
       r.tipo_responsabilita = $tipo_responsabilita,
       r.fonti = [$fonte],
       r.schema_version = $schema_version,
-      r.created_at = datetime()
+      r.created_at = timestamp()
     ON MATCH SET
       r.fonti = CASE WHEN $fonte IN r.fonti THEN r.fonti ELSE r.fonti + $fonte END,
-      r.updated_at = datetime()
+      r.updated_at = timestamp()
     RETURN r.node_id as node_id, r.fonti as fonti
 
   # Crea o merge Rimedio
@@ -264,10 +264,10 @@ cypher_create:
       r.tipo_rimedio = $tipo_rimedio,
       r.fonti = [$fonte],
       r.schema_version = $schema_version,
-      r.created_at = datetime()
+      r.created_at = timestamp()
     ON MATCH SET
       r.fonti = CASE WHEN $fonte IN r.fonti THEN r.fonti ELSE r.fonti + $fonte END,
-      r.updated_at = datetime()
+      r.updated_at = timestamp()
     RETURN r.node_id as node_id, r.fonti as fonti
 
   # ─────────────────────────────────────────────────────────────────────────
@@ -284,10 +284,10 @@ cypher_create:
       s.tipo_sanzione = $tipo_sanzione,
       s.fonti = [$fonte],
       s.schema_version = $schema_version,
-      s.created_at = datetime()
+      s.created_at = timestamp()
     ON MATCH SET
       s.fonti = CASE WHEN $fonte IN s.fonti THEN s.fonti ELSE s.fonti + $fonte END,
-      s.updated_at = datetime()
+      s.updated_at = timestamp()
     RETURN s.node_id as node_id, s.fonti as fonti
 
   # Crea o merge Caso
@@ -301,10 +301,10 @@ cypher_create:
       c.principi_applicati = $principi_applicati,
       c.fonti = [$fonte],
       c.schema_version = $schema_version,
-      c.created_at = datetime()
+      c.created_at = timestamp()
     ON MATCH SET
       c.fonti = CASE WHEN $fonte IN c.fonti THEN c.fonti ELSE c.fonti + $fonte END,
-      c.updated_at = datetime()
+      c.updated_at = timestamp()
     RETURN c.node_id as node_id, c.fonti as fonti
 
   # Crea o merge Eccezione
@@ -317,10 +317,10 @@ cypher_create:
       e.regola_generale = $regola_generale,
       e.fonti = [$fonte],
       e.schema_version = $schema_version,
-      e.created_at = datetime()
+      e.created_at = timestamp()
     ON MATCH SET
       e.fonti = CASE WHEN $fonte IN e.fonti THEN e.fonti ELSE e.fonti + $fonte END,
-      e.updated_at = datetime()
+      e.updated_at = timestamp()
     RETURN e.node_id as node_id, e.fonti as fonti
 
   # Crea o merge Clausola
@@ -333,44 +333,296 @@ cypher_create:
       c.tipo_clausola = $tipo_clausola,
       c.fonti = [$fonte],
       c.schema_version = $schema_version,
-      c.created_at = datetime()
+      c.created_at = timestamp()
     ON MATCH SET
       c.fonti = CASE WHEN $fonte IN c.fonti THEN c.fonti ELSE c.fonti + $fonte END,
-      c.updated_at = datetime()
+      c.updated_at = timestamp()
     RETURN c.node_id as node_id, c.fonti as fonti
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# ENTITY → RELATION MAPPING
+# ═══════════════════════════════════════════════════════════════════════════════
+# Mapping epistemologicamente rigoroso da knowledge-graph.md (sezioni 3.4 e 3.11)
+# Ogni tipo di entità ha una relazione specifica con Norma.
+# Il codice legge questo mapping a runtime - ZERO hardcoding.
+#
+# Relazioni specifiche (da knowledge-graph.md):
+#   - disciplina (§3.4.15): Norma governs ConcettoGiuridico
+#   - applica_a (§3.4.16): Norma applies to SoggettoGiuridico
+#   - definisce (§3.4.17): Norma defines DefinizioneLegale
+#   - prevede_sanzione (§3.4.18): Norma prescribes Sanzione
+#   - stabilisce_termine (§3.4.19): Norma establishes Termine
+#   - prevede (§3.4.20): Norma provides for Procedura
+#   - impone (§3.11.38): Norma imposes ModalitàGiuridica
+#   - attribuisce_responsabilita (§3.11.42): Norma attributes Responsabilità
+#   - esprime_principio (§3.11.44): Norma expresses PrincipioGiuridico
+# ═══════════════════════════════════════════════════════════════════════════════
+
+entity_relation_mapping:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RELAZIONI SPECIFICHE (epistemologicamente precise)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  concetto:
+    relation_type: DISCIPLINA
+    query_key: norma_disciplina_concetto
+    param_name: concept_id
+    reference: "knowledge-graph.md §3.4.15"
+
+  principio:
+    relation_type: ESPRIME_PRINCIPIO
+    query_key: norma_esprime_principio
+    param_name: principle_id
+    reference: "knowledge-graph.md §3.11.44"
+
+  definizione:
+    relation_type: DEFINISCE
+    query_key: norma_definisce
+    param_name: definition_id
+    reference: "knowledge-graph.md §3.4.17"
+
+  soggetto:
+    relation_type: APPLICA_A
+    query_key: norma_applica_a_soggetto
+    param_name: soggetto_id
+    reference: "knowledge-graph.md §3.4.16"
+
+  modalita:
+    relation_type: IMPONE
+    query_key: norma_impone_modalita
+    param_name: modalita_id
+    reference: "knowledge-graph.md §3.11.38"
+
+  procedura:
+    relation_type: PREVEDE
+    query_key: norma_prevede_procedura
+    param_name: procedura_id
+    reference: "knowledge-graph.md §3.4.20"
+
+  termine:
+    relation_type: STABILISCE_TERMINE
+    query_key: norma_stabilisce_termine
+    param_name: termine_id
+    reference: "knowledge-graph.md §3.4.19"
+
+  sanzione:
+    relation_type: PREVEDE_SANZIONE
+    query_key: norma_prevede_sanzione
+    param_name: sanzione_id
+    reference: "knowledge-graph.md §3.4.18"
+
+  responsabilita:
+    relation_type: ATTRIBUISCE_RESPONSABILITA
+    query_key: norma_attribuisce_responsabilita
+    param_name: responsabilita_id
+    reference: "knowledge-graph.md §3.11.42"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # FALLBACK CON DISCIPLINA (per tipi senza relazione specifica)
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Questi tipi usano :DISCIPLINA come relazione generica perché:
+  # - Non hanno una relazione Norma→Entity specifica in knowledge-graph.md
+  # - :DISCIPLINA ("governs") è semanticamente corretto come fallback
+
+  fatto:
+    relation_type: DISCIPLINA
+    query_key: norma_disciplina_generico
+    param_name: entity_id
+    reference: "fallback - no specific Norma→FattoGiuridico relation"
+
+  atto:
+    relation_type: DISCIPLINA
+    query_key: norma_disciplina_generico
+    param_name: entity_id
+    reference: "fallback - no specific Norma→AttoGiuridico relation"
+
+  effetto:
+    relation_type: DISCIPLINA
+    query_key: norma_disciplina_generico
+    param_name: entity_id
+    reference: "fallback - no specific Norma→EffettoGiuridico relation"
+
+  rimedio:
+    relation_type: DISCIPLINA
+    query_key: norma_disciplina_generico
+    param_name: entity_id
+    reference: "fallback - no specific Norma→Rimedio relation"
+
+  ruolo:
+    relation_type: DISCIPLINA
+    query_key: norma_disciplina_generico
+    param_name: entity_id
+    reference: "fallback - no specific Norma→Ruolo relation"
+
+  caso:
+    relation_type: DISCIPLINA
+    query_key: norma_disciplina_generico
+    param_name: entity_id
+    reference: "fallback - no specific Norma→Caso relation"
+
+  eccezione:
+    relation_type: DISCIPLINA
+    query_key: norma_disciplina_generico
+    param_name: entity_id
+    reference: "fallback - no specific Norma→Eccezione relation"
+
+  clausola:
+    relation_type: DISCIPLINA
+    query_key: norma_disciplina_generico
+    param_name: entity_id
+    reference: "fallback - no specific Norma→Clausola relation"
+
+
 # Query Cypher per creazione relazioni
+# NOTA: Usano MERGE per Norma per creare stub se non esiste
+# Gli stub hanno is_stub=true e vengono riempiti dal backbone ingestion
 cypher_relations:
   # Norma → Concetto (DISCIPLINA)
+  # Crea stub Norma se non esiste, per preservare relazioni
   norma_disciplina_concetto: |
-    MATCH (n:Norma {URN: $urn})
+    MERGE (n:Norma {URN: $urn})
+    ON CREATE SET
+      n.is_stub = true,
+      n.stub_source = 'enrichment_pipeline',
+      n.created_at = timestamp()
+    WITH n
     MATCH (c:ConcettoGiuridico {node_id: $concept_id})
     MERGE (n)-[r:DISCIPLINA]->(c)
-    ON CREATE SET r.created_at = datetime(), r.fonte = $fonte
-    RETURN type(r) as rel_type
+    ON CREATE SET r.created_at = timestamp(), r.fonte = $fonte
+    RETURN type(r) as rel_type, n.is_stub as is_stub
 
   # Norma → Principio (ESPRIME_PRINCIPIO)
   norma_esprime_principio: |
-    MATCH (n:Norma {URN: $urn})
+    MERGE (n:Norma {URN: $urn})
+    ON CREATE SET
+      n.is_stub = true,
+      n.stub_source = 'enrichment_pipeline',
+      n.created_at = timestamp()
+    WITH n
     MATCH (p:PrincipioGiuridico {node_id: $principle_id})
     MERGE (n)-[r:ESPRIME_PRINCIPIO]->(p)
-    ON CREATE SET r.created_at = datetime(), r.fonte = $fonte
-    RETURN type(r) as rel_type
+    ON CREATE SET r.created_at = timestamp(), r.fonte = $fonte
+    RETURN type(r) as rel_type, n.is_stub as is_stub
 
   # Norma → Definizione (DEFINISCE)
   norma_definisce: |
-    MATCH (n:Norma {URN: $urn})
+    MERGE (n:Norma {URN: $urn})
+    ON CREATE SET
+      n.is_stub = true,
+      n.stub_source = 'enrichment_pipeline',
+      n.created_at = timestamp()
+    WITH n
     MATCH (d:DefinizioneLegale {node_id: $definition_id})
     MERGE (n)-[r:DEFINISCE]->(d)
-    ON CREATE SET r.created_at = datetime(), r.fonte = $fonte
-    RETURN type(r) as rel_type
+    ON CREATE SET r.created_at = timestamp(), r.fonte = $fonte
+    RETURN type(r) as rel_type, n.is_stub as is_stub
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # NUOVE RELAZIONI SPECIFICHE (da knowledge-graph.md)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  # Norma → Soggetto (APPLICA_A) - §3.4.16
+  norma_applica_a_soggetto: |
+    MERGE (n:Norma {URN: $urn})
+    ON CREATE SET
+      n.is_stub = true,
+      n.stub_source = 'enrichment_pipeline',
+      n.created_at = timestamp()
+    WITH n
+    MATCH (s:SoggettoGiuridico {node_id: $soggetto_id})
+    MERGE (n)-[r:APPLICA_A]->(s)
+    ON CREATE SET r.created_at = timestamp(), r.fonte = $fonte
+    RETURN type(r) as rel_type, n.is_stub as is_stub
+
+  # Norma → Modalità (IMPONE) - §3.11.38
+  norma_impone_modalita: |
+    MERGE (n:Norma {URN: $urn})
+    ON CREATE SET
+      n.is_stub = true,
+      n.stub_source = 'enrichment_pipeline',
+      n.created_at = timestamp()
+    WITH n
+    MATCH (m:ModalitaGiuridica {node_id: $modalita_id})
+    MERGE (n)-[r:IMPONE]->(m)
+    ON CREATE SET r.created_at = timestamp(), r.fonte = $fonte
+    RETURN type(r) as rel_type, n.is_stub as is_stub
+
+  # Norma → Procedura (PREVEDE) - §3.4.20
+  norma_prevede_procedura: |
+    MERGE (n:Norma {URN: $urn})
+    ON CREATE SET
+      n.is_stub = true,
+      n.stub_source = 'enrichment_pipeline',
+      n.created_at = timestamp()
+    WITH n
+    MATCH (p:Procedura {node_id: $procedura_id})
+    MERGE (n)-[r:PREVEDE]->(p)
+    ON CREATE SET r.created_at = timestamp(), r.fonte = $fonte
+    RETURN type(r) as rel_type, n.is_stub as is_stub
+
+  # Norma → Termine (STABILISCE_TERMINE) - §3.4.19
+  norma_stabilisce_termine: |
+    MERGE (n:Norma {URN: $urn})
+    ON CREATE SET
+      n.is_stub = true,
+      n.stub_source = 'enrichment_pipeline',
+      n.created_at = timestamp()
+    WITH n
+    MATCH (t:Termine {node_id: $termine_id})
+    MERGE (n)-[r:STABILISCE_TERMINE]->(t)
+    ON CREATE SET r.created_at = timestamp(), r.fonte = $fonte
+    RETURN type(r) as rel_type, n.is_stub as is_stub
+
+  # Norma → Sanzione (PREVEDE_SANZIONE) - §3.4.18
+  norma_prevede_sanzione: |
+    MERGE (n:Norma {URN: $urn})
+    ON CREATE SET
+      n.is_stub = true,
+      n.stub_source = 'enrichment_pipeline',
+      n.created_at = timestamp()
+    WITH n
+    MATCH (s:Sanzione {node_id: $sanzione_id})
+    MERGE (n)-[r:PREVEDE_SANZIONE]->(s)
+    ON CREATE SET r.created_at = timestamp(), r.fonte = $fonte
+    RETURN type(r) as rel_type, n.is_stub as is_stub
+
+  # Norma → Responsabilità (ATTRIBUISCE_RESPONSABILITA) - §3.11.42
+  norma_attribuisce_responsabilita: |
+    MERGE (n:Norma {URN: $urn})
+    ON CREATE SET
+      n.is_stub = true,
+      n.stub_source = 'enrichment_pipeline',
+      n.created_at = timestamp()
+    WITH n
+    MATCH (r2:Responsabilita {node_id: $responsabilita_id})
+    MERGE (n)-[r:ATTRIBUISCE_RESPONSABILITA]->(r2)
+    ON CREATE SET r.created_at = timestamp(), r.fonte = $fonte
+    RETURN type(r) as rel_type, n.is_stub as is_stub
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # QUERY GENERICA PER FALLBACK CON DISCIPLINA
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Usata per tipi senza relazione specifica (fatto, atto, effetto, etc.)
+  # Il parametro entity_id è generico, il MATCH usa node_id comune a tutti i nodi
+
+  norma_disciplina_generico: |
+    MERGE (n:Norma {URN: $urn})
+    ON CREATE SET
+      n.is_stub = true,
+      n.stub_source = 'enrichment_pipeline',
+      n.created_at = timestamp()
+    WITH n
+    MATCH (e {node_id: $entity_id})
+    MERGE (n)-[r:DISCIPLINA]->(e)
+    ON CREATE SET r.created_at = timestamp(), r.fonte = $fonte
+    RETURN type(r) as rel_type, n.is_stub as is_stub
 
   # Dottrina → Norma (COMMENTA)
   dottrina_commenta_norma: |
     MATCH (d:Dottrina {node_id: $dottrina_id})
     MATCH (n:Norma {URN: $urn})
     MERGE (d)-[r:COMMENTA]->(n)
-    ON CREATE SET r.created_at = datetime()
+    ON CREATE SET r.created_at = timestamp()
     RETURN type(r) as rel_type
 
   # Dottrina → Concetto (SPIEGA)
@@ -378,7 +630,7 @@ cypher_relations:
     MATCH (d:Dottrina {node_id: $dottrina_id})
     MATCH (c:ConcettoGiuridico {node_id: $concept_id})
     MERGE (d)-[r:SPIEGA]->(c)
-    ON CREATE SET r.created_at = datetime()
+    ON CREATE SET r.created_at = timestamp()
     RETURN type(r) as rel_type
 
   # Concetto → Concetto (SPECIES - sottotipo)
@@ -386,7 +638,7 @@ cypher_relations:
     MATCH (c1:ConcettoGiuridico {node_id: $parent_id})
     MATCH (c2:ConcettoGiuridico {node_id: $child_id})
     MERGE (c2)-[r:SPECIES]->(c1)
-    ON CREATE SET r.created_at = datetime(), r.fonte = $fonte
+    ON CREATE SET r.created_at = timestamp(), r.fonte = $fonte
     RETURN type(r) as rel_type
 
   # Principio ↔ Principio (BILANCIA_CON)
@@ -394,7 +646,7 @@ cypher_relations:
     MATCH (p1:PrincipioGiuridico {node_id: $principle1_id})
     MATCH (p2:PrincipioGiuridico {node_id: $principle2_id})
     MERGE (p1)-[r:BILANCIA_CON]->(p2)
-    ON CREATE SET r.created_at = datetime(), r.fonte = $fonte
+    ON CREATE SET r.created_at = timestamp(), r.fonte = $fonte
     RETURN type(r) as rel_type
 
 # Indici da creare per performance

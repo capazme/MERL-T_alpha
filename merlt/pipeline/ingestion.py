@@ -293,6 +293,7 @@ class IngestionPipelineV2:
                 graph_node_urn=article_urn,
                 mapping_type="PRIMARY",
                 confidence=1.0,
+                chunk_text=chunk.text[:2000] if chunk.text else None,  # Primi 2000 char
                 metadata={"comma_numero": chunk.metadata.comma_numero},
             ))
 
@@ -311,6 +312,7 @@ class IngestionPipelineV2:
                         graph_node_urn=urn,
                         mapping_type="HIERARCHIC",
                         confidence=confidence,
+                        chunk_text=chunk.text[:2000] if chunk.text else None,
                     ))
 
         return mappings
@@ -682,6 +684,25 @@ class IngestionPipelineV2:
                 art.efficacia = 'permanente',
                 art.ambito_territoriale = 'nazionale',
                 art.created_at = $timestamp,
+                art.updated_at = $timestamp
+            ON MATCH SET
+                art.node_id = $urn,
+                art.url = $url,
+                art.tipo_documento = 'articolo',
+                art.estremi = $estremi,
+                art.numero_articolo = $numero_articolo,
+                art.rubrica = $rubrica,
+                art.testo_vigente = $testo,
+                art.titolo = $estremi,
+                art.fonte = 'VisualexAPI',
+                art.autorita_emanante = $autorita,
+                art.data_pubblicazione = $data,
+                art.vigenza = 'vigente',
+                art.stato = 'vigente',
+                art.efficacia = 'permanente',
+                art.ambito_territoriale = 'nazionale',
+                art.is_stub = null,
+                art.stub_source = null,
                 art.updated_at = $timestamp
             """,
             {

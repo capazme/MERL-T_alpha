@@ -40,6 +40,7 @@ class BrocardiEnrichmentSource(BaseEnrichmentSource):
     Attributes:
         _scraper: BrocardiScraper sottostante
         _graph_client: Client per query articoli da grafo (opzionale)
+        act_type: Tipo di atto (default: codice civile)
 
     Example:
         >>> source = BrocardiSource()
@@ -47,16 +48,24 @@ class BrocardiEnrichmentSource(BaseEnrichmentSource):
         ...     print(f"Estratto: {content.id}")
     """
 
-    def __init__(self, graph_client=None):
+    def __init__(
+        self,
+        graph_client=None,
+        act_type: str = "codice civile",
+        phase: int = 1,
+    ):
         """
         Inizializza la fonte Brocardi.
 
         Args:
             graph_client: FalkorDBClient per query articoli esistenti (opzionale)
+            act_type: Tipo di atto giuridico (default: codice civile)
+            phase: Fase di esecuzione (default: 1, fonte primaria)
         """
-        super().__init__()
+        super().__init__(phase=phase)
         self._scraper = None
         self._graph_client = graph_client
+        self.act_type = act_type
 
     @property
     def source_name(self) -> str:
@@ -164,9 +173,11 @@ class BrocardiEnrichmentSource(BaseEnrichmentSource):
                             for citato in rel['articoli_citati']:
                                 num = citato.get('numero', '')
                                 if num:
-                                    # Crea URN per articolo citato
-                                    rel_urn = f"urn:nir:stato:legge:1942-03-16;262~art{num}"
-                                    rel_article_refs.append(rel_urn)
+                                    # Crea URN per articolo citato usando generate_urn
+                                    from merlt.sources.utils.urn import generate_urn
+                                    rel_urn = generate_urn(self.act_type, article=str(num))
+                                    if rel_urn:
+                                        rel_article_refs.append(rel_urn)
 
                         yield EnrichmentContent(
                             id=f"brocardi:{article_num}:relazione:{idx}",
@@ -250,15 +261,17 @@ class BrocardiEnrichmentSource(BaseEnrichmentSource):
                 start, end = scope.articoli
             else:
                 # Lista specifica
+                from merlt.sources.utils.urn import generate_urn
                 return [
-                    (str(n), f"urn:nir:stato:legge:1942-03-16;262~art{n}")
+                    (str(n), generate_urn(self.act_type, article=str(n)))
                     for n in scope.articoli
                 ]
         else:
             start, end = 1173, 2059
 
+        from merlt.sources.utils.urn import generate_urn
         return [
-            (str(n), f"urn:nir:stato:legge:1942-03-16;262~art{n}")
+            (str(n), generate_urn(self.act_type, article=str(n)))
             for n in range(start, end + 1)
         ]
 

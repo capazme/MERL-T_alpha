@@ -2,7 +2,7 @@
 
 ## Comprehensive Overview
 
-This section provides a high-level summary of the entire Knowledge Graph structure **23 Node Types** and **65 Relation Types**.
+* [ ] This section provides a high-level summary of the entire Knowledge Graph structure **23 Node Types** and **65 Relation Types**.
 
 ### Components Map
 

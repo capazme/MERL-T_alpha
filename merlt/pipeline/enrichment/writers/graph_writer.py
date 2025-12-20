@@ -247,40 +247,64 @@ class EnrichmentGraphWriter:
         linked: LinkedEntity,
         content: EnrichmentContent
     ) -> None:
-        """Crea relazioni tra entità e norme."""
-        entity = linked.entity
-        queries = self._config.get("cypher_relations", {})
+        """
+        Crea relazioni tra entità e norme usando mapping da config.
 
-        # Seleziona query relazione per tipo
-        if entity.tipo == EntityType.CONCETTO:
-            rel_query = queries.get("norma_disciplina_concetto")
-            id_param = "concept_id"
-        elif entity.tipo == EntityType.PRINCIPIO:
-            rel_query = queries.get("norma_esprime_principio")
-            id_param = "principle_id"
-        elif entity.tipo == EntityType.DEFINIZIONE:
-            rel_query = queries.get("norma_definisce")
-            id_param = "definition_id"
-        else:
+        Il mapping entity_type → relation_type è definito in writers.yaml
+        (sezione entity_relation_mapping) per garantire:
+        - Zero hardcoding nel codice
+        - Rigore epistemologico (relazioni da knowledge-graph.md)
+        - Sperimentabilità (cambia YAML, non Python)
+        """
+        entity = linked.entity
+        entity_type = entity.tipo.value  # es. "concetto", "soggetto", etc.
+
+        # Leggi mapping da config (ZERO hardcoding)
+        mapping = self._config.get("entity_relation_mapping", {}).get(entity_type)
+        if not mapping:
+            logger.debug(f"Nessun mapping relazione per tipo: {entity_type}")
             return
 
+        # Estrai configurazione per questo tipo
+        query_key = mapping.get("query_key")
+        param_name = mapping.get("param_name")
+
+        if not query_key or not param_name:
+            logger.warning(f"Mapping incompleto per {entity_type}: {mapping}")
+            return
+
+        # Cerca la query Cypher
+        queries = self._config.get("cypher_relations", {})
+        rel_query = queries.get(query_key)
+
         if not rel_query:
+            logger.warning(f"Query Cypher non trovata: {query_key}")
             return
 
         # Crea relazione per ogni articolo correlato
         article_refs = entity.articoli_correlati or content.article_refs
+        relations_created = 0
+
         for urn in article_refs:
             try:
                 await self.graph.query(
                     rel_query,
                     {
                         "urn": urn,
-                        id_param: linked.node_id,
+                        param_name: linked.node_id,
                         "fonte": entity.fonte,
                     }
                 )
+                relations_created += 1
             except Exception as e:
                 logger.debug(f"Relazione non creata per {urn}: {e}")
+
+        if relations_created > 0:
+            rel_type = mapping.get("relation_type", "UNKNOWN")
+            logger.debug(
+                f"Creata {relations_created} relazione/i {rel_type} "
+                f"per {entity_type}:{linked.node_id}"
+            )
 
     async def write_dottrina(
         self,

@@ -205,7 +205,7 @@ Deve contenere esattamente {len(contents)} oggetti nell'array "results", uno per
 
     try:
         import os
-        model = os.getenv("LLM_PARSING_MODEL", "openai/gpt-4o-mini")
+        model = os.getenv("LLM_PARSING_MODEL", "google/gemini-2.5-flash")
 
         result = await llm_service.generate_json_completion(
             prompt=prompt,
