@@ -38,6 +38,11 @@ from merlt.tools.registry import (
     get_tool_registry,
     register_tool,
 )
+from merlt.tools.search import (
+    SemanticSearchTool,
+    GraphSearchTool,
+    SearchResultItem,
+)
 
 __all__ = [
     # Base classes
@@ -50,4 +55,8 @@ __all__ = [
     "ToolRegistry",
     "get_tool_registry",
     "register_tool",
+    # Search tools
+    "SemanticSearchTool",
+    "GraphSearchTool",
+    "SearchResultItem",
 ]

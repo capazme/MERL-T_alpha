@@ -282,11 +282,16 @@ class TestToolChain:
 
             @property
             def parameters(self):
-                return [ToolParameter("input", ParameterType.OBJECT, "Input")]
+                # Parametri opzionali - la chain passa il dict del tool precedente
+                return [
+                    ToolParameter("query", ParameterType.STRING, "Query", required=False),
+                    ToolParameter("limit", ParameterType.INTEGER, "Limit", required=False),
+                    ToolParameter("results", ParameterType.ARRAY, "Results", required=False),
+                ]
 
-            async def execute(self, input=None, **kwargs):
+            async def execute(self, **kwargs):
                 return ToolResult.ok(
-                    data={"transformed": True, **kwargs},
+                    data={"transformed": True, "received": kwargs},
                     tool_name=self.name
                 )
 
@@ -296,6 +301,8 @@ class TestToolChain:
         result = await chain.execute(query="test")
 
         assert result.success is True
+        assert result.data["transformed"] is True
+        assert result.data["received"]["query"] == "test"
         assert chain.name == "mock_tool -> transform"
 
     @pytest.mark.asyncio

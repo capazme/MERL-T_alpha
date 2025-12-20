@@ -1,0 +1,540 @@
+"""
+Search Tools
+=============
+
+Tools per la ricerca semantica e basata su grafo nel knowledge graph giuridico.
+
+Tools disponibili:
+- SemanticSearchTool: Ricerca ibrida vettori + grafo
+- GraphSearchTool: Ricerca pura su grafo (traversal)
+
+Esempio:
+    >>> from merlt.tools import SemanticSearchTool
+    >>>
+    >>> tool = SemanticSearchTool(retriever=retriever, embeddings=embeddings)
+    >>> result = await tool(query="Cos'è la legittima difesa?", top_k=5)
+    >>> for item in result.data["results"]:
+    ...     print(item["text"][:100])
+"""
+
+import structlog
+from typing import List, Optional, Dict, Any
+from dataclasses import dataclass
+
+from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+
+log = structlog.get_logger()
+
+
+@dataclass
+class SearchResultItem:
+    """
+    Singolo risultato di ricerca.
+
+    Attributes:
+        chunk_id: ID del chunk
+        text: Testo del chunk
+        similarity_score: Score similarità vettoriale [0-1]
+        graph_score: Score basato su grafo [0-1]
+        final_score: Score combinato [0-1]
+        linked_nodes: Nodi grafo collegati
+        metadata: Metadati aggiuntivi
+    """
+    chunk_id: str
+    text: str
+    similarity_score: float
+    graph_score: float
+    final_score: float
+    linked_nodes: List[Dict[str, Any]]
+    metadata: Dict[str, Any]
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Converte in dizionario per serializzazione."""
+        return {
+            "chunk_id": self.chunk_id,
+            "text": self.text,
+            "similarity_score": self.similarity_score,
+            "graph_score": self.graph_score,
+            "final_score": self.final_score,
+            "linked_nodes": self.linked_nodes,
+            "metadata": self.metadata
+        }
+
+
+class SemanticSearchTool(BaseTool):
+    """
+    Tool per ricerca semantica ibrida nel knowledge graph.
+
+    Combina:
+    - Ricerca vettoriale (Qdrant) per similarità semantica
+    - Struttura grafo (FalkorDB) per contesto giuridico
+
+    Formula: final_score = α * similarity_score + (1-α) * graph_score
+
+    Esempio:
+        >>> from merlt.tools import SemanticSearchTool
+        >>> from merlt.storage.retriever import GraphAwareRetriever
+        >>> from merlt.storage.vectors import EmbeddingService
+        >>>
+        >>> tool = SemanticSearchTool(
+        ...     retriever=retriever,
+        ...     embeddings=EmbeddingService.get_instance()
+        ... )
+        >>> result = await tool(
+        ...     query="Quali sono i termini per la risoluzione del contratto?",
+        ...     top_k=10,
+        ...     expert_type="LiteralExpert"
+        ... )
+        >>> print(f"Trovati {len(result.data['results'])} risultati")
+    """
+
+    name = "semantic_search"
+    description = (
+        "Cerca nel knowledge graph giuridico usando ricerca semantica ibrida. "
+        "Combina similarità vettoriale con struttura del grafo per risultati "
+        "contestualmente rilevanti. Utile per domande su articoli, concetti, "
+        "principi giuridici."
+    )
+
+    def __init__(
+        self,
+        retriever: Any = None,
+        embeddings: Any = None,
+        default_top_k: int = 10,
+        default_expert_type: Optional[str] = None
+    ):
+        """
+        Inizializza SemanticSearchTool.
+
+        Args:
+            retriever: Istanza di GraphAwareRetriever
+            embeddings: Istanza di EmbeddingService
+            default_top_k: Numero default di risultati
+            default_expert_type: Expert type default (LiteralExpert, SystemicExpert, etc.)
+        """
+        super().__init__()
+        self.retriever = retriever
+        self.embeddings = embeddings
+        self.default_top_k = default_top_k
+        self.default_expert_type = default_expert_type
+
+    @property
+    def parameters(self) -> List[ToolParameter]:
+        """Parametri del tool."""
+        return [
+            ToolParameter(
+                name="query",
+                param_type=ParameterType.STRING,
+                description=(
+                    "Query di ricerca in linguaggio naturale. "
+                    "Es: 'Cos'è la legittima difesa?', "
+                    "'Termini per risoluzione contratto'"
+                )
+            ),
+            ToolParameter(
+                name="top_k",
+                param_type=ParameterType.INTEGER,
+                description="Numero massimo di risultati da ritornare",
+                required=False,
+                default=10
+            ),
+            ToolParameter(
+                name="expert_type",
+                param_type=ParameterType.STRING,
+                description=(
+                    "Tipo di expert per pesatura traversal grafo. "
+                    "Influenza quali relazioni sono privilegiate."
+                ),
+                required=False,
+                enum=["LiteralExpert", "SystemicExpert", "PrinciplesExpert", "PrecedentExpert"]
+            ),
+            ToolParameter(
+                name="context_nodes",
+                param_type=ParameterType.ARRAY,
+                description=(
+                    "URN di nodi grafo per contestualizzare la ricerca. "
+                    "Es: ['urn:norma:cc:art1453']"
+                ),
+                required=False
+            ),
+            ToolParameter(
+                name="min_score",
+                param_type=ParameterType.FLOAT,
+                description="Score minimo per filtrare risultati [0-1]",
+                required=False,
+                default=0.0
+            )
+        ]
+
+    async def execute(
+        self,
+        query: str,
+        top_k: int = None,
+        expert_type: str = None,
+        context_nodes: List[str] = None,
+        min_score: float = 0.0
+    ) -> ToolResult:
+        """
+        Esegue ricerca semantica ibrida.
+
+        Args:
+            query: Query in linguaggio naturale
+            top_k: Numero risultati (default: 10)
+            expert_type: Tipo expert per pesatura grafo
+            context_nodes: URN nodi per contesto
+            min_score: Score minimo per filtrare
+
+        Returns:
+            ToolResult con lista di risultati ordinati per final_score
+        """
+        top_k = top_k or self.default_top_k
+        expert_type = expert_type or self.default_expert_type
+
+        log.debug(
+            f"semantic_search - query='{query[:50]}...', "
+            f"top_k={top_k}, expert={expert_type}"
+        )
+
+        # Verifica dipendenze
+        if self.embeddings is None:
+            return ToolResult.fail(
+                error="EmbeddingService non configurato",
+                tool_name=self.name
+            )
+
+        if self.retriever is None:
+            return ToolResult.fail(
+                error="GraphAwareRetriever non configurato",
+                tool_name=self.name
+            )
+
+        try:
+            # Step 1: Genera embedding della query
+            query_embedding = await self._encode_query(query)
+
+            # Step 2: Hybrid retrieval
+            retrieval_results = await self.retriever.retrieve(
+                query_embedding=query_embedding,
+                context_nodes=context_nodes,
+                expert_type=expert_type,
+                top_k=top_k
+            )
+
+            # Step 3: Converti e filtra risultati
+            results = []
+            for r in retrieval_results:
+                if r.final_score >= min_score:
+                    results.append(SearchResultItem(
+                        chunk_id=str(r.chunk_id),
+                        text=r.text,
+                        similarity_score=r.similarity_score,
+                        graph_score=r.graph_score,
+                        final_score=r.final_score,
+                        linked_nodes=r.linked_nodes,
+                        metadata=r.metadata
+                    ).to_dict())
+
+            log.info(
+                f"semantic_search completed - "
+                f"query='{query[:30]}...', "
+                f"results={len(results)}, "
+                f"top_score={results[0]['final_score']:.3f}" if results else "no results"
+            )
+
+            return ToolResult.ok(
+                data={
+                    "query": query,
+                    "results": results,
+                    "total": len(results),
+                    "expert_type": expert_type,
+                    "context_nodes": context_nodes or []
+                },
+                tool_name=self.name,
+                query=query,
+                top_k=top_k,
+                expert_type=expert_type
+            )
+
+        except Exception as e:
+            log.error(f"semantic_search failed: {e}")
+            return ToolResult.fail(
+                error=f"Errore durante la ricerca: {str(e)}",
+                tool_name=self.name
+            )
+
+    async def _encode_query(self, query: str) -> List[float]:
+        """
+        Genera embedding per la query.
+
+        Utilizza il prefisso "query: " come richiesto da E5.
+        """
+        # EmbeddingService supporta encode_query() che aggiunge il prefisso
+        if hasattr(self.embeddings, 'encode_query'):
+            # Sync method - wrap in executor se necessario
+            import asyncio
+            loop = asyncio.get_event_loop()
+            embedding = await loop.run_in_executor(
+                None,
+                self.embeddings.encode_query,
+                query
+            )
+            return embedding.tolist() if hasattr(embedding, 'tolist') else embedding
+
+        # Fallback: encode generico
+        if hasattr(self.embeddings, 'encode'):
+            import asyncio
+            loop = asyncio.get_event_loop()
+            embedding = await loop.run_in_executor(
+                None,
+                lambda: self.embeddings.encode(f"query: {query}")
+            )
+            return embedding.tolist() if hasattr(embedding, 'tolist') else embedding
+
+        raise ValueError("EmbeddingService non supporta encode_query o encode")
+
+
+class GraphSearchTool(BaseTool):
+    """
+    Tool per ricerca diretta nel knowledge graph.
+
+    Esegue traversal del grafo senza componente vettoriale.
+    Utile per:
+    - Navigare relazioni tra norme
+    - Trovare path tra concetti
+    - Esplorare gerarchie normative
+
+    Esempio:
+        >>> tool = GraphSearchTool(graph_db=falkordb_client)
+        >>> result = await tool(
+        ...     start_node="urn:norma:cp:art52",
+        ...     relation_types=["disciplina", "definisce"],
+        ...     max_hops=2
+        ... )
+    """
+
+    name = "graph_search"
+    description = (
+        "Cerca nel knowledge graph tramite traversal diretto. "
+        "Naviga relazioni tra norme, concetti, principi. "
+        "Utile per esplorare la struttura del grafo senza ricerca semantica."
+    )
+
+    def __init__(
+        self,
+        graph_db: Any = None,
+        default_max_hops: int = 2
+    ):
+        """
+        Inizializza GraphSearchTool.
+
+        Args:
+            graph_db: Client FalkorDB
+            default_max_hops: Profondità massima default del traversal
+        """
+        super().__init__()
+        self.graph_db = graph_db
+        self.default_max_hops = default_max_hops
+
+    @property
+    def parameters(self) -> List[ToolParameter]:
+        """Parametri del tool."""
+        return [
+            ToolParameter(
+                name="start_node",
+                param_type=ParameterType.STRING,
+                description=(
+                    "URN del nodo di partenza. "
+                    "Es: 'urn:norma:cp:art52', 'urn:concetto:legittima_difesa'"
+                )
+            ),
+            ToolParameter(
+                name="relation_types",
+                param_type=ParameterType.ARRAY,
+                description=(
+                    "Tipi di relazione da seguire. "
+                    "Es: ['disciplina', 'definisce', 'cita']"
+                ),
+                required=False
+            ),
+            ToolParameter(
+                name="max_hops",
+                param_type=ParameterType.INTEGER,
+                description="Profondità massima del traversal",
+                required=False,
+                default=2
+            ),
+            ToolParameter(
+                name="target_type",
+                param_type=ParameterType.STRING,
+                description=(
+                    "Tipo di nodo target da cercare. "
+                    "Es: 'Norma', 'ConcettoGiuridico', 'PrincipioGiuridico'"
+                ),
+                required=False
+            ),
+            ToolParameter(
+                name="direction",
+                param_type=ParameterType.STRING,
+                description="Direzione del traversal",
+                required=False,
+                enum=["outgoing", "incoming", "both"],
+                default="outgoing"
+            )
+        ]
+
+    async def execute(
+        self,
+        start_node: str,
+        relation_types: List[str] = None,
+        max_hops: int = None,
+        target_type: str = None,
+        direction: str = "outgoing"
+    ) -> ToolResult:
+        """
+        Esegue traversal del knowledge graph.
+
+        Args:
+            start_node: URN nodo di partenza
+            relation_types: Tipi di relazione da seguire (None = tutte)
+            max_hops: Profondità massima
+            target_type: Filtra per tipo nodo target
+            direction: Direzione traversal (outgoing, incoming, both)
+
+        Returns:
+            ToolResult con nodi e relazioni trovati
+        """
+        max_hops = max_hops or self.default_max_hops
+
+        log.debug(
+            f"graph_search - start={start_node}, "
+            f"relations={relation_types}, max_hops={max_hops}"
+        )
+
+        if self.graph_db is None:
+            return ToolResult.fail(
+                error="FalkorDB client non configurato",
+                tool_name=self.name
+            )
+
+        try:
+            # Costruisci query Cypher
+            query, params = self._build_traversal_query(
+                start_node=start_node,
+                relation_types=relation_types,
+                max_hops=max_hops,
+                target_type=target_type,
+                direction=direction
+            )
+
+            # Esegui query
+            result = await self.graph_db.execute_query(query, params)
+
+            # Processa risultati
+            nodes = []
+            edges = []
+
+            for record in result:
+                if "node" in record:
+                    nodes.append(self._node_to_dict(record["node"]))
+                if "rel" in record:
+                    edges.append(self._edge_to_dict(record["rel"]))
+
+            log.info(
+                f"graph_search completed - "
+                f"start={start_node}, nodes={len(nodes)}, edges={len(edges)}"
+            )
+
+            return ToolResult.ok(
+                data={
+                    "start_node": start_node,
+                    "nodes": nodes,
+                    "edges": edges,
+                    "total_nodes": len(nodes),
+                    "total_edges": len(edges)
+                },
+                tool_name=self.name,
+                start_node=start_node,
+                max_hops=max_hops
+            )
+
+        except Exception as e:
+            log.error(f"graph_search failed: {e}")
+            return ToolResult.fail(
+                error=f"Errore nel traversal: {str(e)}",
+                tool_name=self.name
+            )
+
+    def _build_traversal_query(
+        self,
+        start_node: str,
+        relation_types: List[str] = None,
+        max_hops: int = 2,
+        target_type: str = None,
+        direction: str = "outgoing"
+    ) -> tuple:
+        """
+        Costruisce query Cypher per il traversal.
+
+        Returns:
+            Tuple (query_string, params_dict)
+        """
+        # Direzione della relazione
+        if direction == "outgoing":
+            rel_pattern = f"-[r*1..{max_hops}]->"
+        elif direction == "incoming":
+            rel_pattern = f"<-[r*1..{max_hops}]-"
+        else:  # both
+            rel_pattern = f"-[r*1..{max_hops}]-"
+
+        # Filtro per tipo relazione
+        if relation_types:
+            rel_types = "|".join(relation_types)
+            rel_pattern = rel_pattern.replace("[r*", f"[r:{rel_types}*")
+
+        # Target type filter
+        target_filter = f":{target_type}" if target_type else ""
+
+        query = f"""
+        MATCH (start {{URN: $start_urn}})
+        MATCH path = (start){rel_pattern}(target{target_filter})
+        UNWIND nodes(path) AS node
+        UNWIND relationships(path) AS rel
+        RETURN DISTINCT node, rel
+        LIMIT 100
+        """
+
+        params = {"start_urn": start_node}
+
+        return query, params
+
+    def _node_to_dict(self, node: Any) -> Dict[str, Any]:
+        """Converte nodo FalkorDB in dizionario."""
+        if hasattr(node, 'properties'):
+            props = dict(node.properties)
+        elif isinstance(node, dict):
+            props = node
+        else:
+            props = {}
+
+        return {
+            "urn": props.get("URN", props.get("node_id", "")),
+            "type": props.get("_type", "Unknown"),
+            "properties": props
+        }
+
+    def _edge_to_dict(self, edge: Any) -> Dict[str, Any]:
+        """Converte edge FalkorDB in dizionario."""
+        if hasattr(edge, 'type'):
+            edge_type = edge.type
+            props = dict(edge.properties) if hasattr(edge, 'properties') else {}
+        elif isinstance(edge, dict):
+            edge_type = edge.get("type", "UNKNOWN")
+            props = edge
+        else:
+            edge_type = "UNKNOWN"
+            props = {}
+
+        return {
+            "type": edge_type,
+            "properties": props
+        }

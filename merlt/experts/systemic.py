@@ -1,0 +1,449 @@
+"""
+Systemic Expert
+================
+
+Expert specializzato nell'interpretazione sistematica e storica.
+
+Fondamento teorico: Art. 12, comma I + Art. 14 disp. prel. c.c.
+- Art. 12, I: "...secondo la connessione di esse [parole]..."
+- Art. 14: "Le leggi penali e quelle che fanno eccezione... non si applicano
+  oltre i casi e i tempi in esse considerati"
+
+L'interpretazione sistematica considera:
+- CONNESSIONE: Come la norma si inserisce nel sistema giuridico
+- STORICO: Evoluzione della norma nel tempo (modifiche, abrogazioni)
+- TOPOGRAFICO: Posizione della norma (libro, titolo, capo, sezione)
+
+Approccio:
+1. Colloca la norma nel contesto sistematico (codice, legge speciale)
+2. Analizza relazioni con norme collegate (rinvii, deroghe, eccezioni)
+3. Ricostruisce l'evoluzione storica (versioni precedenti, modifiche)
+4. Considera la ratio sistemica (coerenza dell'ordinamento)
+"""
+
+import structlog
+from typing import Dict, Any, Optional, List
+
+from merlt.experts.base import (
+    BaseExpert,
+    ExpertContext,
+    ExpertResponse,
+    LegalSource,
+    ReasoningStep,
+    ConfidenceFactors,
+)
+from merlt.tools import BaseTool
+
+log = structlog.get_logger()
+
+
+class SystemicExpert(BaseExpert):
+    """
+    Expert per interpretazione sistematica e storica.
+
+    Art. 12, I: "connessione delle parole" + Art. 14 (elemento storico)
+
+    Epistemologia: Coerenza sistemica dell'ordinamento
+    Focus: Come la norma si INSERISCE nel sistema giuridico
+
+    Tools principali:
+    - semantic_search: Ricerca norme correlate
+    - graph_search: Navigazione relazioni sistematiche
+
+    Traversal weights:
+    - CONNESSO_A: 1.0 (connessioni sistematiche)
+    - MODIFICA: 0.95 (evoluzione storica - fondamentale)
+    - ABROGA: 0.90 (abrogazioni storiche)
+    - DEROGA: 0.90 (deroghe)
+    - RINVIA: 0.85 (riferimenti incrociati)
+
+    Esempio:
+        >>> from merlt.experts import SystemicExpert
+        >>>
+        >>> expert = SystemicExpert(
+        ...     tools=[SemanticSearchTool(retriever, embeddings)],
+        ...     ai_service=openrouter_service
+        ... )
+        >>> response = await expert.analyze(context)
+    """
+
+    expert_type = "systemic"
+    description = "Interpretazione sistematica e storica (art. 12, I + art. 14 disp. prel. c.c.)"
+
+    # Pesi default per traversal grafo - focus su relazioni sistematiche
+    DEFAULT_TRAVERSAL_WEIGHTS = {
+        "connesso_a": 1.0,     # Connessioni sistematiche
+        "modifica": 0.95,      # Evoluzione storica (fondamentale)
+        "abroga": 0.90,        # Abrogazioni storiche
+        "deroga": 0.90,        # Deroghe
+        "rinvia": 0.85,        # Riferimenti incrociati
+        "disciplina": 0.80,    # Norme che regolano stessa materia
+        "contiene": 0.75,      # Struttura
+        "cita": 0.70,          # Citazioni
+        "default": 0.50
+    }
+
+    def __init__(
+        self,
+        tools: Optional[List[BaseTool]] = None,
+        config: Optional[Dict[str, Any]] = None,
+        ai_service: Any = None
+    ):
+        """
+        Inizializza SystemicExpert.
+
+        Args:
+            tools: Tools per ricerca
+            config: Configurazione (prompt, temperature, traversal_weights)
+            ai_service: Servizio AI per LLM calls
+        """
+        config = config or {}
+        if "traversal_weights" not in config:
+            config["traversal_weights"] = self.DEFAULT_TRAVERSAL_WEIGHTS
+
+        super().__init__(tools=tools, config=config, ai_service=ai_service)
+        self.prompt_template = self._get_systemic_prompt()
+
+    def _get_systemic_prompt(self) -> str:
+        """Prompt specifico per interpretazione sistematica."""
+        return """Sei un esperto giuridico specializzato nell'INTERPRETAZIONE SISTEMATICA E STORICA.
+
+Il tuo approccio si basa su:
+- Art. 12, comma I, disp. prel. c.c.: "...secondo la connessione di esse [parole]..."
+- Art. 14 disp. prel. c.c. (elemento storico-evolutivo)
+
+## METODOLOGIA
+
+1. **INTERPRETAZIONE SISTEMATICA** (connessione)
+   - Colloca la norma nel suo contesto (codice, legge speciale, regolamento)
+   - Analizza la posizione topografica (libro, titolo, capo, sezione)
+   - Identifica norme collegate (rinvii, deroghe, eccezioni, norme generali/speciali)
+   - Verifica la coerenza con l'ordinamento (evita antinomie)
+
+2. **INTERPRETAZIONE STORICA** (art. 14)
+   - Ricostruisci l'evoluzione della norma nel tempo
+   - Analizza le modifiche legislative (quando e perché)
+   - Considera le abrogazioni (espresse, tacite, per incompatibilità)
+   - Valuta i lavori preparatori se rilevanti
+
+3. **PRINCIPI GUIDA**
+   - "Lex posterior derogat priori" (legge successiva deroga anteriore)
+   - "Lex specialis derogat generali" (legge speciale deroga generale)
+   - "In dubio pro libertate" per norme restrittive
+   - Coerenza dell'ordinamento giuridico
+
+## OUTPUT
+
+Rispondi in JSON con questa struttura:
+{
+    "interpretation": "Interpretazione sistematica in italiano",
+    "legal_basis": [
+        {
+            "source_type": "norm",
+            "source_id": "URN della norma",
+            "citation": "Citazione formale",
+            "excerpt": "Testo rilevante",
+            "relevance": "Connessione sistematica con la norma principale"
+        }
+    ],
+    "reasoning_steps": [
+        {
+            "step_number": 1,
+            "description": "Descrizione del passo sistematico",
+            "sources": ["source_id1", "source_id2"]
+        }
+    ],
+    "confidence": 0.0-1.0,
+    "confidence_factors": {
+        "norm_clarity": 0.0-1.0,
+        "jurisprudence_alignment": 0.0-1.0,
+        "contextual_ambiguity": 0.0-1.0,
+        "source_availability": 0.0-1.0
+    },
+    "historical_context": "Evoluzione storica della norma (se rilevante)",
+    "systematic_position": "Posizione nel sistema giuridico",
+    "limitations": "Cosa non hai potuto considerare"
+}
+
+IMPORTANTE:
+- Evidenzia le RELAZIONI tra norme (rinvii, deroghe, abrogazioni)
+- Ricostruisci la STORIA della norma quando rilevante
+- Considera il CONTESTO sistematico (principi generali, norme speciali)
+- Segnala eventuali ANTINOMIE o lacune"""
+
+    async def analyze(self, context: ExpertContext) -> ExpertResponse:
+        """
+        Analizza la query con approccio sistematico e storico.
+
+        Flow:
+        1. Usa semantic_search per trovare norme correlate
+        2. Usa graph_search per esplorare connessioni sistematiche
+        3. Identifica modifiche storiche tramite relazione MODIFICA
+        4. Chiama LLM per analisi sistematica
+        """
+        import time
+        start_time = time.time()
+
+        log.info(
+            f"SystemicExpert analyzing",
+            query=context.query_text[:50],
+            trace_id=context.trace_id
+        )
+
+        # Step 1: Recupera norme correlate
+        retrieved_sources = await self._retrieve_sources(context)
+
+        # Step 2: Espandi con relazioni sistematiche
+        systemic_sources = await self._expand_systemic_relations(context, retrieved_sources)
+
+        # Step 3: Costruisci context arricchito
+        all_sources = retrieved_sources + systemic_sources
+        enriched_context = ExpertContext(
+            query_text=context.query_text,
+            query_embedding=context.query_embedding,
+            entities=context.entities,
+            retrieved_chunks=all_sources,
+            metadata={**context.metadata, "systemic_expansion": True},
+            trace_id=context.trace_id
+        )
+
+        # Step 4: Analisi
+        if self.ai_service:
+            response = await self._analyze_with_llm(enriched_context)
+        else:
+            response = self._analyze_without_llm(enriched_context)
+
+        response.execution_time_ms = (time.time() - start_time) * 1000
+
+        log.info(
+            f"SystemicExpert completed",
+            confidence=response.confidence,
+            sources=len(response.legal_basis),
+            time_ms=response.execution_time_ms
+        )
+
+        return response
+
+    async def _retrieve_sources(self, context: ExpertContext) -> List[Dict[str, Any]]:
+        """Recupera fonti usando i tools disponibili."""
+        sources = []
+
+        if context.retrieved_chunks:
+            sources.extend(context.retrieved_chunks)
+
+        semantic_tool = self._tool_registry.get("semantic_search")
+        if semantic_tool:
+            result = await semantic_tool(
+                query=context.query_text,
+                top_k=5,
+                expert_type="SystemicExpert"
+            )
+            if result.success and result.data.get("results"):
+                sources.extend(result.data["results"])
+
+        return sources
+
+    async def _expand_systemic_relations(
+        self,
+        context: ExpertContext,
+        initial_sources: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Espande le fonti seguendo relazioni sistematiche."""
+        expanded = []
+
+        graph_tool = self._tool_registry.get("graph_search")
+        if not graph_tool:
+            return expanded
+
+        # Raccogli URN da espandere
+        urns_to_expand = set(context.norm_references)
+        for source in initial_sources[:3]:
+            urn = source.get("urn", source.get("source_id", ""))
+            if urn:
+                urns_to_expand.add(urn)
+
+        # Espandi con relazioni sistematiche
+        systemic_relations = ["connesso_a", "modifica", "abroga", "deroga", "rinvia"]
+
+        for urn in list(urns_to_expand)[:5]:
+            try:
+                result = await graph_tool(
+                    start_node=urn,
+                    relation_types=systemic_relations,
+                    max_hops=2,
+                    direction="both"  # Bidirezionale per connessioni
+                )
+                if result.success:
+                    for node in result.data.get("nodes", []):
+                        expanded.append({
+                            "text": node.get("properties", {}).get("testo", ""),
+                            "urn": node.get("urn", ""),
+                            "type": node.get("type", ""),
+                            "source": "systemic_expansion",
+                            "relation": "systemic"
+                        })
+            except Exception as e:
+                log.warning(f"Failed to expand {urn}: {e}")
+
+        return expanded
+
+    async def _analyze_with_llm(self, context: ExpertContext) -> ExpertResponse:
+        """Analizza con LLM."""
+        import json
+
+        system_prompt = self.prompt_template
+        user_prompt = self._format_context_for_llm(context)
+
+        try:
+            response = await self.ai_service.generate_response_async(
+                prompt=f"{system_prompt}\n\n{user_prompt}",
+                model=self.model,
+                temperature=self.temperature
+            )
+
+            if isinstance(response, dict):
+                content = response.get("content", str(response))
+                tokens = response.get("usage", {}).get("total_tokens", 0)
+            else:
+                content = str(response)
+                tokens = 0
+
+            # Clean markdown
+            content = content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            elif content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+
+            data = json.loads(content)
+            return self._build_response(data, context, tokens)
+
+        except Exception as e:
+            log.error(f"LLM analysis failed: {e}")
+            return ExpertResponse(
+                expert_type=self.expert_type,
+                interpretation=f"Errore nell'analisi sistematica: {str(e)}",
+                confidence=0.0,
+                limitations=str(e),
+                trace_id=context.trace_id
+            )
+
+    def _analyze_without_llm(self, context: ExpertContext) -> ExpertResponse:
+        """Genera risposta basic senza LLM."""
+        sources = context.retrieved_chunks[:5]
+
+        legal_basis = []
+        for chunk in sources:
+            legal_basis.append(LegalSource(
+                source_type="norm",
+                source_id=chunk.get("urn", chunk.get("chunk_id", "")),
+                citation=chunk.get("urn", ""),
+                excerpt=chunk.get("text", "")[:500],
+                relevance=f"Connessione sistematica - {chunk.get('source', 'unknown')}"
+            ))
+
+        interpretation = "Analisi sistematica delle fonti recuperate:\n\n"
+        for i, chunk in enumerate(sources, 1):
+            text = chunk.get("text", "")[:200]
+            source_type = chunk.get("source", "semantic")
+            interpretation += f"{i}. [{source_type}] {text}...\n\n"
+
+        interpretation += "\n[Nota: Analisi sistematica completa richiede servizio AI]"
+
+        return ExpertResponse(
+            expert_type=self.expert_type,
+            interpretation=interpretation,
+            legal_basis=legal_basis,
+            confidence=0.3,
+            limitations="Analisi senza LLM - solo recupero fonti sistematiche",
+            trace_id=context.trace_id
+        )
+
+    def _format_context_for_llm(self, context: ExpertContext) -> str:
+        """Formatta context per LLM con focus sistematico."""
+        sections = [
+            f"## DOMANDA DELL'UTENTE\n{context.query_text}"
+        ]
+
+        if context.norm_references:
+            sections.append(f"\n## NORME CITATE\n" + ", ".join(context.norm_references))
+
+        if context.legal_concepts:
+            sections.append(f"\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
+
+        if context.retrieved_chunks:
+            # Separa fonti per tipo
+            semantic = [c for c in context.retrieved_chunks if c.get("source") != "systemic_expansion"]
+            systemic = [c for c in context.retrieved_chunks if c.get("source") == "systemic_expansion"]
+
+            if semantic:
+                sections.append("\n## NORME DIRETTAMENTE RILEVANTI")
+                for i, chunk in enumerate(semantic[:5], 1):
+                    text = chunk.get("text", "")
+                    urn = chunk.get("urn", "N/A")
+                    sections.append(f"\n### Fonte {i} (URN: {urn})\n{text}")
+
+            if systemic:
+                sections.append("\n## NORME SISTEMATICAMENTE CONNESSE")
+                for i, chunk in enumerate(systemic[:5], 1):
+                    text = chunk.get("text", "")
+                    urn = chunk.get("urn", "N/A")
+                    rel = chunk.get("relation", "N/A")
+                    sections.append(f"\n### Connessione {i} (URN: {urn}, relazione: {rel})\n{text}")
+
+        return "\n".join(sections)
+
+    def _build_response(
+        self,
+        data: Dict[str, Any],
+        context: ExpertContext,
+        tokens: int
+    ) -> ExpertResponse:
+        """Costruisce ExpertResponse da JSON LLM."""
+        legal_basis = []
+        for lb in data.get("legal_basis", []):
+            legal_basis.append(LegalSource(
+                source_type=lb.get("source_type", "norm"),
+                source_id=lb.get("source_id", ""),
+                citation=lb.get("citation", ""),
+                excerpt=lb.get("excerpt", ""),
+                relevance=lb.get("relevance", "")
+            ))
+
+        reasoning_steps = []
+        for rs in data.get("reasoning_steps", []):
+            reasoning_steps.append(ReasoningStep(
+                step_number=rs.get("step_number", 0),
+                description=rs.get("description", ""),
+                sources=rs.get("sources", [])
+            ))
+
+        cf_data = data.get("confidence_factors", {})
+        confidence_factors = ConfidenceFactors(
+            norm_clarity=cf_data.get("norm_clarity", 0.5),
+            jurisprudence_alignment=cf_data.get("jurisprudence_alignment", 0.5),
+            contextual_ambiguity=cf_data.get("contextual_ambiguity", 0.5),
+            source_availability=cf_data.get("source_availability", 0.5)
+        )
+
+        # Aggiungi contesto storico/sistematico alle limitations se presente
+        limitations = data.get("limitations", "")
+        if data.get("historical_context"):
+            limitations += f"\n\nContesto storico: {data['historical_context']}"
+        if data.get("systematic_position"):
+            limitations += f"\n\nPosizione sistematica: {data['systematic_position']}"
+
+        return ExpertResponse(
+            expert_type=self.expert_type,
+            interpretation=data.get("interpretation", ""),
+            legal_basis=legal_basis,
+            reasoning_steps=reasoning_steps,
+            confidence=data.get("confidence", 0.5),
+            confidence_factors=confidence_factors,
+            limitations=limitations.strip(),
+            trace_id=context.trace_id,
+            tokens_used=tokens
+        )
