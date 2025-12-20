@@ -14,8 +14,12 @@
 | [EXP-004](./EXP-004_ingestion_costituzione/) | ingestion_costituzione | **COMPLETED** | 2025-12-05 | RQ1-3 | Ingestion 139 articoli Costituzione Italiana |
 | [EXP-006](./EXP-006_libro_primo_cp/) | libro_primo_cp | **COMPLETED** | 2025-12-07 | RQ1-4 | Ingestion 263 articoli Libro I Codice Penale + RAG validation |
 | [EXP-007](./EXP-007_full_ingestion/) | full_ingestion | **COMPLETED** | 2025-12-08 | RQ1-4 | Pipeline end-to-end: Brocardi + Bridge + Multivigenza |
+| [EXP-008](./EXP-008_costituzione_completa/) | costituzione_completa | **COMPLETED** | 2025-12-08 | RQ1-3 | Ingestion Costituzione 139 art: 545 nodi, 37 art. con modifiche |
+| [EXP-009](./EXP-009_costituzione_full/) | costituzione_full | **COMPLETED** | 2025-12-08 | RQ1-3 | Costituzione con Comma/Lettera: 1201 nodi, 1062 relazioni |
 | EXP-011 | costituzione_schema | **COMPLETED** | 2025-12-08 | RQ1-3 | Allineamento schema + numero_* properties |
 | EXP-012 | multi_source_embeddings | **COMPLETED** | 2025-12-08 | RQ3-4 | Multi-source embeddings (norma + spiegazione + ratio + massime) |
+| [EXP-013](./EXP-013_enrichment_torrente/) | enrichment_torrente | **COMPLETED** | 2025-12-13 | RQ3 | Enrichment LLM da manuale Torrente: 1909 entità, 1316 relazioni |
+| [EXP-014](./EXP-014_full_ingestion/) | full_ingestion_v2 | **COMPLETED** | 2025-12-14/15 | RQ1-4 | Full ingestion Libro IV ottimizzato: 27,740 nodi, 43,935 relazioni |
 
 > **Nota**: EXP-002 (Brocardi Enrichment) è stato integrato direttamente in EXP-001 durante il re-run del 4 dicembre 2025.
 
@@ -29,7 +33,7 @@
 ### Fase 3: Expert Reasoning
 | ID | Nome | Status | Data | RQ | Descrizione |
 |----|------|--------|------|-----|-------------|
-| EXP-009 | expert_comparison | PLANNED | - | RQ5 | Confronto 4 Expert con tools specializzati |
+| EXP-018 | expert_comparison | PLANNED | - | RQ5 | Confronto 4 Expert con tools specializzati |
 
 ### Fase 4: RLCF Learning
 | ID | Nome | Status | Data | RQ | Descrizione |
@@ -39,7 +43,9 @@
 ### Fase 5: Benchmark & Validation
 | ID | Nome | Status | Data | RQ | Descrizione |
 |----|------|--------|------|-----|-------------|
-| EXP-008 | bridge_benchmark | PLANNED | - | RQ4 | Benchmark formale Bridge Table vs join runtime |
+| [EXP-015](./EXP-015_rag_validation_benchmark/) | rag_validation | **COMPLETED** | 2025-12-15 | RQ3-4,7 | RAG Benchmark 50 query: Recall@5=42%, MRR=0.594, latenza 93.5ms |
+| [EXP-016](./EXP-016_semantic_benchmark/) | semantic_benchmark | **COMPLETED** | 2025-12-15 | RQ3,7 | Benchmark semantico corretto: NDCG@5=0.869, MRR=0.850, Hit Rate=96.7% |
+| EXP-017 | bridge_benchmark | PLANNED | - | RQ4 | Benchmark formale Bridge Table vs join runtime |
 
 ---
 
@@ -47,10 +53,10 @@
 
 | Metrica | Valore |
 |---------|--------|
-| Esperimenti totali | **12** |
-| Completati | **9** |
+| Esperimenti totali | **18** |
+| Completati | **15** |
 | In corso | 0 |
-| Pianificati | **3** (EXP-008, EXP-009, EXP-010) |
+| Pianificati | **3** (EXP-010, EXP-017, EXP-018) |
 | Falliti | 0 |
 
 ---
@@ -128,6 +134,30 @@
 ├── EXP-012 completato - multi-source embeddings implementati
 ├── RAG validation baseline: Recall@5=100%, MRR=0.850
 └── Libro IV ingestion script pronto (887 articoli)
+
+2025-12-13
+├── EXP-013 creato - Enrichment LLM da manuale Torrente
+├── Integrazione iusgraph → merlt/rlcf
+├── Task handlers per RLCF implementati
+├── EXP-013 completato - 1,909 entità, 1,316 relazioni estratte
+└── Database cleanup (eliminati Dottrina generici)
+
+2025-12-14
+├── EXP-014 design document creato
+├── Fix bug rubrica tra parentesi (parsing.py)
+├── Backup baseline pre-ingestion
+├── BatchIngestionPipeline implementata (parallelizzazione)
+└── EXP-014 backbone ingestion avviata
+
+2025-12-15
+├── EXP-014 backbone completato - 887 articoli, 7.2s/articolo
+├── EXP-014 enrichment LLM completato - 3,049 entità
+├── EXP-014 completato - 27,740 nodi, 43,935 relazioni
+├── EXP-015 creato - RAG Validation Benchmark
+├── EXP-015 completato - Recall@5=42%, MRR=0.594
+├── Lessons learned: metodologia errata per query normative
+├── EXP-016 creato - Semantic Benchmark (metodologia corretta)
+└── EXP-016 completato - NDCG@5=0.869, MRR=0.850, Hit Rate=96.7%
 ```
 
 ---
@@ -136,12 +166,13 @@
 
 | RQ | Descrizione | Esperimenti | Status |
 |----|-------------|-------------|--------|
-| RQ1 | Chunking comma-level preserva integrità semantica? | EXP-001, EXP-006 | ✅ **Verified** |
-| RQ2 | Struttura gerarchica migliora navigabilità? | EXP-001 | ✅ **Verified** |
-| RQ3 | Enrichment Brocardi aggiunge valore misurabile? | EXP-001, EXP-006, EXP-007 | ✅ **Verified** |
-| RQ4 | Bridge Table riduce latenza vs join runtime? | EXP-002, EXP-003 | ⚠️ **Data Ready** (benchmark formale: EXP-008) |
-| RQ5 | Expert specialization migliora qualità? | - | ❌ Planned (EXP-009) |
+| RQ1 | Chunking comma-level preserva integrità semantica? | EXP-001, EXP-006, EXP-014 | ✅ **Verified** |
+| RQ2 | Struttura gerarchica migliora navigabilità? | EXP-001, EXP-014 | ✅ **Verified** |
+| RQ3 | Enrichment Brocardi aggiunge valore misurabile? | EXP-001, EXP-006, EXP-007, EXP-013, EXP-015, EXP-016 | ✅ **Verified** (norma > spiegazione) |
+| RQ4 | Bridge Table riduce latenza vs join runtime? | EXP-002, EXP-003, EXP-015 | ✅ **Verified** (2.9ms mediana) |
+| RQ5 | Expert specialization migliora qualità? | - | ❌ Planned (EXP-018) |
 | RQ6 | RLCF converge a pesi ottimali? | - | ❌ Planned (EXP-010) |
+| RQ7 | Multi-source embeddings migliorano Recall? | EXP-012, EXP-015, EXP-016 | ⚠️ **Nuance** (sì per MRR, no per Recall) |
 
 ---
 
@@ -284,4 +315,73 @@
 
 ---
 
-*Ultimo aggiornamento: 2025-12-08 (notte)*
+## Risultati Chiave EXP-013 (Enrichment Torrente)
+
+| Metrica | Valore |
+|---------|--------|
+| Chunk processati | 595 |
+| Entità create | 1,909 |
+| Relazioni create | 1,316 |
+| Token input | 1.2M |
+| Durata | ~45 min |
+| Modello | Gemini 2.5 Flash |
+
+---
+
+## Risultati Chiave EXP-014 (Full Ingestion Ottimizzato)
+
+| Metrica | Valore | Note |
+|---------|--------|------|
+| Articoli processati | 887/887 | 100% copertura |
+| Nodi grafo totali | 27,740 | +103% vs baseline |
+| Relazioni totali | 43,935 | +1137% vs baseline |
+| Embeddings multi-source | 5,926 | norma+spiegazione+ratio+massime |
+| Entità estratte | 3,049 | +2,233 merge |
+| Durata backbone | 1h 46m | 7.2s/articolo |
+
+**Storage finale:**
+| Storage | Contenuto |
+|---------|-----------|
+| FalkorDB | 27,740 nodi, 43,935 relazioni |
+| Qdrant | 5,926 vectors (multi-source) |
+| Bridge Table | 27,114 mappings |
+
+---
+
+## Risultati Chiave EXP-015 (RAG Validation Benchmark)
+
+| Metrica | Valore | Target | Status |
+|---------|--------|--------|--------|
+| Recall@5 | 0.420 | ≥ 0.85 | ⚠️ Sotto target |
+| MRR | 0.594 | ≥ 0.70 | ⚠️ Sotto target |
+| Hit Rate@5 | 0.700 | - | - |
+| Latenza full pipeline | 93.5ms | < 150ms | ✅ |
+| Latenza Qdrant | 2.9ms | < 5ms | ✅ |
+
+**Insight**: Query concettuali (Recall@5=61.1%) >> query normative (40%) >> query pratiche (24.2%)
+
+**Finding principale**: `norma` (46.3%) > `spiegazione` (37.3%) per Recall
+
+---
+
+## Risultati Chiave EXP-016 (Semantic Benchmark)
+
+| Metrica | Valore | Target | Status |
+|---------|--------|--------|--------|
+| NDCG@5 | 0.869 | ≥ 0.6 | ✅ |
+| Queries with score=3 | 93.3% | ≥ 70% | ✅ |
+| Queries with score≥2 | 96.7% | ≥ 90% | ✅ |
+| MRR | 0.850 | - | Eccellente |
+| Hit Rate@5 | 96.7% | - | - |
+
+**Confronto EXP-015 vs EXP-016:**
+| Metrica | EXP-015 | EXP-016 | Miglioramento |
+|---------|---------|---------|---------------|
+| MRR | 0.594 | 0.850 | +43% |
+| Hit Rate@5 | 70% | 96.7% | +38% |
+
+**Lesson**: Allineare test alle capacità effettive del sistema
+
+---
+
+*Ultimo aggiornamento: 2025-12-20*
