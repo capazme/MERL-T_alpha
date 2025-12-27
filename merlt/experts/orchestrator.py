@@ -33,6 +33,7 @@ from merlt.experts.literal import LiteralExpert
 from merlt.experts.systemic import SystemicExpert
 from merlt.experts.principles import PrinciplesExpert
 from merlt.experts.precedent import PrecedentExpert
+from merlt.experts.query_analyzer import analyze_query, enrich_context
 from merlt.tools import BaseTool
 
 log = structlog.get_logger()
@@ -168,16 +169,44 @@ class MultiExpertOrchestrator:
 
         log.info(f"Processing query", query=query[:50], trace_id=trace_id)
 
-        # Step 1: Costruisci context
-        context = ExpertContext(
-            query_text=query,
-            entities=entities or {},
-            retrieved_chunks=retrieved_chunks or [],
-            metadata=metadata or {},
+        # Step 1: Analizza query per estrarre entità
+        query_analysis = analyze_query(query)
+
+        log.info(
+            "Query analyzed",
+            articles=query_analysis.article_numbers,
+            concepts=query_analysis.legal_concepts[:3] if query_analysis.legal_concepts else [],
+            query_type=query_analysis.query_type,
             trace_id=trace_id
         )
 
-        # Step 2: Routing
+        # Step 2: Costruisci context con entità estratte
+        # Merge provided entities with extracted ones
+        merged_entities = entities or {}
+        if query_analysis.norm_references:
+            merged_entities["norm_references"] = query_analysis.norm_references
+        if query_analysis.legal_concepts:
+            merged_entities["legal_concepts"] = query_analysis.legal_concepts
+        if query_analysis.article_numbers:
+            merged_entities["article_numbers"] = query_analysis.article_numbers
+
+        context = ExpertContext(
+            query_text=query,
+            entities=merged_entities,
+            retrieved_chunks=retrieved_chunks or [],
+            metadata={
+                **(metadata or {}),
+                "query_analysis": {
+                    "query_type": query_analysis.query_type,
+                    "confidence": query_analysis.confidence,
+                    "article_numbers": query_analysis.article_numbers,
+                    "legal_concepts": query_analysis.legal_concepts,
+                }
+            },
+            trace_id=trace_id
+        )
+
+        # Step 3: Routing
         routing_decision = await self.router.route(context)
 
         log.info(
@@ -186,7 +215,7 @@ class MultiExpertOrchestrator:
             weights=routing_decision.expert_weights
         )
 
-        # Step 3: Seleziona Expert
+        # Step 4: Seleziona Expert
         selected_experts = routing_decision.get_selected_experts(
             threshold=self.config.selection_threshold
         )[:self.config.max_experts]
@@ -197,13 +226,13 @@ class MultiExpertOrchestrator:
 
         log.info(f"Selected experts", experts=[e[0] for e in selected_experts])
 
-        # Step 4: Esegui Expert
+        # Step 5: Esegui Expert
         if self.config.parallel_execution:
             responses = await self._run_experts_parallel(selected_experts, context)
         else:
             responses = await self._run_experts_sequential(selected_experts, context)
 
-        # Step 5: Aggrega risposte
+        # Step 6: Aggrega risposte
         weights = {exp: w for exp, w in selected_experts}
         aggregated = await self.gating.aggregate(responses, weights, trace_id)
 

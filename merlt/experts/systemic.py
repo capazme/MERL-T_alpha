@@ -32,12 +32,14 @@ from merlt.experts.base import (
     ReasoningStep,
     ConfidenceFactors,
 )
+from merlt.experts.react_mixin import ReActMixin
 from merlt.tools import BaseTool
+from merlt.storage.retriever.models import get_source_types_for_expert
 
 log = structlog.get_logger()
 
 
-class SystemicExpert(BaseExpert):
+class SystemicExpert(BaseExpert, ReActMixin):
     """
     Expert per interpretazione sistematica e storica.
 
@@ -94,7 +96,7 @@ class SystemicExpert(BaseExpert):
 
         Args:
             tools: Tools per ricerca
-            config: Configurazione (prompt, temperature, traversal_weights)
+            config: Configurazione (prompt, temperature, traversal_weights, use_react)
             ai_service: Servizio AI per LLM calls
         """
         config = config or {}
@@ -102,6 +104,16 @@ class SystemicExpert(BaseExpert):
             config["traversal_weights"] = self.DEFAULT_TRAVERSAL_WEIGHTS
 
         super().__init__(tools=tools, config=config, ai_service=ai_service)
+
+        # ReAct mode configuration
+        self.use_react = config.get("use_react", False)
+        self.react_config = {
+            "max_iterations": config.get("react_max_iterations", 5),
+            "novelty_threshold": config.get("react_novelty_threshold", 0.1),
+            "temperature": 0.1,
+            "model": config.get("react_model", self.model)
+        }
+
         self.prompt_template = self._get_systemic_prompt()
 
     def _get_systemic_prompt(self) -> str:
@@ -111,6 +123,13 @@ class SystemicExpert(BaseExpert):
 Il tuo approccio si basa su:
 - Art. 12, comma I, disp. prel. c.c.: "...secondo la connessione di esse [parole]..."
 - Art. 14 disp. prel. c.c. (elemento storico-evolutivo)
+
+## REGOLA FONDAMENTALE - SOURCE OF TRUTH
+
+⚠️ DEVI usare ESCLUSIVAMENTE le fonti fornite nella sezione "TESTI NORMATIVI RECUPERATI".
+⚠️ NON PUOI citare articoli, sentenze o dottrina che NON sono presenti in quella sezione.
+⚠️ Se le fonti recuperate sono insufficienti, indica "source_availability" basso e spiega nelle limitations.
+⚠️ Se nessuna fonte è rilevante, imposta confidence=0.1 e spiega il problema.
 
 ## METODOLOGIA
 
@@ -165,21 +184,29 @@ Rispondi in JSON con questa struttura:
     "limitations": "Cosa non hai potuto considerare"
 }
 
-IMPORTANTE:
-- Evidenzia le RELAZIONI tra norme (rinvii, deroghe, abrogazioni)
-- Ricostruisci la STORIA della norma quando rilevante
-- Considera il CONTESTO sistematico (principi generali, norme speciali)
-- Segnala eventuali ANTINOMIE o lacune"""
+CHECKLIST FINALE:
+✅ Ogni fonte in legal_basis DEVE provenire da TESTI NORMATIVI RECUPERATI
+✅ Il campo "source_id" DEVE essere ESATTAMENTE il valore indicato come `source_id` nella fonte
+✅ NON inventare source_id - copia esattamente il valore mostrato
+✅ Ogni excerpt DEVE essere un testo copiato dalle fonti, non parafrasato
+✅ Se le fonti sono insufficienti, abbassa confidence e source_availability
+✅ NON inventare MAI articoli o sentenze non presenti nelle fonti
+✅ Evidenzia le RELAZIONI tra norme SOLO se entrambe sono nelle fonti"""
 
     async def analyze(self, context: ExpertContext) -> ExpertResponse:
         """
         Analizza la query con approccio sistematico e storico.
 
-        Flow:
+        Flow (standard):
         1. Usa semantic_search per trovare norme correlate
         2. Usa graph_search per esplorare connessioni sistematiche
         3. Identifica modifiche storiche tramite relazione MODIFICA
         4. Chiama LLM per analisi sistematica
+
+        Flow (ReAct mode - use_react=True):
+        1. ReAct loop: LLM decide quali tool usare iterativamente
+        2. Convergenza automatica basata su novelty threshold
+        3. Analisi LLM finale con tutte le fonti raccolte
         """
         import time
         start_time = time.time()
@@ -187,33 +214,56 @@ IMPORTANTE:
         log.info(
             f"SystemicExpert analyzing",
             query=context.query_text[:50],
-            trace_id=context.trace_id
+            trace_id=context.trace_id,
+            use_react=self.use_react
         )
 
-        # Step 1: Recupera norme correlate
-        retrieved_sources = await self._retrieve_sources(context)
+        # Step 1: Recupera fonti (ReAct o standard)
+        if self.use_react and self.ai_service:
+            # ReAct mode: LLM-driven tool selection
+            all_sources = await self.react_loop(
+                context,
+                max_iterations=self.react_config.get("max_iterations", 5),
+                novelty_threshold=self.react_config.get("novelty_threshold", 0.1)
+            )
+            log.info(
+                f"SystemicExpert ReAct completed",
+                sources=len(all_sources),
+                react_metrics=self.get_react_metrics() if hasattr(self, '_react_result') else {}
+            )
+        else:
+            # Standard mode: fixed tool sequence
+            retrieved_sources = await self._retrieve_sources(context)
+            systemic_sources = await self._expand_systemic_relations(context, retrieved_sources)
+            all_sources = retrieved_sources + systemic_sources
 
-        # Step 2: Espandi con relazioni sistematiche
-        systemic_sources = await self._expand_systemic_relations(context, retrieved_sources)
-
-        # Step 3: Costruisci context arricchito
-        all_sources = retrieved_sources + systemic_sources
+        # Step 2: Costruisci context arricchito
         enriched_context = ExpertContext(
             query_text=context.query_text,
             query_embedding=context.query_embedding,
             entities=context.entities,
             retrieved_chunks=all_sources,
-            metadata={**context.metadata, "systemic_expansion": True},
+            metadata={
+                **context.metadata,
+                "systemic_expansion": True,
+                "react_mode": self.use_react,
+                "react_metrics": self.get_react_metrics() if self.use_react and hasattr(self, '_react_result') else {}
+            },
             trace_id=context.trace_id
         )
 
-        # Step 4: Analisi
+        # Step 3: Analisi
         if self.ai_service:
             response = await self._analyze_with_llm(enriched_context)
         else:
             response = self._analyze_without_llm(enriched_context)
 
         response.execution_time_ms = (time.time() - start_time) * 1000
+
+        # Aggiungi metriche ReAct se disponibili
+        if self.use_react and hasattr(self, '_react_result'):
+            response.metadata = response.metadata or {}
+            response.metadata["react_metrics"] = self.get_react_metrics()
 
         log.info(
             f"SystemicExpert completed",
@@ -225,21 +275,48 @@ IMPORTANTE:
         return response
 
     async def _retrieve_sources(self, context: ExpertContext) -> List[Dict[str, Any]]:
-        """Recupera fonti usando i tools disponibili."""
+        """
+        Recupera fonti usando i tools disponibili.
+
+        Flow:
+        1. Usa chunks già recuperati se presenti
+        2. Semantic search per trovare norme correlate
+        3. Estrai URN dai risultati per graph expansion
+        """
         sources = []
+        self._extracted_urns = set()  # Store for later graph expansion
 
         if context.retrieved_chunks:
             sources.extend(context.retrieved_chunks)
+            # Estrai URN dai chunks già presenti
+            for chunk in context.retrieved_chunks:
+                urn = chunk.get("article_urn") or chunk.get("urn")
+                if urn:
+                    self._extracted_urns.add(urn)
 
+        # Semantic search - SOLO norme per SystemicExpert (connessione tra norme)
         semantic_tool = self._tool_registry.get("semantic_search")
         if semantic_tool:
+            source_types = get_source_types_for_expert("SystemicExpert")
             result = await semantic_tool(
                 query=context.query_text,
                 top_k=5,
-                expert_type="SystemicExpert"
+                expert_type="SystemicExpert",
+                source_types=source_types  # ["norma"] - connessione tra norme
             )
             if result.success and result.data.get("results"):
                 sources.extend(result.data["results"])
+                # Estrai URN dai risultati per graph expansion
+                for item in result.data["results"]:
+                    urn = item.get("metadata", {}).get("article_urn") or item.get("urn")
+                    if urn:
+                        self._extracted_urns.add(urn)
+
+        log.debug(
+            f"SystemicExpert sources retrieved",
+            total=len(sources),
+            extracted_urns=len(self._extracted_urns)
+        )
 
         return sources
 
@@ -248,22 +325,35 @@ IMPORTANTE:
         context: ExpertContext,
         initial_sources: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """Espande le fonti seguendo relazioni sistematiche."""
+        """
+        Espande le fonti seguendo relazioni sistematiche.
+
+        Combina:
+        - URN estratti da semantic_search (self._extracted_urns)
+        - URN da context.norm_references (dal query_analyzer)
+        """
         expanded = []
 
         graph_tool = self._tool_registry.get("graph_search")
         if not graph_tool:
             return expanded
 
-        # Raccogli URN da espandere
-        urns_to_expand = set(context.norm_references)
-        for source in initial_sources[:3]:
-            urn = source.get("urn", source.get("source_id", ""))
-            if urn:
-                urns_to_expand.add(urn)
+        # Combina URN da context + URN estratti da semantic_search
+        urns_to_expand = set(context.norm_references) | getattr(self, '_extracted_urns', set())
+
+        if not urns_to_expand:
+            log.debug("SystemicExpert: No URNs to expand")
+            return expanded
 
         # Espandi con relazioni sistematiche
-        systemic_relations = ["connesso_a", "modifica", "abroga", "deroga", "rinvia"]
+        # Relazioni reali nel grafo (verificate con: MATCH ()-[r]->() RETURN type(r), count(*))
+        systemic_relations = ["DISCIPLINA", "modifica", "abroga", "interpreta", "IMPONE"]
+
+        log.debug(
+            f"SystemicExpert graph expansion",
+            urns_count=len(urns_to_expand),
+            urns=list(urns_to_expand)[:3]
+        )
 
         for urn in list(urns_to_expand)[:5]:
             try:
@@ -274,16 +364,27 @@ IMPORTANTE:
                     direction="both"  # Bidirezionale per connessioni
                 )
                 if result.success:
-                    for node in result.data.get("nodes", []):
+                    graph_nodes = result.data.get("nodes", [])
+                    log.debug(
+                        f"Systemic expansion for {urn[:50]}...",
+                        nodes_found=len(graph_nodes)
+                    )
+                    for node in graph_nodes:
                         expanded.append({
                             "text": node.get("properties", {}).get("testo", ""),
                             "urn": node.get("urn", ""),
                             "type": node.get("type", ""),
                             "source": "systemic_expansion",
-                            "relation": "systemic"
+                            "relation": "systemic",
+                            "source_urn": urn
                         })
             except Exception as e:
                 log.warning(f"Failed to expand {urn}: {e}")
+
+        log.info(
+            f"SystemicExpert systemic expansion",
+            total_expanded=len(expanded)
+        )
 
         return expanded
 
@@ -375,6 +476,8 @@ IMPORTANTE:
             sections.append(f"\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
 
         if context.retrieved_chunks:
+            sections.append("⚠️ USA ESATTAMENTE il source_id indicato per ogni fonte nel campo legal_basis!")
+
             # Separa fonti per tipo
             semantic = [c for c in context.retrieved_chunks if c.get("source") != "systemic_expansion"]
             systemic = [c for c in context.retrieved_chunks if c.get("source") == "systemic_expansion"]
@@ -383,16 +486,27 @@ IMPORTANTE:
                 sections.append("\n## NORME DIRETTAMENTE RILEVANTI")
                 for i, chunk in enumerate(semantic[:5], 1):
                     text = chunk.get("text", "")
+                    chunk_id = chunk.get("chunk_id", chunk.get("urn", f"source_{i}"))
                     urn = chunk.get("urn", "N/A")
-                    sections.append(f"\n### Fonte {i} (URN: {urn})\n{text}")
+                    source_type = chunk.get("source_type", "norma")
+                    sections.append(f"\n### Fonte {i}")
+                    sections.append(f"- **source_id**: `{chunk_id}` ← USA QUESTO ESATTO VALORE")
+                    sections.append(f"- **urn**: {urn}")
+                    sections.append(f"- **source_type**: {source_type}")
+                    sections.append(f"- **testo**:\n{text}")
 
             if systemic:
                 sections.append("\n## NORME SISTEMATICAMENTE CONNESSE")
                 for i, chunk in enumerate(systemic[:5], 1):
                     text = chunk.get("text", "")
+                    chunk_id = chunk.get("chunk_id", chunk.get("urn", f"systemic_{i}"))
                     urn = chunk.get("urn", "N/A")
                     rel = chunk.get("relation", "N/A")
-                    sections.append(f"\n### Connessione {i} (URN: {urn}, relazione: {rel})\n{text}")
+                    sections.append(f"\n### Connessione {i}")
+                    sections.append(f"- **source_id**: `{chunk_id}` ← USA QUESTO ESATTO VALORE")
+                    sections.append(f"- **urn**: {urn}")
+                    sections.append(f"- **relazione**: {rel}")
+                    sections.append(f"- **testo**:\n{text}")
 
         return "\n".join(sections)
 

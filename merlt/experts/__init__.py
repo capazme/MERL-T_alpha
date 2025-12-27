@@ -50,6 +50,7 @@ from merlt.experts.precedent import PrecedentExpert
 from merlt.experts.router import ExpertRouter, RoutingDecision
 from merlt.experts.gating import GatingNetwork, AggregatedResponse
 from merlt.experts.orchestrator import MultiExpertOrchestrator, OrchestratorConfig
+from merlt.experts.react_mixin import ReActMixin, ReActResult, ThoughtActionObservation
 
 __all__ = [
     # Base classes
@@ -73,4 +74,8 @@ __all__ = [
     "AggregatedResponse",
     "MultiExpertOrchestrator",
     "OrchestratorConfig",
+    # ReAct Pattern
+    "ReActMixin",
+    "ReActResult",
+    "ThoughtActionObservation",
 ]

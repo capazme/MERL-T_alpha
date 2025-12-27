@@ -185,23 +185,76 @@ class FalkorDBClient:
                 max_hops=3
             )
         """
-        cypher = f"""
-            MATCH path = shortestPath(
-                (start:Norma {{URN: $start_urn}})-[*1..{max_hops}]-(end:Norma {{URN: $end_urn}})
-            )
-            RETURN path
+        # FalkorDB has limitations with undirected shortestPath
+        # Use a simpler approach: check direct connection or shared neighbors
+
+        # Step 1: Check direct connection (1 hop)
+        cypher_direct = """
+            MATCH (start) WHERE start.URN = $start_urn OR start.nome = $start_urn
+            MATCH (end) WHERE end.URN = $end_urn OR end.nome = $end_urn
+            MATCH (start)-[r]->(end)
+            RETURN type(r) as rel_type, 1 as distance
+            LIMIT 1
         """
 
-        results = await self.query(cypher, {
-            "start_urn": start_node,
-            "end_urn": end_node
-        })
+        try:
+            results = await self.query(cypher_direct, {
+                "start_urn": start_node,
+                "end_urn": end_node
+            })
 
-        if not results:
+            if results:
+                return {
+                    "path": {"edges": [results[0].get("rel_type")]},
+                    "length": 1
+                }
+
+            # Step 2: Check reverse direct connection
+            cypher_reverse = """
+                MATCH (start) WHERE start.URN = $start_urn OR start.nome = $start_urn
+                MATCH (end) WHERE end.URN = $end_urn OR end.nome = $end_urn
+                MATCH (start)<-[r]-(end)
+                RETURN type(r) as rel_type, 1 as distance
+                LIMIT 1
+            """
+
+            results = await self.query(cypher_reverse, {
+                "start_urn": start_node,
+                "end_urn": end_node
+            })
+
+            if results:
+                return {
+                    "path": {"edges": [results[0].get("rel_type")]},
+                    "length": 1
+                }
+
+            # Step 3: Check shared neighbor (2 hops)
+            if max_hops >= 2:
+                cypher_shared = """
+                    MATCH (start) WHERE start.URN = $start_urn OR start.nome = $start_urn
+                    MATCH (end) WHERE end.URN = $end_urn OR end.nome = $end_urn
+                    MATCH (start)-[r1]->(shared)<-[r2]-(end)
+                    RETURN type(r1) as r1_type, type(r2) as r2_type, 2 as distance
+                    LIMIT 1
+                """
+
+                results = await self.query(cypher_shared, {
+                    "start_urn": start_node,
+                    "end_urn": end_node
+                })
+
+                if results:
+                    return {
+                        "path": {"edges": [results[0].get("r1_type"), results[0].get("r2_type")]},
+                        "length": 2
+                    }
+
             return None
 
-        # Extract path from result
-        return results[0].get("path")
+        except Exception as e:
+            # If nodes not found or no path exists, return None silently
+            return None
 
     async def traverse(
         self,
@@ -250,6 +303,88 @@ class FalkorDBClient:
             result["score"] = 1.0 / (result.get("depth", 1) + 1)
 
         return results
+
+    async def get_related_nodes_for_article(
+        self,
+        article_urn: str,
+        max_results: int = 20
+    ) -> List[Dict[str, Any]]:
+        """
+        Find all nodes related to an article (both incoming and outgoing).
+
+        Useful for graph enrichment during retrieval:
+        - Outgoing: ConcettoGiuridico, EffettoGiuridico disciplined by article
+        - Incoming: AttoGiudiziario, Dottrina that interpret/comment the article
+
+        Args:
+            article_urn: Full article URN (e.g., "https://www.normattiva.it/...~art1453")
+            max_results: Maximum nodes to return
+
+        Returns:
+            List of related nodes with relationship info
+
+        Example:
+            nodes = await client.get_related_nodes_for_article(
+                "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453"
+            )
+        """
+        # Extract numero_articolo from URN
+        import re
+        match = re.search(r'~art(\d+)', article_urn)
+        if not match:
+            log.warning(f"Could not extract article number from URN: {article_urn}")
+            return []
+
+        numero_articolo = match.group(1)
+
+        # Query both outgoing and incoming relationships
+        cypher = """
+            MATCH (n:Norma {numero_articolo: $numero})
+            OPTIONAL MATCH (n)-[r_out]->(m_out)
+            WHERE m_out IS NOT NULL
+            WITH n, collect(DISTINCT {
+                direction: 'outgoing',
+                rel_type: type(r_out),
+                node_label: labels(m_out)[0],
+                node_urn: m_out.URN,
+                node_nome: m_out.nome,
+                node_estremi: m_out.estremi
+            }) AS outgoing
+            OPTIONAL MATCH (m_in)-[r_in]->(n)
+            WHERE m_in IS NOT NULL
+            WITH n, outgoing, collect(DISTINCT {
+                direction: 'incoming',
+                rel_type: type(r_in),
+                node_label: labels(m_in)[0],
+                node_urn: m_in.URN,
+                node_nome: m_in.nome,
+                node_estremi: m_in.estremi
+            }) AS incoming
+            RETURN outgoing + incoming AS related_nodes
+            LIMIT 1
+        """
+
+        try:
+            results = await self.query(cypher, {"numero": numero_articolo})
+
+            if not results or not results[0].get("related_nodes"):
+                log.debug(f"No related nodes for art.{numero_articolo}")
+                return []
+
+            related = results[0]["related_nodes"]
+
+            # Filter out null entries and limit
+            valid_nodes = [
+                node for node in related
+                if node.get("rel_type") and node.get("node_label")
+            ][:max_results]
+
+            log.debug(f"Found {len(valid_nodes)} related nodes for art.{numero_articolo}")
+            return valid_nodes
+
+        except Exception as e:
+            log.error(f"Error getting related nodes for {article_urn}: {e}")
+            return []
 
     async def health_check(self) -> bool:
         """

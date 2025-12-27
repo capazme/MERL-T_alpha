@@ -34,12 +34,14 @@ from merlt.experts.base import (
     ReasoningStep,
     ConfidenceFactors,
 )
+from merlt.experts.react_mixin import ReActMixin
 from merlt.tools import BaseTool, SemanticSearchTool, GraphSearchTool
+from merlt.storage.retriever.models import get_source_types_for_expert
 
 log = structlog.get_logger()
 
 
-class LiteralExpert(BaseExpert):
+class LiteralExpert(BaseExpert, ReActMixin):
     """
     Expert per interpretazione letterale (art. 12, I disp. prel. c.c.).
 
@@ -95,7 +97,7 @@ class LiteralExpert(BaseExpert):
 
         Args:
             tools: Tools per ricerca (SemanticSearchTool, GraphSearchTool)
-            config: Configurazione (prompt, temperature, traversal_weights)
+            config: Configurazione (prompt, temperature, traversal_weights, use_react)
             ai_service: Servizio AI per LLM calls
         """
         # Merge traversal weights with defaults
@@ -104,6 +106,15 @@ class LiteralExpert(BaseExpert):
             config["traversal_weights"] = self.DEFAULT_TRAVERSAL_WEIGHTS
 
         super().__init__(tools=tools, config=config, ai_service=ai_service)
+
+        # ReAct mode configuration
+        self.use_react = config.get("use_react", False)
+        self.react_config = {
+            "max_iterations": config.get("react_max_iterations", 5),
+            "novelty_threshold": config.get("react_novelty_threshold", 0.1),
+            "temperature": 0.1,
+            "model": config.get("react_model", self.model)
+        }
 
         # Override prompt template for literal interpretation
         self.prompt_template = self._get_literal_prompt()
@@ -116,34 +127,42 @@ Il tuo approccio si basa sull'art. 12, comma I, delle disposizioni preliminari a
 "Nell'applicare la legge non si può ad essa attribuire altro senso che quello fatto palese
 dal significato proprio delle parole secondo la connessione di esse..."
 
+## REGOLA FONDAMENTALE - SOURCE OF TRUTH
+
+⚠️ DEVI usare ESCLUSIVAMENTE le fonti fornite nella sezione "TESTI NORMATIVI RECUPERATI".
+⚠️ NON PUOI citare articoli, sentenze o dottrina che NON sono presenti in quella sezione.
+⚠️ Se le fonti recuperate sono insufficienti, indica "source_availability" basso e spiega nelle limitations.
+⚠️ Se nessuna fonte è rilevante, imposta confidence=0.1 e spiega il problema.
+
 ## METODOLOGIA
 
 1. **SIGNIFICATO PROPRIO DELLE PAROLE**
-   - Usa il significato TECNICO-GIURIDICO se esiste una definizione legale
+   - Usa il significato TECNICO-GIURIDICO se esiste una definizione legale nelle fonti
    - Altrimenti usa il significato COMUNE delle parole
-   - Verifica sempre se esistono definizioni nella stessa legge o in leggi collegate
+   - Cita SOLO definizioni presenti nelle fonti recuperate
 
 2. **CONNESSIONE DELLE PAROLE**
-   - Analizza la struttura sintattica della norma
-   - Considera la collocazione sistematica (capo, sezione, titolo)
-   - Segui i rinvii normativi interni
+   - Analizza la struttura sintattica delle norme recuperate
+   - Considera la collocazione sistematica (capo, sezione, titolo) se presente
+   - Segui rinvii normativi SOLO se il testo target è nelle fonti
 
 3. **LIMITI**
    - "In claris non fit interpretatio" - se il testo è chiaro, non servono altri canoni
    - NON usare argomenti teleologici o sistematici
    - NON speculare sull'intenzione del legislatore
+   - NON inventare fonti non presenti nella sezione TESTI NORMATIVI RECUPERATI
 
 ## OUTPUT
 
 Rispondi in JSON con questa struttura:
 {
-    "interpretation": "Interpretazione letterale in italiano",
+    "interpretation": "Interpretazione letterale in italiano BASATA SOLO sulle fonti recuperate",
     "legal_basis": [
         {
-            "source_type": "norm",
-            "source_id": "URN della norma",
+            "source_type": "norm|jurisprudence|doctrine",
+            "source_id": "URN/ID ESATTAMENTE come appare nelle fonti recuperate",
             "citation": "Citazione formale (es. Art. 1321 c.c.)",
-            "excerpt": "Testo rilevante",
+            "excerpt": "Testo ESATTO copiato dalle fonti recuperate",
             "relevance": "Perché questa fonte è rilevante"
         }
     ],
@@ -151,7 +170,7 @@ Rispondi in JSON con questa struttura:
         {
             "step_number": 1,
             "description": "Descrizione del passo",
-            "sources": ["source_id1", "source_id2"]
+            "sources": ["source_id DALLE fonti recuperate"]
         }
     ],
     "confidence": 0.0-1.0,
@@ -161,24 +180,31 @@ Rispondi in JSON con questa struttura:
         "contextual_ambiguity": 0.0-1.0,
         "source_availability": 0.0-1.0
     },
-    "limitations": "Cosa non hai potuto considerare"
+    "limitations": "Cosa non hai potuto considerare perché non presente nelle fonti"
 }
 
-IMPORTANTE:
-- Cita SEMPRE le norme esatte con URN/articolo
-- Riporta il testo letterale delle disposizioni rilevanti
-- Spiega il significato tecnico dei termini usati
-- Se il testo è ambiguo, segnalalo nelle limitations"""
+CHECKLIST FINALE:
+✅ Ogni fonte in legal_basis DEVE provenire da TESTI NORMATIVI RECUPERATI
+✅ Il campo "source_id" DEVE essere ESATTAMENTE il valore indicato come `source_id` nella fonte
+✅ NON inventare source_id - copia esattamente il valore mostrato
+✅ Ogni excerpt DEVE essere un testo copiato dalle fonti, non parafrasato
+✅ Se le fonti sono insufficienti, abbassa confidence e source_availability
+✅ NON inventare MAI articoli o sentenze non presenti nelle fonti"""
 
     async def analyze(self, context: ExpertContext) -> ExpertResponse:
         """
         Analizza la query con approccio letterale.
 
-        Flow:
+        Flow (standard):
         1. Usa semantic_search per trovare norme rilevanti
         2. Se ci sono riferimenti normativi, usa graph_search per espandere
         3. Chiama LLM con testo delle norme recuperate
         4. Produce ExpertResponse con interpretazione letterale
+
+        Flow (ReAct mode - use_react=True):
+        1. ReAct loop: LLM decide quali tool usare iterativamente
+        2. Convergenza automatica basata su novelty threshold
+        3. Analisi LLM finale con tutte le fonti raccolte
         """
         import time
         start_time = time.time()
@@ -186,11 +212,26 @@ IMPORTANTE:
         log.info(
             f"LiteralExpert analyzing",
             query=context.query_text[:50],
-            trace_id=context.trace_id
+            trace_id=context.trace_id,
+            use_react=self.use_react
         )
 
-        # Step 1: Recupera norme rilevanti
-        retrieved_sources = await self._retrieve_sources(context)
+        # Step 1: Recupera fonti (ReAct o standard)
+        if self.use_react and self.ai_service:
+            # ReAct mode: LLM-driven tool selection
+            retrieved_sources = await self.react_loop(
+                context,
+                max_iterations=self.react_config.get("max_iterations", 5),
+                novelty_threshold=self.react_config.get("novelty_threshold", 0.1)
+            )
+            log.info(
+                f"LiteralExpert ReAct completed",
+                sources=len(retrieved_sources),
+                react_metrics=self.get_react_metrics() if hasattr(self, '_react_result') else {}
+            )
+        else:
+            # Standard mode: fixed tool sequence
+            retrieved_sources = await self._retrieve_sources(context)
 
         # Step 2: Costruisci context arricchito
         enriched_context = ExpertContext(
@@ -198,7 +239,11 @@ IMPORTANTE:
             query_embedding=context.query_embedding,
             entities=context.entities,
             retrieved_chunks=retrieved_sources,
-            metadata=context.metadata,
+            metadata={
+                **context.metadata,
+                "react_mode": self.use_react,
+                "react_metrics": self.get_react_metrics() if self.use_react and hasattr(self, '_react_result') else {}
+            },
             trace_id=context.trace_id
         )
 
@@ -211,6 +256,11 @@ IMPORTANTE:
 
         response.execution_time_ms = (time.time() - start_time) * 1000
 
+        # Aggiungi metriche ReAct se disponibili
+        if self.use_react and hasattr(self, '_react_result'):
+            response.metadata = response.metadata or {}
+            response.metadata["react_metrics"] = self.get_react_metrics()
+
         log.info(
             f"LiteralExpert completed",
             confidence=response.confidence,
@@ -221,41 +271,87 @@ IMPORTANTE:
         return response
 
     async def _retrieve_sources(self, context: ExpertContext) -> List[Dict[str, Any]]:
-        """Recupera fonti usando i tools disponibili."""
-        sources = []
+        """
+        Recupera fonti usando i tools disponibili.
 
-        # Usa chunks già recuperati se presenti
+        Flow:
+        1. Usa chunks già recuperati se presenti
+        2. Semantic search per trovare norme rilevanti
+        3. Estrai URN dai risultati semantic search
+        4. Graph search per espandere le relazioni (SEMPRE, non solo se norm_references)
+        """
+        sources = []
+        explored_urns = set()
+
+        # Step 1: Usa chunks già recuperati se presenti
         if context.retrieved_chunks:
             sources.extend(context.retrieved_chunks)
+            # Estrai URN dai chunks già presenti
+            for chunk in context.retrieved_chunks:
+                urn = chunk.get("article_urn") or chunk.get("urn")
+                if urn:
+                    explored_urns.add(urn)
 
-        # Semantic search se disponibile
+        # Step 2: Semantic search - SOLO norme per LiteralExpert (art. 12, I)
         semantic_tool = self._tool_registry.get("semantic_search")
+        semantic_results = []
         if semantic_tool:
+            source_types = get_source_types_for_expert("LiteralExpert")
             result = await semantic_tool(
                 query=context.query_text,
                 top_k=5,
-                expert_type="LiteralExpert"
+                expert_type="LiteralExpert",
+                source_types=source_types  # ["norma"] - significato proprio delle parole
             )
             if result.success and result.data.get("results"):
-                sources.extend(result.data["results"])
+                semantic_results = result.data["results"]
+                sources.extend(semantic_results)
 
-        # Graph search per espandere riferimenti normativi
+                # Estrai URN dai risultati per graph expansion
+                for item in semantic_results:
+                    urn = item.get("metadata", {}).get("article_urn") or item.get("urn")
+                    if urn:
+                        explored_urns.add(urn)
+
+        # Step 3: Graph search per espandere le relazioni
+        # Combina: URN da context.norm_references + URN estratti da semantic search
+        urns_to_explore = set(context.norm_references) | explored_urns
+
         graph_tool = self._tool_registry.get("graph_search")
-        if graph_tool and context.norm_references:
-            for urn in context.norm_references[:3]:  # Limita a 3 per performance
+        if graph_tool and urns_to_explore:
+            log.debug(
+                f"LiteralExpert graph expansion",
+                urns_count=len(urns_to_explore),
+                urns=list(urns_to_explore)[:3]  # Log solo primi 3
+            )
+
+            for urn in list(urns_to_explore)[:3]:  # Limita a 3 per performance
                 result = await graph_tool(
                     start_node=urn,
-                    relation_types=["contiene", "definisce", "rinvia"],
+                    relation_types=["contiene", "DEFINISCE", "DISCIPLINA"],  # Relazioni reali nel grafo
                     max_hops=2
                 )
                 if result.success:
-                    for node in result.data.get("nodes", []):
+                    graph_nodes = result.data.get("nodes", [])
+                    log.debug(
+                        f"Graph expansion for {urn[:50]}...",
+                        nodes_found=len(graph_nodes)
+                    )
+                    for node in graph_nodes:
                         sources.append({
                             "text": node.get("properties", {}).get("testo", ""),
                             "urn": node.get("urn", ""),
                             "type": node.get("type", ""),
-                            "source": "graph_traversal"
+                            "source": "graph_traversal",
+                            "source_urn": urn  # Traccia da dove viene
                         })
+
+        log.info(
+            f"LiteralExpert sources retrieved",
+            total=len(sources),
+            from_semantic=len(semantic_results),
+            from_graph=len(sources) - len(semantic_results) - len(context.retrieved_chunks)
+        )
 
         return sources
 
@@ -353,11 +449,20 @@ IMPORTANTE:
 
         if context.retrieved_chunks:
             sections.append("\n## TESTI NORMATIVI RECUPERATI")
+            sections.append("⚠️ USA ESATTAMENTE il source_id indicato per ogni fonte nel campo legal_basis!")
             for i, chunk in enumerate(context.retrieved_chunks[:5], 1):
                 text = chunk.get("text", "")
-                urn = chunk.get("urn", chunk.get("chunk_id", "N/A"))
+                # chunk_id è l'identificativo univoco da usare come source_id
+                chunk_id = chunk.get("chunk_id", chunk.get("urn", f"source_{i}"))
+                urn = chunk.get("urn", "N/A")
                 score = chunk.get("final_score", chunk.get("similarity_score", "N/A"))
-                sections.append(f"\n### Fonte {i} (URN: {urn}, score: {score})\n{text}")
+                source_type = chunk.get("source_type", "norma")
+                sections.append(f"\n### Fonte {i}")
+                sections.append(f"- **source_id**: `{chunk_id}` ← USA QUESTO ESATTO VALORE")
+                sections.append(f"- **urn**: {urn}")
+                sections.append(f"- **source_type**: {source_type}")
+                sections.append(f"- **score**: {score}")
+                sections.append(f"- **testo**:\n{text}")
 
         return "\n".join(sections)
 

@@ -94,7 +94,8 @@ class GraphAwareRetriever:
         query_embedding: List[float],
         context_nodes: Optional[List[str]] = None,
         expert_type: Optional[str] = None,
-        top_k: Optional[int] = None
+        top_k: Optional[int] = None,
+        source_types: Optional[List[str]] = None
     ) -> List[RetrievalResult]:
         """
         Perform hybrid retrieval combining vector similarity and graph structure.
@@ -105,6 +106,10 @@ class GraphAwareRetriever:
                            Example: ["urn:norma:cc:art1453", "urn:concetto:contratto"]
             expert_type: Expert type for traversal weights (LiteralExpert, SystemicExpert, etc.)
             top_k: Number of results to return (default from config)
+            source_types: Filter by source type(s) for expert specialization.
+                          Example: ["norma"] for LiteralExpert,
+                                   ["massima"] for PrecedentExpert,
+                                   ["ratio", "spiegazione"] for PrinciplesExpert
 
         Returns:
             List of RetrievalResult sorted by final_score (descending)
@@ -115,6 +120,7 @@ class GraphAwareRetriever:
             ...     query_embedding=embed("termini risoluzione contratto"),
             ...     context_nodes=context_nodes,
             ...     expert_type="LiteralExpert",
+            ...     source_types=["norma"],  # Solo norme per LiteralExpert
             ...     top_k=10
             ... )
         """
@@ -123,13 +129,14 @@ class GraphAwareRetriever:
 
         log.debug(
             f"retrieve() - context_nodes={len(context_nodes or [])}, "
-            f"expert={expert_type}, top_k={top_k}"
+            f"expert={expert_type}, source_types={source_types}, top_k={top_k}"
         )
 
         # STEP 1: Vector search (over-retrieve for re-ranking)
         vector_results = await self._vector_search(
             query_embedding,
-            limit=top_k * self.config.over_retrieve_factor
+            limit=top_k * self.config.over_retrieve_factor,
+            source_types=source_types
         )
 
         log.debug(f"Vector search returned {len(vector_results)} candidates")
@@ -138,12 +145,34 @@ class GraphAwareRetriever:
         enriched_results = []
 
         for vr in vector_results:
-            # Find graph nodes linked to this chunk
-            linked_nodes = await self.bridge.get_nodes_for_chunk(vr.chunk_id)
+            # Get article_urn from payload metadata (more reliable than chunk_id)
+            article_urn = vr.metadata.get("article_urn", "")
+
+            # Find graph nodes linked to this article via FalkorDB
+            # This is more reliable than bridge table since it queries the graph directly
+            if article_urn and hasattr(self.graph_db, 'get_related_nodes_for_article'):
+                linked_nodes = await self.graph_db.get_related_nodes_for_article(
+                    article_urn,
+                    max_results=10
+                )
+                # Convert to expected format for graph_score calculation
+                linked_nodes = [
+                    {
+                        "graph_node_urn": node.get("node_urn") or node.get("node_nome", ""),
+                        "node_type": node.get("node_label", ""),
+                        "relation_type": node.get("rel_type", ""),
+                        "direction": node.get("direction", ""),
+                        "metadata": node
+                    }
+                    for node in linked_nodes
+                ]
+            else:
+                # Fallback to bridge table (may not work if chunk_id mismatch)
+                linked_nodes = await self.bridge.get_nodes_for_chunk(vr.chunk_id)
 
             # Compute graph score
             graph_score = await self._compute_graph_score(
-                chunk_nodes=[node["graph_node_urn"] for node in linked_nodes],
+                chunk_nodes=[node["graph_node_urn"] for node in linked_nodes if node.get("graph_node_urn")],
                 context_nodes=context_nodes or [],
                 expert_type=expert_type
             )
@@ -180,7 +209,8 @@ class GraphAwareRetriever:
     async def _vector_search(
         self,
         query_embedding: List[float],
-        limit: int
+        limit: int,
+        source_types: Optional[List[str]] = None
     ) -> List[VectorSearchResult]:
         """
         Step 1: Vector similarity search in Qdrant.
@@ -188,6 +218,7 @@ class GraphAwareRetriever:
         Args:
             query_embedding: Query vector
             limit: Number of results to retrieve
+            source_types: Filter by source_type metadata (e.g., ["norma", "massima"])
 
         Returns:
             List of VectorSearchResult with chunk_id, text, similarity_score
@@ -196,25 +227,59 @@ class GraphAwareRetriever:
             log.warning("vector_db not configured, returning empty results")
             return []
 
-        # Qdrant search API
-        # NOTE: Actual implementation depends on Qdrant client
-        # This is a generic interface
+        # Qdrant query_points API (qdrant-client >= 1.16)
         try:
-            results = await self.vector_db.search(
-                collection_name="legal_chunks",
-                query_vector=query_embedding,
-                limit=limit
+            from qdrant_client.models import Filter, FieldCondition, MatchAny
+
+            # Use collection name from config
+            collection_name = self.config.collection_name
+
+            # Build filter for source_type if specified
+            query_filter = None
+            if source_types:
+                query_filter = Filter(
+                    must=[
+                        FieldCondition(
+                            key="source_type",
+                            match=MatchAny(any=source_types)
+                        )
+                    ]
+                )
+                log.debug(f"Applying source_type filter: {source_types}")
+
+            # query_points() is the correct API for qdrant-client 1.16+
+            response = self.vector_db.query_points(
+                collection_name=collection_name,
+                query=query_embedding,
+                limit=limit,
+                query_filter=query_filter
             )
 
-            return [
-                VectorSearchResult(
-                    chunk_id=UUID(r.id),
-                    text=r.payload.get("text", ""),
+            results = []
+            for r in response.points:
+                # Handle both UUID and integer IDs from Qdrant
+                if isinstance(r.id, int):
+                    # For integer IDs, create a deterministic UUID from the int
+                    import hashlib
+                    id_hash = hashlib.md5(str(r.id).encode()).hexdigest()
+                    chunk_id = UUID(id_hash[:8] + '-' + id_hash[8:12] + '-' + id_hash[12:16] + '-' + id_hash[16:20] + '-' + id_hash[20:32])
+                elif isinstance(r.id, UUID):
+                    chunk_id = r.id
+                else:
+                    try:
+                        chunk_id = UUID(str(r.id))
+                    except ValueError:
+                        # Fallback: create UUID from string hash
+                        id_hash = hashlib.md5(str(r.id).encode()).hexdigest()
+                        chunk_id = UUID(id_hash[:8] + '-' + id_hash[8:12] + '-' + id_hash[12:16] + '-' + id_hash[16:20] + '-' + id_hash[20:32])
+
+                results.append(VectorSearchResult(
+                    chunk_id=chunk_id,
+                    text=r.payload.get("text", "") if r.payload else "",
                     similarity_score=r.score,
-                    metadata=r.payload
-                )
-                for r in results
-            ]
+                    metadata=r.payload or {}
+                ))
+            return results
 
         except Exception as e:
             log.error(f"Vector search failed: {e}")
@@ -285,8 +350,8 @@ class GraphAwareRetriever:
         """
         try:
             result = await self.graph_db.shortest_path(
-                start_node_urn=source,
-                end_node_urn=target,
+                start_node=source,
+                end_node=target,
                 max_hops=max_hops
             )
 

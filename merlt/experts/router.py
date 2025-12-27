@@ -10,7 +10,7 @@ Il router analizza la query e decide:
 3. Se eseguire in parallelo o sequenziale
 
 Strategia di routing basata su:
-- Tipo di query (definitional, interpretive, procedural, constitutional)
+- Tipo di query (definitional, interpretive, procedural, constitutional, teleological)
 - Entità estratte (norme, concetti, riferimenti giurisprudenziali)
 - Keyword specifiche
 - Configurazione YAML
@@ -138,6 +138,14 @@ class ExpertRouter:
             r"sistema",
             r"evoluzione\s+(storica|normativa)",
         ],
+        "teleological": [
+            r"ratio\s+(legis|della|dell)",
+            r"finalit[aà]\s+(della|dell)",
+            r"scopo\s+(della|dell)",
+            r"perch[eé]\s+il\s+legislatore",
+            r"intenzione\s+(del\s+legislatore|della\s+norma)",
+            r"funzione\s+(della|dell)",
+        ],
     }
 
     # Pesi default per tipo di query
@@ -183,6 +191,12 @@ class ExpertRouter:
             "systemic": 0.25,
             "principles": 0.20,
             "precedent": 0.20,
+        },
+        "teleological": {
+            "literal": 0.15,
+            "systemic": 0.25,
+            "principles": 0.50,
+            "precedent": 0.10,
         },
     }
 

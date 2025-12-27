@@ -172,6 +172,7 @@ class ExpertResponse:
     execution_time_ms: float = 0.0
     tokens_used: int = 0
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    metadata: Dict[str, Any] = field(default_factory=dict)  # Additional metadata (e.g., react_metrics)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializza in dizionario."""
@@ -186,7 +187,8 @@ class ExpertResponse:
             "trace_id": self.trace_id,
             "execution_time_ms": self.execution_time_ms,
             "tokens_used": self.tokens_used,
-            "timestamp": self.timestamp
+            "timestamp": self.timestamp,
+            "metadata": self.metadata
         }
 
 
@@ -277,18 +279,24 @@ class BaseExpert(ABC):
 
 Analizza la domanda dell'utente seguendo rigorosamente il tuo approccio interpretativo.
 
-IMPORTANTE:
-- Cita SEMPRE le fonti giuridiche (articoli, sentenze, dottrina)
-- Spiega il ragionamento passo per passo
-- Indica chiaramente i limiti della tua analisi
-- Rispondi in italiano
+## REGOLA FONDAMENTALE - SOURCE OF TRUTH
+
+⚠️ DEVI usare ESCLUSIVAMENTE le fonti fornite nella sezione "FONTI RECUPERATE".
+⚠️ NON PUOI citare articoli, sentenze o dottrina che NON sono presenti in quella sezione.
+⚠️ Se le fonti recuperate sono insufficienti, indica un confidence basso e spiega nelle limitations.
+⚠️ Se nessuna fonte è rilevante, imposta confidence=0.1 e spiega il problema.
 
 Output in formato JSON con campi:
-- interpretation: str (interpretazione principale)
-- legal_basis: List[Dict] (fonti citate)
+- interpretation: str (interpretazione basata SOLO sulle fonti recuperate)
+- legal_basis: List[Dict] (fonti citate - DEVONO provenire da FONTI RECUPERATE)
 - reasoning_steps: List[Dict] (passi del ragionamento)
-- confidence: float (0.0-1.0)
-- limitations: str (limiti dell'analisi)"""
+- confidence: float (0.0-1.0) - abbassa se fonti insufficienti
+- limitations: str (cosa non hai potuto considerare perché non nelle fonti)
+
+CHECKLIST:
+✅ Ogni fonte DEVE provenire dalla sezione FONTI RECUPERATE
+✅ NON inventare MAI fonti non presenti
+✅ Rispondi in italiano"""
 
     @property
     def traversal_weights(self) -> Dict[str, float]:
@@ -333,6 +341,377 @@ Output in formato JSON con campi:
         Utile per passare a LLM per function calling.
         """
         return self._tool_registry.get_all_schemas()
+
+    async def explore_iteratively(
+        self,
+        context: ExpertContext,
+        max_iterations: int = 3,
+        source_types: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Esplorazione iterativa con semantic_search + graph_search.
+
+        Ogni Expert può usare questo metodo per esplorare il knowledge graph
+        in modo iterativo fino a convergenza.
+
+        Flow per ogni iterazione:
+        1. semantic_search con query o concetti estratti
+        2. Estrai URN dai risultati
+        3. graph_search sui nuovi URN
+        4. Aggiungi nuove fonti
+        5. Ripeti fino a convergenza o max_iterations
+
+        Args:
+            context: ExpertContext con query e dati iniziali
+            max_iterations: Numero massimo di iterazioni
+            source_types: Tipi di fonte da cercare (expert-specific)
+
+        Returns:
+            Lista di tutte le fonti trovate
+        """
+        all_sources = []
+        explored_urns = set()
+        exploration_history = []  # Per RLCF feedback
+
+        # Inizia con chunks già recuperati
+        if context.retrieved_chunks:
+            all_sources.extend(context.retrieved_chunks)
+            for chunk in context.retrieved_chunks:
+                urn = chunk.get("article_urn") or chunk.get("urn")
+                if urn:
+                    explored_urns.add(urn)
+
+        # Aggiungi URN da context.norm_references
+        urns_to_explore = set(context.norm_references)
+
+        semantic_tool = self._tool_registry.get("semantic_search")
+        graph_tool = self._tool_registry.get("graph_search")
+
+        for iteration in range(max_iterations):
+            iteration_log = {
+                "iteration": iteration + 1,
+                "urns_explored": len(explored_urns),
+                "sources_found": len(all_sources),
+                "new_urns": 0,
+                "new_sources": 0
+            }
+
+            # Step 1: Semantic search
+            if semantic_tool and iteration == 0:
+                # Prima iterazione: cerca con la query originale
+                result = await semantic_tool(
+                    query=context.query_text,
+                    top_k=5,
+                    expert_type=f"{self.expert_type.capitalize()}Expert",
+                    source_types=source_types
+                )
+                if result.success and result.data.get("results"):
+                    new_sources = result.data["results"]
+                    for source in new_sources:
+                        # Evita duplicati
+                        source_id = source.get("chunk_id") or source.get("urn")
+                        if source_id and not any(s.get("chunk_id") == source_id or s.get("urn") == source_id for s in all_sources):
+                            all_sources.append(source)
+                            iteration_log["new_sources"] += 1
+
+                        # Estrai URN per graph expansion
+                        urn = source.get("metadata", {}).get("article_urn") or source.get("urn")
+                        if urn and urn not in explored_urns:
+                            urns_to_explore.add(urn)
+                            iteration_log["new_urns"] += 1
+
+            # Step 2: Graph search su URN non ancora esplorati
+            if graph_tool and urns_to_explore:
+                urns_this_iteration = list(urns_to_explore - explored_urns)[:5]  # Limita a 5
+
+                for urn in urns_this_iteration:
+                    explored_urns.add(urn)
+
+                    try:
+                        result = await graph_tool(
+                            start_node=urn,
+                            relation_types=list(self.traversal_weights.keys()) if self.traversal_weights else None,
+                            max_hops=2,
+                            direction="both"
+                        )
+
+                        if result.success:
+                            for node in result.data.get("nodes", []):
+                                node_urn = node.get("urn")
+                                node_text = node.get("properties", {}).get("testo", "")
+
+                                # Evita nodi vuoti
+                                if not node_text:
+                                    continue
+
+                                # Evita duplicati
+                                if not any(s.get("urn") == node_urn for s in all_sources):
+                                    all_sources.append({
+                                        "text": node_text,
+                                        "urn": node_urn,
+                                        "type": node.get("type", ""),
+                                        "source": "graph_exploration",
+                                        "source_urn": urn,
+                                        "iteration": iteration + 1
+                                    })
+                                    iteration_log["new_sources"] += 1
+
+                                # Aggiungi URN per prossima iterazione
+                                if node_urn and node_urn not in explored_urns:
+                                    urns_to_explore.add(node_urn)
+                                    iteration_log["new_urns"] += 1
+
+                    except Exception as e:
+                        log.warning(f"Graph search failed for {urn}: {e}")
+
+            exploration_history.append(iteration_log)
+
+            log.debug(
+                f"{self.expert_type} iteration {iteration + 1}",
+                new_sources=iteration_log["new_sources"],
+                new_urns=iteration_log["new_urns"],
+                total_sources=len(all_sources)
+            )
+
+            # Convergenza: nessuna nuova fonte trovata
+            if iteration_log["new_sources"] == 0 and iteration_log["new_urns"] == 0:
+                log.info(
+                    f"{self.expert_type} converged",
+                    iterations=iteration + 1,
+                    total_sources=len(all_sources),
+                    total_urns=len(explored_urns)
+                )
+                break
+
+        # Store exploration history per RLCF feedback
+        self._exploration_history = exploration_history
+        self._explored_urns = explored_urns
+
+        return all_sources
+
+    def get_exploration_metrics(self) -> Dict[str, Any]:
+        """
+        Ottiene metriche dell'esplorazione per RLCF feedback.
+
+        Returns:
+            Dict con metriche: iterations, sources_per_iteration, convergence, etc.
+        """
+        history = getattr(self, '_exploration_history', [])
+        explored = getattr(self, '_explored_urns', set())
+
+        if not history:
+            return {"status": "not_explored"}
+
+        return {
+            "iterations": len(history),
+            "converged": history[-1]["new_sources"] == 0 if history else False,
+            "total_sources": sum(h["new_sources"] for h in history),
+            "total_urns_explored": len(explored),
+            "sources_per_iteration": [h["new_sources"] for h in history],
+            "history": history
+        }
+
+    async def record_feedback(
+        self,
+        response: "ExpertResponse",
+        user_rating: float,
+        feedback_type: str = "accuracy",
+        feedback_details: Optional[Dict[str, Any]] = None,
+        rlcf_orchestrator: Optional[Any] = None,
+        user_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Registra feedback dell'utente per apprendimento RLCF.
+
+        Il feedback viene usato per:
+        - Aggiornare traversal_weights per il grafo
+        - Migliorare routing verso questo expert
+        - Ottimizzare parametri di ricerca
+        - Persistere nel database RLCF (se orchestrator fornito)
+
+        Args:
+            response: ExpertResponse su cui dare feedback
+            user_rating: Rating 0-1 (0=scarso, 1=eccellente)
+            feedback_type: Tipo di feedback (accuracy, utility, transparency)
+            feedback_details: Dettagli aggiuntivi (es. fonti mancanti, errori)
+            rlcf_orchestrator: RLCFOrchestrator per persistenza DB (opzionale)
+            user_id: ID utente per authority tracking (opzionale)
+
+        Returns:
+            Dict con feedback registrato e suggerimenti di update
+        """
+        # Inizializza feedback history se non esiste
+        if not hasattr(self, '_feedback_history'):
+            self._feedback_history = []
+
+        exploration_metrics = self.get_exploration_metrics()
+
+        feedback_record = {
+            "timestamp": datetime.now().isoformat(),
+            "trace_id": response.trace_id,
+            "expert_type": self.expert_type,
+            "user_rating": user_rating,
+            "feedback_type": feedback_type,
+            "feedback_details": feedback_details or {},
+            "response_confidence": response.confidence,
+            "sources_used": len(response.legal_basis),
+            "exploration_metrics": exploration_metrics,
+            "current_traversal_weights": self.traversal_weights.copy() if self.traversal_weights else {},
+        }
+
+        # Persist to in-memory history
+        self._feedback_history.append(feedback_record)
+
+        # Calcola suggerimenti per aggiornamento pesi
+        weight_updates = self._compute_weight_updates(
+            user_rating,
+            response,
+            exploration_metrics
+        )
+
+        feedback_record["weight_update_suggestions"] = weight_updates
+
+        # NEW: Persist to RLCF database via orchestrator
+        if rlcf_orchestrator:
+            try:
+                rlcf_result = await rlcf_orchestrator.record_expert_feedback(
+                    expert_type=self.expert_type,
+                    response=response,
+                    user_rating=user_rating,
+                    feedback_type=feedback_type,
+                    user_id=user_id,
+                    feedback_details=feedback_details
+                )
+                feedback_record["rlcf_result"] = rlcf_result
+                feedback_record["persisted_to_db"] = True
+
+                log.info(
+                    f"Feedback persisted to RLCF DB for {self.expert_type}",
+                    feedback_id=rlcf_result.get("feedback_id"),
+                    weights_updated=rlcf_result.get("weights_updated")
+                )
+            except Exception as e:
+                log.error(
+                    f"Failed to persist feedback to RLCF DB: {e}",
+                    expert_type=self.expert_type,
+                    trace_id=response.trace_id
+                )
+                feedback_record["rlcf_error"] = str(e)
+                feedback_record["persisted_to_db"] = False
+        else:
+            feedback_record["persisted_to_db"] = False
+
+        log.info(
+            f"Feedback recorded for {self.expert_type}",
+            rating=user_rating,
+            trace_id=response.trace_id,
+            updates_suggested=len(weight_updates),
+            persisted=feedback_record.get("persisted_to_db", False)
+        )
+
+        return feedback_record
+
+    def _compute_weight_updates(
+        self,
+        user_rating: float,
+        response: "ExpertResponse",
+        exploration_metrics: Dict[str, Any]
+    ) -> Dict[str, float]:
+        """
+        Calcola suggerimenti di aggiornamento pesi basati sul feedback.
+
+        Logica:
+        - Se rating alto e fonte usata → aumenta peso della relazione
+        - Se rating basso → diminuisci pesi correnti
+        - Se convergenza rapida con buon rating → mantieni pesi
+
+        Returns:
+            Dict con delta per ogni peso (positivo = aumenta, negativo = diminuisci)
+        """
+        updates = {}
+        learning_rate = 0.1  # Configurable
+
+        if not self.traversal_weights:
+            return updates
+
+        # Fattore base: quanto cambiare i pesi
+        if user_rating > 0.7:
+            # Feedback positivo: rafforza pesi correnti
+            factor = learning_rate * (user_rating - 0.5)
+        elif user_rating < 0.3:
+            # Feedback negativo: riduci pesi correnti
+            factor = -learning_rate * (0.5 - user_rating)
+        else:
+            # Feedback neutro: nessun cambiamento
+            return updates
+
+        # Applica factor a tutti i pesi
+        for relation, weight in self.traversal_weights.items():
+            if relation != "default":
+                updates[relation] = factor * weight
+
+        return updates
+
+    def apply_weight_updates(self, updates: Dict[str, float]) -> None:
+        """
+        Applica aggiornamenti ai traversal weights.
+
+        Args:
+            updates: Dict con delta per ogni relazione
+        """
+        if not self.traversal_weights:
+            return
+
+        for relation, delta in updates.items():
+            if relation in self.traversal_weights:
+                new_weight = self.traversal_weights[relation] + delta
+                # Clamp tra 0.1 e 1.0
+                self.traversal_weights[relation] = max(0.1, min(1.0, new_weight))
+
+        # Aggiorna config
+        self.config["traversal_weights"] = self.traversal_weights
+
+        log.info(
+            f"Weights updated for {self.expert_type}",
+            updates=updates
+        )
+
+    def get_feedback_summary(self) -> Dict[str, Any]:
+        """
+        Ottiene riepilogo di tutto il feedback ricevuto.
+
+        Returns:
+            Dict con statistiche feedback per RLCF dashboard
+        """
+        history = getattr(self, '_feedback_history', [])
+
+        if not history:
+            return {"status": "no_feedback", "total": 0}
+
+        ratings = [f["user_rating"] for f in history]
+
+        return {
+            "total_feedback": len(history),
+            "average_rating": sum(ratings) / len(ratings) if ratings else 0,
+            "min_rating": min(ratings) if ratings else 0,
+            "max_rating": max(ratings) if ratings else 0,
+            "by_type": self._group_by_type(history),
+            "recent": history[-5:] if len(history) > 5 else history
+        }
+
+    def _group_by_type(self, history: List[Dict]) -> Dict[str, float]:
+        """Raggruppa feedback per tipo."""
+        by_type = {}
+        for f in history:
+            ftype = f.get("feedback_type", "unknown")
+            if ftype not in by_type:
+                by_type[ftype] = []
+            by_type[ftype].append(f["user_rating"])
+
+        return {
+            t: sum(ratings) / len(ratings) if ratings else 0
+            for t, ratings in by_type.items()
+        }
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(type={self.expert_type}, tools={len(self.tools)})>"
@@ -465,7 +844,8 @@ class ExpertWithTools(BaseExpert):
                 response = await self.ai_service.generate_response_async(
                     prompt=f"{system_prompt}\n\n{user_prompt}",
                     model=self.model,
-                    temperature=self.temperature
+                    temperature=self.temperature,
+                    response_format={"type": "json_object"}  # Garantisce JSON valido
                 )
 
                 # Parse content

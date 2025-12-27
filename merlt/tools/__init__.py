@@ -41,7 +41,22 @@ from merlt.tools.registry import (
 from merlt.tools.search import (
     SemanticSearchTool,
     GraphSearchTool,
+    ArticleFetchTool,
     SearchResultItem,
+)
+from merlt.tools.verification import (
+    VerificationTool,
+    VerificationResult,
+    SourceVerificationMixin,
+)
+from merlt.tools.definition import (
+    DefinitionLookupTool,
+    DefinitionEntry,
+)
+from merlt.tools.hierarchy import (
+    HierarchyNavigationTool,
+    HierarchyNode,
+    NavigationDirection,
 )
 
 __all__ = [
@@ -58,5 +73,17 @@ __all__ = [
     # Search tools
     "SemanticSearchTool",
     "GraphSearchTool",
+    "ArticleFetchTool",
     "SearchResultItem",
+    # Verification tools
+    "VerificationTool",
+    "VerificationResult",
+    "SourceVerificationMixin",
+    # Definition tools
+    "DefinitionLookupTool",
+    "DefinitionEntry",
+    # Hierarchy tools
+    "HierarchyNavigationTool",
+    "HierarchyNode",
+    "NavigationDirection",
 ]

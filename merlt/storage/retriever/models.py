@@ -86,12 +86,15 @@ class RetrieverConfig:
                              Default: 0.5 (neutral)
         enable_graph_enrichment: Enable/disable graph scoring (for A/B testing)
                                  Default: True
+        collection_name: Qdrant collection name
+                         Default: 'merl_t_dev_chunks'
     """
     alpha: float = 0.7
     over_retrieve_factor: int = 3
     max_graph_hops: int = 3
     default_graph_score: float = 0.5
     enable_graph_enrichment: bool = True
+    collection_name: str = "merl_t_dev_chunks"
 
     def __post_init__(self):
         """Validate configuration values."""
@@ -179,3 +182,37 @@ def _get_default_weights() -> Dict[str, Dict[str, float]]:
 
 # Expert-specific traversal weights loaded from config
 EXPERT_TRAVERSAL_WEIGHTS = _load_expert_weights()
+
+
+# Expert-specific source type filters (Art. 12 Preleggi alignment)
+# Ogni Expert cerca SOLO i tipi di fonte rilevanti per il suo canone ermeneutico
+EXPERT_SOURCE_TYPES: Dict[str, List[str]] = {
+    # LiteralExpert: "Significato proprio delle parole" - solo norme
+    "LiteralExpert": ["norma"],
+    "literal": ["norma"],
+
+    # SystemicExpert: "Connessione tra norme" - norme + context sistematico
+    "SystemicExpert": ["norma"],
+    "systemic": ["norma"],
+
+    # PrinciplesExpert: "Principi generali" - ratio legis + dottrina
+    "PrinciplesExpert": ["ratio", "spiegazione"],
+    "principles": ["ratio", "spiegazione"],
+
+    # PrecedentExpert: "Diritto vivente" - massime giurisprudenziali
+    "PrecedentExpert": ["massima"],
+    "precedent": ["massima"],
+}
+
+
+def get_source_types_for_expert(expert_type: str) -> List[str]:
+    """
+    Ritorna i source_types appropriati per un expert.
+
+    Args:
+        expert_type: Nome dell'expert (es: "LiteralExpert", "literal")
+
+    Returns:
+        Lista di source_types (es: ["norma"], ["massima"])
+    """
+    return EXPERT_SOURCE_TYPES.get(expert_type, [])

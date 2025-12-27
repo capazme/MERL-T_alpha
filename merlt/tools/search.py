@@ -163,6 +163,18 @@ class SemanticSearchTool(BaseTool):
                 description="Score minimo per filtrare risultati [0-1]",
                 required=False,
                 default=0.0
+            ),
+            ToolParameter(
+                name="source_types",
+                param_type=ParameterType.ARRAY,
+                description=(
+                    "Filtra per tipo di fonte. Specializzazione per expert: "
+                    "LiteralExpert=['norma'], "
+                    "SystemicExpert=['norma'], "
+                    "PrinciplesExpert=['ratio','spiegazione'], "
+                    "PrecedentExpert=['massima']"
+                ),
+                required=False
             )
         ]
 
@@ -172,7 +184,8 @@ class SemanticSearchTool(BaseTool):
         top_k: int = None,
         expert_type: str = None,
         context_nodes: List[str] = None,
-        min_score: float = 0.0
+        min_score: float = 0.0,
+        source_types: List[str] = None
     ) -> ToolResult:
         """
         Esegue ricerca semantica ibrida.
@@ -183,6 +196,7 @@ class SemanticSearchTool(BaseTool):
             expert_type: Tipo expert per pesatura grafo
             context_nodes: URN nodi per contesto
             min_score: Score minimo per filtrare
+            source_types: Filtro per tipo fonte (es: ['norma'], ['massima'])
 
         Returns:
             ToolResult con lista di risultati ordinati per final_score
@@ -192,7 +206,7 @@ class SemanticSearchTool(BaseTool):
 
         log.debug(
             f"semantic_search - query='{query[:50]}...', "
-            f"top_k={top_k}, expert={expert_type}"
+            f"top_k={top_k}, expert={expert_type}, source_types={source_types}"
         )
 
         # Verifica dipendenze
@@ -212,12 +226,13 @@ class SemanticSearchTool(BaseTool):
             # Step 1: Genera embedding della query
             query_embedding = await self._encode_query(query)
 
-            # Step 2: Hybrid retrieval
+            # Step 2: Hybrid retrieval with source_type filtering
             retrieval_results = await self.retriever.retrieve(
                 query_embedding=query_embedding,
                 context_nodes=context_nodes,
                 expert_type=expert_type,
-                top_k=top_k
+                top_k=top_k,
+                source_types=source_types
             )
 
             # Step 3: Converti e filtra risultati
@@ -247,12 +262,14 @@ class SemanticSearchTool(BaseTool):
                     "results": results,
                     "total": len(results),
                     "expert_type": expert_type,
-                    "context_nodes": context_nodes or []
+                    "context_nodes": context_nodes or [],
+                    "source_types": source_types or []
                 },
                 tool_name=self.name,
                 query=query,
                 top_k=top_k,
-                expert_type=expert_type
+                expert_type=expert_type,
+                source_types=source_types
             )
 
         except Exception as e:
@@ -426,8 +443,8 @@ class GraphSearchTool(BaseTool):
                 direction=direction
             )
 
-            # Esegui query
-            result = await self.graph_db.execute_query(query, params)
+            # Esegui query (FalkorDBClient usa .query(), non .execute_query())
+            result = await self.graph_db.query(query, params)
 
             # Processa risultati
             nodes = []
@@ -538,3 +555,155 @@ class GraphSearchTool(BaseTool):
             "type": edge_type,
             "properties": props
         }
+
+
+class ArticleFetchTool(BaseTool):
+    """
+    Tool per recuperare testo articoli da Normattiva (API esterna).
+
+    Utile quando l'articolo non è presente nel grafo locale.
+    Gli expert possono usare questo tool per ottenere il testo ufficiale
+    di qualsiasi articolo del sistema normativo italiano.
+
+    Esempio:
+        >>> tool = ArticleFetchTool()
+        >>> result = await tool(
+        ...     tipo_atto="codice civile",
+        ...     numero_articolo="1453"
+        ... )
+        >>> print(result.data["text"][:200])
+    """
+
+    name = "article_fetch"
+    description = (
+        "Recupera il testo ufficiale di un articolo da Normattiva. "
+        "Usa questo tool quando hai bisogno del testo di un articolo "
+        "che non è presente nel database locale."
+    )
+
+    def __init__(self, scraper: Any = None):
+        """
+        Inizializza ArticleFetchTool.
+
+        Args:
+            scraper: NormattivaScraper opzionale. Se None, ne crea uno nuovo.
+        """
+        super().__init__()
+        self._scraper = scraper
+        self._scraper_initialized = False
+
+    async def _get_scraper(self):
+        """Lazy initialization del scraper."""
+        if self._scraper is None:
+            from merlt.sources import NormattivaScraper
+            self._scraper = NormattivaScraper()
+        return self._scraper
+
+    @property
+    def parameters(self) -> List[ToolParameter]:
+        """Parametri del tool."""
+        return [
+            ToolParameter(
+                name="tipo_atto",
+                param_type=ParameterType.STRING,
+                description=(
+                    "Tipo di atto normativo. "
+                    "Es: 'codice civile', 'codice penale', 'costituzione', "
+                    "'decreto legislativo', 'legge'"
+                )
+            ),
+            ToolParameter(
+                name="numero_articolo",
+                param_type=ParameterType.STRING,
+                description=(
+                    "Numero dell'articolo da recuperare. "
+                    "Es: '1453', '52', '2043'"
+                )
+            ),
+            ToolParameter(
+                name="data_atto",
+                param_type=ParameterType.STRING,
+                description=(
+                    "Data dell'atto per decreti/leggi (formato: YYYY-MM-DD). "
+                    "Non necessario per codici."
+                ),
+                required=False
+            ),
+            ToolParameter(
+                name="numero_atto",
+                param_type=ParameterType.STRING,
+                description=(
+                    "Numero dell'atto per decreti/leggi. "
+                    "Non necessario per codici."
+                ),
+                required=False
+            )
+        ]
+
+    async def execute(
+        self,
+        tipo_atto: str,
+        numero_articolo: str,
+        data_atto: str = None,
+        numero_atto: str = None
+    ) -> ToolResult:
+        """
+        Recupera il testo di un articolo da Normattiva.
+
+        Args:
+            tipo_atto: Tipo di atto (codice civile, legge, etc.)
+            numero_articolo: Numero dell'articolo
+            data_atto: Data dell'atto (per decreti/leggi)
+            numero_atto: Numero dell'atto (per decreti/leggi)
+
+        Returns:
+            ToolResult con testo dell'articolo e URN
+        """
+        log.debug(
+            f"article_fetch - tipo={tipo_atto}, art={numero_articolo}"
+        )
+
+        try:
+            from merlt.sources.utils.norma import Norma, NormaVisitata
+
+            # Crea oggetto Norma
+            norma = Norma(
+                tipo_atto=tipo_atto,
+                data=data_atto,
+                numero_atto=numero_atto
+            )
+
+            # Crea NormaVisitata con articolo specifico
+            norma_visitata = NormaVisitata(
+                norma=norma,
+                numero_articolo=numero_articolo
+            )
+
+            # Recupera documento
+            scraper = await self._get_scraper()
+            text, urn = await scraper.get_document(norma_visitata)
+
+            log.info(
+                f"article_fetch completed - "
+                f"tipo={tipo_atto}, art={numero_articolo}, urn={urn[:50]}..."
+            )
+
+            return ToolResult.ok(
+                data={
+                    "text": text,
+                    "urn": urn,
+                    "tipo_atto": tipo_atto,
+                    "numero_articolo": numero_articolo,
+                    "source": "normattiva"
+                },
+                tool_name=self.name,
+                tipo_atto=tipo_atto,
+                numero_articolo=numero_articolo
+            )
+
+        except Exception as e:
+            log.error(f"article_fetch failed: {e}")
+            return ToolResult.fail(
+                error=f"Impossibile recuperare articolo: {str(e)}",
+                tool_name=self.name
+            )

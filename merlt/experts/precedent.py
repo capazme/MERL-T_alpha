@@ -35,12 +35,14 @@ from merlt.experts.base import (
     ReasoningStep,
     ConfidenceFactors,
 )
+from merlt.experts.react_mixin import ReActMixin
 from merlt.tools import BaseTool
+from merlt.storage.retriever.models import get_source_types_for_expert
 
 log = structlog.get_logger()
 
 
-class PrecedentExpert(BaseExpert):
+class PrecedentExpert(BaseExpert, ReActMixin):
     """
     Expert per interpretazione giurisprudenziale.
 
@@ -111,7 +113,7 @@ class PrecedentExpert(BaseExpert):
 
         Args:
             tools: Tools per ricerca
-            config: Configurazione (prompt, temperature, traversal_weights)
+            config: Configurazione (prompt, temperature, traversal_weights, use_react)
             ai_service: Servizio AI per LLM calls
         """
         config = config or {}
@@ -119,6 +121,16 @@ class PrecedentExpert(BaseExpert):
             config["traversal_weights"] = self.DEFAULT_TRAVERSAL_WEIGHTS
 
         super().__init__(tools=tools, config=config, ai_service=ai_service)
+
+        # ReAct mode configuration
+        self.use_react = config.get("use_react", False)
+        self.react_config = {
+            "max_iterations": config.get("react_max_iterations", 5),
+            "novelty_threshold": config.get("react_novelty_threshold", 0.1),
+            "temperature": 0.1,
+            "model": config.get("react_model", self.model)
+        }
+
         self.prompt_template = self._get_precedent_prompt()
 
     def _get_precedent_prompt(self) -> str:
@@ -127,6 +139,13 @@ class PrecedentExpert(BaseExpert):
 
 Il tuo approccio si basa sulla prassi applicativa e sul "diritto vivente":
 come le corti interpretano e applicano effettivamente le norme.
+
+## REGOLA FONDAMENTALE - SOURCE OF TRUTH
+
+⚠️ DEVI usare ESCLUSIVAMENTE le fonti fornite nella sezione "TESTI NORMATIVI RECUPERATI".
+⚠️ NON PUOI citare sentenze, massime o orientamenti che NON sono presenti in quella sezione.
+⚠️ Se le fonti recuperate sono insufficienti, indica "source_availability" basso e spiega nelle limitations.
+⚠️ Se nessuna sentenza è rilevante, imposta confidence=0.1 e spiega il problema.
 
 ## METODOLOGIA
 
@@ -189,22 +208,29 @@ Rispondi in JSON con questa struttura:
     "limitations": "Cosa non hai potuto considerare"
 }
 
-IMPORTANTE:
-- Cita SEMPRE le sentenze con riferimento completo
-- Distingui giurisprudenza COSTANTE da orientamenti ISOLATI
-- Segnala CONTRASTI tra diverse corti o sezioni
-- Indica l'AUTORITÀ della fonte (SU > sez. semplice)
-- Considera il TEMPO: sentenze recenti vs. risalenti"""
+CHECKLIST FINALE:
+✅ Ogni fonte in legal_basis DEVE provenire da TESTI NORMATIVI RECUPERATI
+✅ Il campo "source_id" DEVE essere ESATTAMENTE il valore indicato come `source_id` nella fonte
+✅ NON inventare source_id - copia esattamente il valore mostrato
+✅ Ogni massima o excerpt DEVE essere copiato dalle fonti, non parafrasato
+✅ Se le fonti sono insufficienti, abbassa confidence e source_availability
+✅ NON inventare MAI sentenze, massime o riferimenti non presenti nelle fonti
+✅ Usa SOLO le sentenze effettivamente recuperate dal database"""
 
     async def analyze(self, context: ExpertContext) -> ExpertResponse:
         """
         Analizza la query cercando precedenti giurisprudenziali.
 
-        Flow:
+        Flow (standard):
         1. Cerca massime e sentenze rilevanti
         2. Identifica orientamenti consolidati
         3. Valuta gerarchia delle fonti
         4. Produce interpretazione basata sulla prassi
+
+        Flow (ReAct mode - use_react=True):
+        1. ReAct loop: LLM decide quali tool usare iterativamente
+        2. Convergenza automatica basata su novelty threshold
+        3. Analisi LLM finale con tutte le fonti raccolte
         """
         import time
         start_time = time.time()
@@ -212,35 +238,58 @@ IMPORTANTE:
         log.info(
             f"PrecedentExpert analyzing",
             query=context.query_text[:50],
-            trace_id=context.trace_id
+            trace_id=context.trace_id,
+            use_react=self.use_react
         )
 
-        # Step 1: Recupera fonti
-        retrieved_sources = await self._retrieve_sources(context)
+        # Step 1: Recupera fonti (ReAct o standard)
+        if self.use_react and self.ai_service:
+            # ReAct mode: LLM-driven tool selection
+            all_sources = await self.react_loop(
+                context,
+                max_iterations=self.react_config.get("max_iterations", 5),
+                novelty_threshold=self.react_config.get("novelty_threshold", 0.1)
+            )
+            # Still apply authority ranking
+            all_sources = self._rank_by_authority(all_sources)
+            log.info(
+                f"PrecedentExpert ReAct completed",
+                sources=len(all_sources),
+                react_metrics=self.get_react_metrics() if hasattr(self, '_react_result') else {}
+            )
+        else:
+            # Standard mode: fixed tool sequence
+            retrieved_sources = await self._retrieve_sources(context)
+            jurisprudence_sources = await self._search_jurisprudence(context)
+            all_sources = self._rank_by_authority(retrieved_sources + jurisprudence_sources)
 
-        # Step 2: Cerca specificamente giurisprudenza
-        jurisprudence_sources = await self._search_jurisprudence(context)
-
-        # Step 3: Ordina per autorità
-        all_sources = self._rank_by_authority(retrieved_sources + jurisprudence_sources)
-
-        # Step 4: Costruisci context arricchito
+        # Step 2: Costruisci context arricchito
         enriched_context = ExpertContext(
             query_text=context.query_text,
             query_embedding=context.query_embedding,
             entities=context.entities,
             retrieved_chunks=all_sources,
-            metadata={**context.metadata, "jurisprudence_search": True},
+            metadata={
+                **context.metadata,
+                "jurisprudence_search": True,
+                "react_mode": self.use_react,
+                "react_metrics": self.get_react_metrics() if self.use_react and hasattr(self, '_react_result') else {}
+            },
             trace_id=context.trace_id
         )
 
-        # Step 5: Analisi
+        # Step 3: Analisi
         if self.ai_service:
             response = await self._analyze_with_llm(enriched_context)
         else:
             response = self._analyze_without_llm(enriched_context)
 
         response.execution_time_ms = (time.time() - start_time) * 1000
+
+        # Aggiungi metriche ReAct se disponibili
+        if self.use_react and hasattr(self, '_react_result'):
+            response.metadata = response.metadata or {}
+            response.metadata["react_metrics"] = self.get_react_metrics()
 
         log.info(
             f"PrecedentExpert completed",
@@ -252,21 +301,48 @@ IMPORTANTE:
         return response
 
     async def _retrieve_sources(self, context: ExpertContext) -> List[Dict[str, Any]]:
-        """Recupera fonti usando i tools disponibili."""
+        """
+        Recupera fonti usando i tools disponibili.
+
+        Flow:
+        1. Usa chunks già recuperati se presenti
+        2. Semantic search per trovare massime
+        3. Estrai URN dai risultati per graph expansion
+        """
         sources = []
+        self._extracted_urns = set()  # Store for later graph expansion
 
         if context.retrieved_chunks:
             sources.extend(context.retrieved_chunks)
+            # Estrai URN dai chunks già presenti
+            for chunk in context.retrieved_chunks:
+                urn = chunk.get("article_urn") or chunk.get("urn")
+                if urn:
+                    self._extracted_urns.add(urn)
 
+        # Semantic search - SOLO massime per PrecedentExpert (diritto vivente)
         semantic_tool = self._tool_registry.get("semantic_search")
         if semantic_tool:
+            source_types = get_source_types_for_expert("PrecedentExpert")
             result = await semantic_tool(
                 query=context.query_text,
                 top_k=5,
-                expert_type="PrecedentExpert"
+                expert_type="PrecedentExpert",
+                source_types=source_types  # ["massima"] - prassi giurisprudenziale
             )
             if result.success and result.data.get("results"):
                 sources.extend(result.data["results"])
+                # Estrai URN dai risultati per graph expansion
+                for item in result.data["results"]:
+                    urn = item.get("metadata", {}).get("article_urn") or item.get("urn")
+                    if urn:
+                        self._extracted_urns.add(urn)
+
+        log.debug(
+            f"PrecedentExpert sources retrieved",
+            total=len(sources),
+            extracted_urns=len(self._extracted_urns)
+        )
 
         return sources
 
@@ -285,12 +361,14 @@ IMPORTANTE:
             f"massima {' '.join(context.legal_concepts[:2]) if context.legal_concepts else base_query}"
         ]
 
+        source_types = get_source_types_for_expert("PrecedentExpert")
         for query in jur_queries:
             try:
                 result = await semantic_tool(
                     query=query,
                     top_k=3,
-                    expert_type="PrecedentExpert"
+                    expert_type="PrecedentExpert",
+                    source_types=source_types  # ["massima"]
                 )
                 if result.success and result.data.get("results"):
                     for r in result.data["results"]:
@@ -300,10 +378,21 @@ IMPORTANTE:
                 log.warning(f"Jurisprudence search failed: {e}")
 
         # Ricerca grafo per relazioni giurisprudenziali
+        # Combina URN da context + URN estratti da semantic_search
+        urns_to_explore = set(context.norm_references) | getattr(self, '_extracted_urns', set())
+
         graph_tool = self._tool_registry.get("graph_search")
-        if graph_tool and context.norm_references:
-            jur_relations = ["interpreta", "applica", "cita", "conferma"]
-            for urn in context.norm_references[:2]:
+        if graph_tool and urns_to_explore:
+            # Relazioni reali nel grafo (interpreta: 11,343, commenta: 2,609)
+            jur_relations = ["interpreta", "commenta", "DISCIPLINA", "APPLICA_A"]
+
+            log.debug(
+                f"PrecedentExpert graph expansion",
+                urns_count=len(urns_to_explore),
+                urns=list(urns_to_explore)[:3]
+            )
+
+            for urn in list(urns_to_explore)[:3]:
                 try:
                     result = await graph_tool(
                         start_node=urn,
@@ -312,7 +401,12 @@ IMPORTANTE:
                         direction="incoming"  # Sentenze che citano la norma
                     )
                     if result.success:
-                        for node in result.data.get("nodes", []):
+                        graph_nodes = result.data.get("nodes", [])
+                        log.debug(
+                            f"Jurisprudence expansion for {urn[:50]}...",
+                            nodes_found=len(graph_nodes)
+                        )
+                        for node in graph_nodes:
                             node_type = node.get("type", "")
                             if "Massima" in node_type or "Sentenza" in node_type:
                                 jurisprudence.append({
@@ -320,18 +414,24 @@ IMPORTANTE:
                                     "urn": node.get("urn", ""),
                                     "type": node_type,
                                     "source": "jurisprudence_graph",
-                                    "court": node.get("properties", {}).get("corte", "unknown")
+                                    "court": node.get("properties", {}).get("corte", "unknown"),
+                                    "source_urn": urn
                                 })
                 except Exception as e:
                     log.warning(f"Graph jurisprudence search failed: {e}")
+
+        log.info(
+            f"PrecedentExpert jurisprudence found",
+            total=len(jurisprudence)
+        )
 
         return jurisprudence
 
     def _rank_by_authority(self, sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Ordina le fonti per autorità della corte."""
         def get_authority_score(source: Dict[str, Any]) -> float:
-            court = source.get("court", "").lower()
-            text = source.get("text", "").lower()
+            court = (source.get("court") or "").lower()
+            text = (source.get("text") or "").lower()
 
             # Identifica la corte dal testo o metadati
             if "corte costituzionale" in court or "corte costituzionale" in text:
@@ -446,6 +546,8 @@ IMPORTANTE:
             sections.append(f"\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
 
         if context.retrieved_chunks:
+            sections.append("⚠️ USA ESATTAMENTE il source_id indicato per ogni fonte nel campo legal_basis!")
+
             # Separa per tipo e ordina per autorità
             norms = [c for c in context.retrieved_chunks if c.get("source") not in ["jurisprudence_search", "jurisprudence_graph"]]
             jur = [c for c in context.retrieved_chunks if c.get("source") in ["jurisprudence_search", "jurisprudence_graph"]]
@@ -454,17 +556,27 @@ IMPORTANTE:
                 sections.append("\n## FONTI GIURISPRUDENZIALI (ordinate per autorità)")
                 for i, chunk in enumerate(jur[:7], 1):
                     text = chunk.get("text", "")
+                    chunk_id = chunk.get("chunk_id", chunk.get("urn", f"jur_{i}"))
                     urn = chunk.get("urn", "N/A")
                     authority = chunk.get("authority_score", "N/A")
                     court = chunk.get("court", "N/D")
-                    sections.append(f"\n### Precedente {i} (autorità: {authority}, corte: {court})\nRiferimento: {urn}\n{text}")
+                    sections.append(f"\n### Precedente {i}")
+                    sections.append(f"- **source_id**: `{chunk_id}` ← USA QUESTO ESATTO VALORE")
+                    sections.append(f"- **urn**: {urn}")
+                    sections.append(f"- **autorità**: {authority}")
+                    sections.append(f"- **corte**: {court}")
+                    sections.append(f"- **testo**:\n{text}")
 
             if norms:
                 sections.append("\n## NORME INTERPRETATE")
                 for i, chunk in enumerate(norms[:3], 1):
                     text = chunk.get("text", "")
+                    chunk_id = chunk.get("chunk_id", chunk.get("urn", f"norm_{i}"))
                     urn = chunk.get("urn", "N/A")
-                    sections.append(f"\n### Norma {i} (URN: {urn})\n{text}")
+                    sections.append(f"\n### Norma {i}")
+                    sections.append(f"- **source_id**: `{chunk_id}` ← USA QUESTO ESATTO VALORE")
+                    sections.append(f"- **urn**: {urn}")
+                    sections.append(f"- **testo**:\n{text}")
 
         return "\n".join(sections)
 

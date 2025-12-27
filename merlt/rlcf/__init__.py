@@ -48,7 +48,30 @@ __all__ = [
     "ai_service",
     "aggregation",
     "authority",
+    "database",
     "models",
     "metrics",
+    "orchestrator",
+    "RLCFOrchestrator",
     "validation",
 ]
+
+# Convenience imports for common classes
+def get_orchestrator():
+    """Get RLCFOrchestrator singleton."""
+    from merlt.rlcf.orchestrator import get_orchestrator as _get
+    return _get
+
+def get_async_session():
+    """Get async database session."""
+    from merlt.rlcf.database import get_async_session as _get
+    return _get
+
+
+# Direct access to RLCFOrchestrator class
+def __getattr__(name):
+    """Lazy import for RLCFOrchestrator to avoid circular imports."""
+    if name == "RLCFOrchestrator":
+        from merlt.rlcf.orchestrator import RLCFOrchestrator
+        return RLCFOrchestrator
+    raise AttributeError(f"module 'merlt.rlcf' has no attribute '{name}'")

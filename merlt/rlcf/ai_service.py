@@ -76,6 +76,11 @@ Categorize risks by severity and likelihood.""",
     
     def __init__(self):
         self.session: Optional[aiohttp.ClientSession] = None
+        self._last_usage: Dict[str, int] = {}  # Track usage from last API call
+
+    def get_last_usage(self) -> Dict[str, int]:
+        """Get usage data from the last API call."""
+        return self._last_usage.copy()
     
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
@@ -333,8 +338,9 @@ Please provide a concise legal summary highlighting key points, obligations, and
         system_prompt: Optional[str] = None,
         model: str = "google/gemini-2.5-flash",
         temperature: float = 0.1,
-        max_tokens: int = 4000,
-        api_key: Optional[str] = None
+        max_tokens: int = 128000,
+        api_key: Optional[str] = None,
+        response_format: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Generate a generic completion using OpenRouter API.
@@ -350,6 +356,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
             temperature: Sampling temperature (0.0-1.0)
             max_tokens: Maximum tokens to generate
             api_key: Optional API key (defaults to env OPENROUTER_API_KEY)
+            response_format: Optional format constraint (e.g., {"type": "json_object"})
 
         Returns:
             str: Generated completion text
@@ -378,6 +385,10 @@ Please provide a concise legal summary highlighting key points, obligations, and
                 "max_tokens": max_tokens,
             }
 
+            # Add structured output format if specified
+            if response_format:
+                payload["response_format"] = response_format
+
             headers = {
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
@@ -405,7 +416,23 @@ Please provide a concise legal summary highlighting key points, obligations, and
                     raise Exception("Invalid response from OpenRouter API")
 
                 completion = data["choices"][0]["message"]["content"]
-                log.info(f"Successfully generated completion ({len(completion)} chars)")
+
+                # Extract usage data if available
+                usage = data.get("usage", {})
+                total_tokens = usage.get("total_tokens", 0)
+                prompt_tokens = usage.get("prompt_tokens", 0)
+                completion_tokens = usage.get("completion_tokens", 0)
+
+                log.info(
+                    f"Successfully generated completion ({len(completion)} chars, {total_tokens} tokens)"
+                )
+
+                # Store usage in a thread-safe way for later retrieval
+                self._last_usage = {
+                    "total_tokens": total_tokens,
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens
+                }
 
                 return completion
 
@@ -418,8 +445,9 @@ Please provide a concise legal summary highlighting key points, obligations, and
         prompt: str,
         model: str = "google/gemini-2.5-flash",
         temperature: float = 0.7,
-        max_tokens: int = 1000,
-        system_prompt: Optional[str] = None
+        max_tokens: int = 128000,
+        system_prompt: Optional[str] = None,
+        response_format: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Async method for generating responses (alias for generate_completion).
@@ -432,6 +460,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
             temperature: Sampling temperature (0.0-1.0)
             max_tokens: Maximum tokens to generate
             system_prompt: Optional system prompt
+            response_format: Optional format constraint (e.g., {"type": "json_object"})
 
         Returns:
             str: Generated response text
@@ -442,7 +471,8 @@ Please provide a concise legal summary highlighting key points, obligations, and
             system_prompt=system_prompt,
             model=model,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
+            response_format=response_format
         )
 
     async def generate_json_completion(

@@ -34,12 +34,14 @@ from merlt.experts.base import (
     ReasoningStep,
     ConfidenceFactors,
 )
+from merlt.experts.react_mixin import ReActMixin
 from merlt.tools import BaseTool
+from merlt.storage.retriever.models import get_source_types_for_expert
 
 log = structlog.get_logger()
 
 
-class PrinciplesExpert(BaseExpert):
+class PrinciplesExpert(BaseExpert, ReActMixin):
     """
     Expert per interpretazione teleologica e per principi.
 
@@ -98,7 +100,7 @@ class PrinciplesExpert(BaseExpert):
 
         Args:
             tools: Tools per ricerca
-            config: Configurazione (prompt, temperature, traversal_weights)
+            config: Configurazione (prompt, temperature, traversal_weights, use_react)
             ai_service: Servizio AI per LLM calls
         """
         config = config or {}
@@ -106,6 +108,16 @@ class PrinciplesExpert(BaseExpert):
             config["traversal_weights"] = self.DEFAULT_TRAVERSAL_WEIGHTS
 
         super().__init__(tools=tools, config=config, ai_service=ai_service)
+
+        # ReAct mode configuration
+        self.use_react = config.get("use_react", False)
+        self.react_config = {
+            "max_iterations": config.get("react_max_iterations", 5),
+            "novelty_threshold": config.get("react_novelty_threshold", 0.1),
+            "temperature": 0.1,
+            "model": config.get("react_model", self.model)
+        }
+
         self.prompt_template = self._get_principles_prompt()
 
     def _get_principles_prompt(self) -> str:
@@ -114,6 +126,13 @@ class PrinciplesExpert(BaseExpert):
 
 Il tuo approccio si basa sull'art. 12, comma II, disp. prel. c.c.:
 "...si decide secondo i principi generali dell'ordinamento giuridico dello Stato."
+
+## REGOLA FONDAMENTALE - SOURCE OF TRUTH
+
+⚠️ DEVI usare ESCLUSIVAMENTE le fonti fornite nella sezione "TESTI NORMATIVI RECUPERATI".
+⚠️ NON PUOI citare articoli, sentenze o dottrina che NON sono presenti in quella sezione.
+⚠️ Se le fonti recuperate sono insufficienti, indica "source_availability" basso e spiega nelle limitations.
+⚠️ Se nessuna fonte è rilevante, imposta confidence=0.1 e spiega il problema.
 
 ## METODOLOGIA
 
@@ -175,21 +194,29 @@ Rispondi in JSON con questa struttura:
     "limitations": "Cosa non hai potuto considerare"
 }
 
-IMPORTANTE:
-- Identifica sempre la RATIO LEGIS
-- Cerca PRINCIPI costituzionali e sovranazionali applicabili
-- Applica INTERPRETAZIONE CONFORME quando possibile
-- Segnala CONFLITTI tra interpretazione letterale e teleologica"""
+CHECKLIST FINALE:
+✅ Ogni fonte in legal_basis DEVE provenire da TESTI NORMATIVI RECUPERATI
+✅ Il campo "source_id" DEVE essere ESATTAMENTE il valore indicato come `source_id` nella fonte
+✅ NON inventare source_id - copia esattamente il valore mostrato
+✅ Ogni excerpt DEVE essere un testo copiato dalle fonti, non parafrasato
+✅ Se le fonti sono insufficienti, abbassa confidence e source_availability
+✅ NON inventare MAI articoli o sentenze non presenti nelle fonti
+✅ Identifica ratio_legis SOLO da fonti presenti (dottrina, relazioni illustrative)"""
 
     async def analyze(self, context: ExpertContext) -> ExpertResponse:
         """
         Analizza la query con approccio teleologico.
 
-        Flow:
+        Flow (standard):
         1. Recupera norme e principi rilevanti
         2. Cerca fonti costituzionali e sovranazionali
         3. Identifica la ratio legis
         4. Produce interpretazione orientata ai principi
+
+        Flow (ReAct mode - use_react=True):
+        1. ReAct loop: LLM decide quali tool usare iterativamente
+        2. Convergenza automatica basata su novelty threshold
+        3. Analisi LLM finale con tutte le fonti raccolte
         """
         import time
         start_time = time.time()
@@ -197,33 +224,56 @@ IMPORTANTE:
         log.info(
             f"PrinciplesExpert analyzing",
             query=context.query_text[:50],
-            trace_id=context.trace_id
+            trace_id=context.trace_id,
+            use_react=self.use_react
         )
 
-        # Step 1: Recupera fonti
-        retrieved_sources = await self._retrieve_sources(context)
+        # Step 1: Recupera fonti (ReAct o standard)
+        if self.use_react and self.ai_service:
+            # ReAct mode: LLM-driven tool selection
+            all_sources = await self.react_loop(
+                context,
+                max_iterations=self.react_config.get("max_iterations", 5),
+                novelty_threshold=self.react_config.get("novelty_threshold", 0.1)
+            )
+            log.info(
+                f"PrinciplesExpert ReAct completed",
+                sources=len(all_sources),
+                react_metrics=self.get_react_metrics() if hasattr(self, '_react_result') else {}
+            )
+        else:
+            # Standard mode: fixed tool sequence
+            retrieved_sources = await self._retrieve_sources(context)
+            principle_sources = await self._search_principles(context)
+            all_sources = retrieved_sources + principle_sources
 
-        # Step 2: Cerca principi costituzionali/EU
-        principle_sources = await self._search_principles(context)
-
-        # Step 3: Costruisci context arricchito
-        all_sources = retrieved_sources + principle_sources
+        # Step 2: Costruisci context arricchito
         enriched_context = ExpertContext(
             query_text=context.query_text,
             query_embedding=context.query_embedding,
             entities=context.entities,
             retrieved_chunks=all_sources,
-            metadata={**context.metadata, "principles_search": True},
+            metadata={
+                **context.metadata,
+                "principles_search": True,
+                "react_mode": self.use_react,
+                "react_metrics": self.get_react_metrics() if self.use_react and hasattr(self, '_react_result') else {}
+            },
             trace_id=context.trace_id
         )
 
-        # Step 4: Analisi
+        # Step 3: Analisi
         if self.ai_service:
             response = await self._analyze_with_llm(enriched_context)
         else:
             response = self._analyze_without_llm(enriched_context)
 
         response.execution_time_ms = (time.time() - start_time) * 1000
+
+        # Aggiungi metriche ReAct se disponibili
+        if self.use_react and hasattr(self, '_react_result'):
+            response.metadata = response.metadata or {}
+            response.metadata["react_metrics"] = self.get_react_metrics()
 
         log.info(
             f"PrinciplesExpert completed",
@@ -235,21 +285,48 @@ IMPORTANTE:
         return response
 
     async def _retrieve_sources(self, context: ExpertContext) -> List[Dict[str, Any]]:
-        """Recupera fonti usando i tools disponibili."""
+        """
+        Recupera fonti usando i tools disponibili.
+
+        Flow:
+        1. Usa chunks già recuperati se presenti
+        2. Semantic search per trovare ratio e spiegazioni
+        3. Estrai URN dai risultati per graph expansion
+        """
         sources = []
+        self._extracted_urns = set()  # Store for later graph expansion
 
         if context.retrieved_chunks:
             sources.extend(context.retrieved_chunks)
+            # Estrai URN dai chunks già presenti
+            for chunk in context.retrieved_chunks:
+                urn = chunk.get("article_urn") or chunk.get("urn")
+                if urn:
+                    self._extracted_urns.add(urn)
 
+        # Semantic search - ratio e spiegazioni per PrinciplesExpert (art. 12, II)
         semantic_tool = self._tool_registry.get("semantic_search")
         if semantic_tool:
+            source_types = get_source_types_for_expert("PrinciplesExpert")
             result = await semantic_tool(
                 query=context.query_text,
                 top_k=5,
-                expert_type="PrinciplesExpert"
+                expert_type="PrinciplesExpert",
+                source_types=source_types  # ["ratio", "spiegazione"] - principi generali
             )
             if result.success and result.data.get("results"):
                 sources.extend(result.data["results"])
+                # Estrai URN dai risultati per graph expansion
+                for item in result.data["results"]:
+                    urn = item.get("metadata", {}).get("article_urn") or item.get("urn")
+                    if urn:
+                        self._extracted_urns.add(urn)
+
+        log.debug(
+            f"PrinciplesExpert sources retrieved",
+            total=len(sources),
+            extracted_urns=len(self._extracted_urns)
+        )
 
         return sources
 
@@ -267,12 +344,14 @@ IMPORTANTE:
             f"diritti fondamentali {' '.join(context.legal_concepts[:2]) if context.legal_concepts else context.query_text[:30]}"
         ]
 
+        source_types = get_source_types_for_expert("PrinciplesExpert")
         for query in principle_queries:
             try:
                 result = await semantic_tool(
                     query=query,
                     top_k=3,
-                    expert_type="PrinciplesExpert"
+                    expert_type="PrinciplesExpert",
+                    source_types=source_types  # ["ratio", "spiegazione"]
                 )
                 if result.success and result.data.get("results"):
                     for r in result.data["results"]:
@@ -282,10 +361,21 @@ IMPORTANTE:
                 log.warning(f"Principles search failed: {e}")
 
         # Ricerca grafo per relazioni con principi
+        # Combina URN da context + URN estratti da semantic_search
+        urns_to_explore = set(context.norm_references) | getattr(self, '_extracted_urns', set())
+
         graph_tool = self._tool_registry.get("graph_search")
-        if graph_tool and context.norm_references:
-            principle_relations = ["attua", "esprime", "costituzionale", "principio"]
-            for urn in context.norm_references[:2]:
+        if graph_tool and urns_to_explore:
+            # Relazioni reali nel grafo per principi (ESPRIME_PRINCIPIO: 740 occorrenze)
+            principle_relations = ["ESPRIME_PRINCIPIO", "DISCIPLINA", "interpreta", "commenta"]
+
+            log.debug(
+                f"PrinciplesExpert graph expansion",
+                urns_count=len(urns_to_explore),
+                urns=list(urns_to_explore)[:3]
+            )
+
+            for urn in list(urns_to_explore)[:3]:
                 try:
                     result = await graph_tool(
                         start_node=urn,
@@ -293,17 +383,28 @@ IMPORTANTE:
                         max_hops=2
                     )
                     if result.success:
-                        for node in result.data.get("nodes", []):
+                        graph_nodes = result.data.get("nodes", [])
+                        log.debug(
+                            f"Principles expansion for {urn[:50]}...",
+                            nodes_found=len(graph_nodes)
+                        )
+                        for node in graph_nodes:
                             node_type = node.get("type", "")
                             if "Principio" in node_type or "Costituzionale" in node_type:
                                 principles.append({
                                     "text": node.get("properties", {}).get("testo", ""),
                                     "urn": node.get("urn", ""),
                                     "type": node_type,
-                                    "source": "principle_graph"
+                                    "source": "principle_graph",
+                                    "source_urn": urn
                                 })
                 except Exception as e:
                     log.warning(f"Graph principle search failed: {e}")
+
+        log.info(
+            f"PrinciplesExpert principles found",
+            total=len(principles)
+        )
 
         return principles
 
@@ -395,6 +496,8 @@ IMPORTANTE:
             sections.append(f"\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
 
         if context.retrieved_chunks:
+            sections.append("⚠️ USA ESATTAMENTE il source_id indicato per ogni fonte nel campo legal_basis!")
+
             # Separa fonti per tipo
             norms = [c for c in context.retrieved_chunks if c.get("source") not in ["principles_search", "principle_graph"]]
             principles = [c for c in context.retrieved_chunks if c.get("source") in ["principles_search", "principle_graph"]]
@@ -403,16 +506,26 @@ IMPORTANTE:
                 sections.append("\n## NORME ORDINARIE")
                 for i, chunk in enumerate(norms[:5], 1):
                     text = chunk.get("text", "")
+                    chunk_id = chunk.get("chunk_id", chunk.get("urn", f"norm_{i}"))
                     urn = chunk.get("urn", "N/A")
-                    sections.append(f"\n### Norma {i} (URN: {urn})\n{text}")
+                    source_type = chunk.get("source_type", "norma")
+                    sections.append(f"\n### Norma {i}")
+                    sections.append(f"- **source_id**: `{chunk_id}` ← USA QUESTO ESATTO VALORE")
+                    sections.append(f"- **urn**: {urn}")
+                    sections.append(f"- **source_type**: {source_type}")
+                    sections.append(f"- **testo**:\n{text}")
 
             if principles:
                 sections.append("\n## PRINCIPI E NORME COSTITUZIONALI/EU")
                 for i, chunk in enumerate(principles[:5], 1):
                     text = chunk.get("text", "")
+                    chunk_id = chunk.get("chunk_id", chunk.get("urn", f"principle_{i}"))
                     urn = chunk.get("urn", "N/A")
                     p_type = chunk.get("type", "Principio")
-                    sections.append(f"\n### {p_type} {i} (URN: {urn})\n{text}")
+                    sections.append(f"\n### {p_type} {i}")
+                    sections.append(f"- **source_id**: `{chunk_id}` ← USA QUESTO ESATTO VALORE")
+                    sections.append(f"- **urn**: {urn}")
+                    sections.append(f"- **testo**:\n{text}")
 
         return "\n".join(sections)
 

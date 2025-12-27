@@ -104,3 +104,6 @@ dump.rdb
 *.piddata/
 *db*
 data/*
+
+#Experiments
+docs/experiments/*

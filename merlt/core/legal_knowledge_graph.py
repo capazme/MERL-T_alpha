@@ -144,7 +144,8 @@ class MerltConfig:
 
     def __post_init__(self):
         if self.qdrant_collection is None:
-            self.qdrant_collection = self.graph_name
+            # Convention: qdrant collection is {graph_name}_chunks
+            self.qdrant_collection = f"{self.graph_name}_chunks"
 
 
 @dataclass

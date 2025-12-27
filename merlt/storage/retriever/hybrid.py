@@ -138,12 +138,34 @@ class GraphAwareRetriever:
         enriched_results = []
 
         for vr in vector_results:
-            # Find graph nodes linked to this chunk
-            linked_nodes = await self.bridge.get_nodes_for_chunk(vr.chunk_id)
+            # Get article_urn from payload metadata (more reliable than chunk_id)
+            article_urn = vr.metadata.get("article_urn", "")
+
+            # Find graph nodes linked to this article via FalkorDB
+            # This is more reliable than bridge table since it queries the graph directly
+            if article_urn and hasattr(self.graph_db, 'get_related_nodes_for_article'):
+                linked_nodes = await self.graph_db.get_related_nodes_for_article(
+                    article_urn,
+                    max_results=10
+                )
+                # Convert to expected format for graph_score calculation
+                linked_nodes = [
+                    {
+                        "graph_node_urn": node.get("node_urn") or node.get("node_nome", ""),
+                        "node_type": node.get("node_label", ""),
+                        "relation_type": node.get("rel_type", ""),
+                        "direction": node.get("direction", ""),
+                        "metadata": node
+                    }
+                    for node in linked_nodes
+                ]
+            else:
+                # Fallback to bridge table (may not work if chunk_id mismatch)
+                linked_nodes = await self.bridge.get_nodes_for_chunk(vr.chunk_id)
 
             # Compute graph score
             graph_score = await self._compute_graph_score(
-                chunk_nodes=[node["graph_node_urn"] for node in linked_nodes],
+                chunk_nodes=[node["graph_node_urn"] for node in linked_nodes if node.get("graph_node_urn")],
                 context_nodes=context_nodes or [],
                 expert_type=expert_type
             )
@@ -196,25 +218,43 @@ class GraphAwareRetriever:
             log.warning("vector_db not configured, returning empty results")
             return []
 
-        # Qdrant search API
-        # NOTE: Actual implementation depends on Qdrant client
-        # This is a generic interface
+        # Qdrant query_points API (qdrant-client >= 1.16)
         try:
-            results = await self.vector_db.search(
-                collection_name="legal_chunks",
-                query_vector=query_embedding,
-                limit=limit
+            # Use collection name from config
+            collection_name = self.config.collection_name
+
+            # query_points() is the correct API for qdrant-client 1.16+
+            response = self.vector_db.query_points(
+                collection_name=collection_name,
+                query=query_embedding,
+                limit=limit,
             )
 
-            return [
-                VectorSearchResult(
-                    chunk_id=UUID(r.id),
-                    text=r.payload.get("text", ""),
+            results = []
+            for r in response.points:
+                # Handle both UUID and integer IDs from Qdrant
+                if isinstance(r.id, int):
+                    # For integer IDs, create a deterministic UUID from the int
+                    import hashlib
+                    id_hash = hashlib.md5(str(r.id).encode()).hexdigest()
+                    chunk_id = UUID(id_hash[:8] + '-' + id_hash[8:12] + '-' + id_hash[12:16] + '-' + id_hash[16:20] + '-' + id_hash[20:32])
+                elif isinstance(r.id, UUID):
+                    chunk_id = r.id
+                else:
+                    try:
+                        chunk_id = UUID(str(r.id))
+                    except ValueError:
+                        # Fallback: create UUID from string hash
+                        id_hash = hashlib.md5(str(r.id).encode()).hexdigest()
+                        chunk_id = UUID(id_hash[:8] + '-' + id_hash[8:12] + '-' + id_hash[12:16] + '-' + id_hash[16:20] + '-' + id_hash[20:32])
+
+                results.append(VectorSearchResult(
+                    chunk_id=chunk_id,
+                    text=r.payload.get("text", "") if r.payload else "",
                     similarity_score=r.score,
-                    metadata=r.payload
-                )
-                for r in results
-            ]
+                    metadata=r.payload or {}
+                ))
+            return results
 
         except Exception as e:
             log.error(f"Vector search failed: {e}")
@@ -229,11 +269,11 @@ class GraphAwareRetriever:
         """
         Step 2: Compute graph-based relevance score.
 
-        Algorithm:
-            1. For each (chunk_node, context_node) pair:
-               - Find shortest path in graph (max_hops)
-               - Score path based on length + relation weights
-            2. Return max score across all pairs
+        Algorithm con strategie di fallback:
+            1. Se no context_nodes → usa centrality score del chunk_node
+            2. Se context_nodes → trova shortest path
+            3. Se no path found → usa relation density come fallback
+            4. MAI ritornare default 0.5 se possiamo calcolare qualcosa
 
         Args:
             chunk_nodes: Graph node URNs linked to the chunk
@@ -246,9 +286,17 @@ class GraphAwareRetriever:
         if not self.config.enable_graph_enrichment:
             return self.config.default_graph_score
 
-        if not context_nodes or not chunk_nodes:
+        # Case 1: No chunk nodes at all
+        if not chunk_nodes:
             return self.config.default_graph_score
 
+        # Case 2: No context nodes - use centrality score
+        if not context_nodes:
+            centrality = await self._compute_centrality_score(chunk_nodes[0])
+            log.debug(f"Using centrality score: {centrality:.3f} (no context nodes)")
+            return centrality
+
+        # Case 3: Normal path-based scoring
         max_score = 0.0
 
         for chunk_node in chunk_nodes:
@@ -264,7 +312,95 @@ class GraphAwareRetriever:
                     path_score = self._score_path(path, expert_type)
                     max_score = max(max_score, path_score)
 
-        return max_score if max_score > 0 else self.config.default_graph_score
+        # Case 4: No path found - use relation density as fallback
+        if max_score == 0.0:
+            density = await self._compute_relation_density(chunk_nodes, context_nodes)
+            log.debug(f"Using relation density fallback: {density:.3f} (no path found)")
+            return density
+
+        return max_score
+
+    async def _compute_centrality_score(self, node_urn: str) -> float:
+        """
+        Compute centrality score based on node degree.
+
+        Nodi con più relazioni sono generalmente più importanti/connessi
+        nel sistema giuridico.
+
+        Formula: min(degree / 10.0, 1.0)
+
+        Args:
+            node_urn: URN del nodo da valutare
+
+        Returns:
+            Centrality score [0, 1]
+        """
+        try:
+            cypher = """
+                MATCH (n) WHERE n.URN = $urn OR n.nome = $urn
+                MATCH (n)-[r]-()
+                RETURN count(r) as degree
+            """
+            result = await self.graph_db.query(cypher, {"urn": node_urn})
+
+            if result:
+                degree = result[0].get("degree", 0)
+                # Normalize: 10+ relations = max score
+                score = min(degree / 10.0, 1.0)
+                return max(score, 0.2)  # Minimum 0.2 if node exists
+
+            return 0.3  # Node exists but no relations
+
+        except Exception as e:
+            log.debug(f"Centrality computation failed for {node_urn}: {e}")
+            return 0.3
+
+    async def _compute_relation_density(
+        self,
+        chunk_nodes: List[str],
+        context_nodes: List[str]
+    ) -> float:
+        """
+        Compute relation density via shared neighbors.
+
+        Anche senza path diretto, due nodi possono avere vicini comuni,
+        indicando correlazione semantica nel grafo.
+
+        Formula: min(shared_neighbors / 5.0, 0.8)
+
+        Args:
+            chunk_nodes: URN dei nodi chunk
+            context_nodes: URN dei nodi context
+
+        Returns:
+            Density score [0, 0.8] - capped at 0.8 perché path diretto è meglio
+        """
+        try:
+            # Query for shared neighbors between chunk and context nodes
+            cypher = """
+                UNWIND $chunks AS c
+                UNWIND $contexts AS x
+                MATCH (a) WHERE a.URN = c OR a.nome = c
+                MATCH (b) WHERE b.URN = x OR b.nome = x
+                MATCH (a)--(shared)--(b)
+                RETURN count(DISTINCT shared) AS cnt
+            """
+            result = await self.graph_db.query(cypher, {
+                "chunks": chunk_nodes[:3],  # Limit per performance
+                "contexts": context_nodes[:3]
+            })
+
+            if result:
+                shared_count = result[0].get("cnt", 0)
+                # 5+ shared neighbors = 0.8 (capped)
+                score = min(shared_count / 5.0, 0.8)
+                return max(score, 0.2)  # Minimum 0.2 se ci sono nodi
+
+            return 0.2  # Fallback minimo
+
+        except Exception as e:
+            log.debug(f"Relation density computation failed: {e}")
+            return 0.2
 
     async def _find_shortest_path(
         self,
@@ -285,8 +421,8 @@ class GraphAwareRetriever:
         """
         try:
             result = await self.graph_db.shortest_path(
-                start_node_urn=source,
-                end_node_urn=target,
+                start_node=source,
+                end_node=target,
                 max_hops=max_hops
             )
 
