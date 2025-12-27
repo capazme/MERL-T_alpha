@@ -1,8 +1,8 @@
 # =============================================================================
-# MERL-T Streamlit Application Dockerfile
+# MERL-T Streamlit Application Dockerfile (CPU-only, lightweight)
 # =============================================================================
 #
-# Multi-stage build for optimized production image
+# Ottimizzato per server senza GPU - usa PyTorch CPU-only (~200MB vs 2.5GB)
 #
 # Usage:
 #   docker build -f Dockerfile.streamlit -t merl-t-streamlit .
@@ -24,24 +24,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY pyproject.toml ./
-COPY requirements*.txt ./
-
-# Create virtual environment and install dependencies
+# Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install from pyproject.toml or requirements.txt
-RUN pip install --no-cache-dir --upgrade pip && \
-    if [ -f requirements.txt ]; then \
-        pip install --no-cache-dir -r requirements.txt; \
-    else \
-        pip install --no-cache-dir .; \
-    fi
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
 
-# Install Streamlit explicitly (in case not in requirements)
-RUN pip install --no-cache-dir streamlit
+# Install PyTorch CPU-only FIRST (much smaller than CUDA version)
+RUN pip install --no-cache-dir \
+    torch --index-url https://download.pytorch.org/whl/cpu
+
+# Copy and install requirements (excluding torch since already installed)
+COPY requirements.txt ./
+RUN grep -v "^torch" requirements.txt > requirements-no-torch.txt && \
+    pip install --no-cache-dir -r requirements-no-torch.txt || true
+
+# Install essential packages explicitly
+RUN pip install --no-cache-dir \
+    streamlit \
+    structlog \
+    pyyaml \
+    redis \
+    asyncpg \
+    qdrant-client \
+    sentence-transformers \
+    aiohttp \
+    httpx
 
 # -----------------------------------------------------------------------------
 # Stage 2: Runtime (minimal production image)
@@ -64,11 +73,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY merlt/ ./merlt/
 COPY apps/ ./apps/
 
-# Create logs directory (will be mounted as volume in production)
-RUN mkdir -p ./logs
-
-# Set ownership
-RUN chown -R appuser:appuser /app
+# Create logs directory
+RUN mkdir -p ./logs && chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
@@ -78,7 +84,6 @@ ENV STREAMLIT_SERVER_PORT=8501
 ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
 ENV STREAMLIT_SERVER_HEADLESS=true
 ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
-ENV STREAMLIT_THEME_BASE=light
 
 # Expose port
 EXPOSE 8501
@@ -87,5 +92,5 @@ EXPOSE 8501
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8501/_stcore/health || exit 1
 
-# Default command: run expert_debugger
+# Default command
 CMD ["streamlit", "run", "apps/expert_debugger.py", "--server.port=8501", "--server.address=0.0.0.0"]
