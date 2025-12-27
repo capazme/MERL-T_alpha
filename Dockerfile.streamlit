@@ -13,7 +13,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Builder (install dependencies)
 # -----------------------------------------------------------------------------
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -46,7 +46,7 @@ RUN pip install --no-cache-dir streamlit
 # -----------------------------------------------------------------------------
 # Stage 2: Runtime (minimal production image)
 # -----------------------------------------------------------------------------
-FROM python:3.11-slim as runtime
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
@@ -63,7 +63,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy application code
 COPY merlt/ ./merlt/
 COPY apps/ ./apps/
-COPY logs/ ./logs/ 2>/dev/null || mkdir -p ./logs
+
+# Create logs directory (will be mounted as volume in production)
+RUN mkdir -p ./logs
 
 # Set ownership
 RUN chown -R appuser:appuser /app
